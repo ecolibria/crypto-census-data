@@ -1,2 +1,15 @@
 node_modules/
 .DS_Store
+
+# Nothing here should ever hold a credential -- this repository publishes
+# public measurements and runs no service. These patterns exist so that a
+# future contributor's stray file cannot become a public one by accident.
+.env
+.env.*
+!.env.example
+secrets.json
+credentials.json
+*.pem
+*.key
+*.p12
+*.pfx
