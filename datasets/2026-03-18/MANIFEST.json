@@ -1,0 +1,37 @@
+{
+  "dataset": "CryptoServe Census corpus layer, March 2026",
+  "kind": "aggregate-only",
+  "generatedAt": "2026-07-28T20:23:34.302Z",
+  "license": "CC-BY-4.0",
+  "provenance": {
+    "sourceRepository": null,
+    "sourceCommit": null,
+    "workflowRun": null
+  },
+  "provenanceNote": "The raw per-package output of this scan does not exist. It was written to scan-results-*.json at the repository root, which matched a line in .gitignore, so it was never committed; it was searched for on 2026-07-27 across local disk, all 13 connected GitHub organisations and GitHub code search, and found nowhere. The aggregate survived because it was committed, and survived twice over: in data/corpus/corpus-2026-03-18.json and in the CC-BY-4.0 scan summary served at census.cryptoserve.dev/data/scan-summary-2026-03.json. The two agree exactly. This dataset is published as aggregate-only for that reason, and it is why the scan pipeline now persists raw output as a build artifact and fails when it produces nothing.",
+  "corpus": {
+    "file": "corpus-2026-03-18.json",
+    "collectedAt": "2026-03-18",
+    "packagesScanned": 2809479,
+    "packagesWithCrypto": 108145,
+    "bytes": 3008,
+    "sha256": "3c13b3163199e6f10ec6763234c63d42dee4d486f622604c48ea59b640af2d98"
+  },
+  "ecosystems": [],
+  "ecosystemCount": 11,
+  "totalScanned": 2809479,
+  "totalWithCrypto": 108145,
+  "knownIssues": [
+    {
+      "ecosystem": "hex",
+      "defect": "detector-read-a-field-that-does-not-exist",
+      "direction": "understates"
+    },
+    {
+      "ecosystem": "pub",
+      "defect": "enumeration-capped-at-one-page",
+      "direction": "understates"
+    }
+  ],
+  "note": "Aggregate counts of packages examined per ecosystem and how they classify across the weak, modern and PQC tiers. Two ecosystems carry a knownIssue recording a defect in the scanner that produced their row; the figures are annotated rather than edited, because a published corpus is dated evidence. See knownIssues."
+}

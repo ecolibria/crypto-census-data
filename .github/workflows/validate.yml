@@ -1,0 +1,52 @@
+name: Validate datasets
+
+# Two properties, both of which a citation depends on:
+#
+#   1. Every published dataset still matches the hashes recorded for it, and is
+#      internally consistent with its own aggregate.
+#   2. No already-published dataset is being rewritten by this change.
+#
+# The second cannot run on `push` alone -- it needs a base to compare against --
+# so it is scoped to pull requests, while validation runs on both.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Hashes, schema and arithmetic
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate every dataset
+        run: node scripts/validate-dataset.mjs
+
+  immutable:
+    name: No published dataset is rewritten
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # check-immutable.mjs diffs against the merge base, so the history
+          # between base and head has to be present. A shallow clone reports
+          # every file as added and the check passes without checking anything.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check immutability against the base branch
+        run: node scripts/check-immutable.mjs "origin/${{ github.base_ref }}"

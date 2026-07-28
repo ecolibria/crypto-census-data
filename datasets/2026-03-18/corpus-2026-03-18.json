@@ -1,0 +1,93 @@
+{
+  "collectedAt": "2026-03-18",
+  "packagesScanned": 2809479,
+  "packagesWithCrypto": 108145,
+  "withWeakCrypto": 21332,
+  "withModernOnly": 86625,
+  "withPqcReady": 188,
+  "withNoCrypto": 2701334,
+  "weakShareOfCryptoUsing": 19.7,
+  "pqcShareOfCryptoUsing": 0.17,
+  "byEcosystem": {
+    "npm": {
+      "scanned": 1000000,
+      "weakExposed": 5690,
+      "modernOnly": 20172,
+      "pqcReady": 43
+    },
+    "pypi": {
+      "scanned": 400000,
+      "weakExposed": 712,
+      "modernOnly": 10444,
+      "pqcReady": 18
+    },
+    "go": {
+      "scanned": 500008,
+      "weakExposed": 8305,
+      "modernOnly": 32443,
+      "pqcReady": 17
+    },
+    "maven": {
+      "scanned": 111200,
+      "weakExposed": 2185,
+      "modernOnly": 2048,
+      "pqcReady": 0
+    },
+    "crates": {
+      "scanned": 233171,
+      "weakExposed": 3394,
+      "modernOnly": 14689,
+      "pqcReady": 109
+    },
+    "packagist": {
+      "scanned": 200000,
+      "weakExposed": 380,
+      "modernOnly": 1934,
+      "pqcReady": 0
+    },
+    "nuget": {
+      "scanned": 200000,
+      "weakExposed": 533,
+      "modernOnly": 3296,
+      "pqcReady": 1
+    },
+    "rubygems": {
+      "scanned": 100000,
+      "weakExposed": 83,
+      "modernOnly": 1305,
+      "pqcReady": 0
+    },
+    "hex": {
+      "scanned": 15000,
+      "weakExposed": 0,
+      "modernOnly": 0,
+      "pqcReady": 0,
+      "knownIssue": {
+        "defect": "detector-read-a-field-that-does-not-exist",
+        "summary": "The scanner read `requirements` from the release entries in /api/packages/<name>, which carry only version, url, has_docs and inserted_at. The dependency list was therefore empty for every package on hex.pm and all 15,000 were classified as using no cryptography. phoenix, which requires the catalogued plug_crypto, was counted as crypto-free.",
+        "affects": ["weakExposed", "modernOnly", "pqcReady"],
+        "direction": "understates",
+        "correctedIn": "scripts/scan-hex.mjs, 2026-07-28. Against the fixed scanner 9 of the top 300 Hex packages by downloads resolve to a catalogued dependency. The corrected figures land with the next published corpus."
+      }
+    },
+    "pub": {
+      "scanned": 100,
+      "weakExposed": 0,
+      "modernOnly": 0,
+      "pqcReady": 0,
+      "knownIssue": {
+        "defect": "enumeration-capped-at-one-page",
+        "summary": "Enumeration paginated /api/search with an empty query, and pub.dev caps a blank search at ten pages of ten. It scanned 100 packages of the roughly 86,000 pub.dev publishes, and reported no fetch errors while doing it.",
+        "affects": ["scanned", "weakExposed", "modernOnly", "pqcReady"],
+        "direction": "understates",
+        "correctedIn": "scripts/scan-pub.mjs, 2026-07-28. /api/package-names returns every name in one response; verified live at 85,865. The corrected figures land with the next published corpus."
+      }
+    },
+    "cocoapods": {
+      "scanned": 50000,
+      "weakExposed": 50,
+      "modernOnly": 294,
+      "pqcReady": 0
+    }
+  }
+}

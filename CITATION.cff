@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+title: CryptoServe Census
+message: >-
+  Cite the dated dataset you used, not the repository. Each directory under
+  datasets/ is an independent, immutable release with its own collection date.
+type: dataset
+authors:
+  - name: CryptoServe
+    website: https://census.cryptoserve.dev
+license: CC-BY-4.0
+repository-code: https://github.com/opena2a-org/crypto-census-data
+url: https://census.cryptoserve.dev
+abstract: >-
+  Cryptographic dependency adoption across eleven public package registries.
+  Each dataset records, per ecosystem, how many packages were examined and how
+  many depend on a catalogued cryptographic library, split across weak, modern
+  and post-quantum tiers. Counts are of packages examined, not of packages using
+  cryptography; every published share is over the crypto-using subset.
+keywords:
+  - cryptography
+  - post-quantum cryptography
+  - software supply chain
+  - package registries
+  - dependency analysis
