@@ -129,6 +129,20 @@ function validate(name) {
       'Publish it as raw+aggregate.');
   }
 
+  // A partial run must say it is partial.
+  //
+  // The scan workflow cannot publish one -- its aggregate step depends on every
+  // ecosystem scan succeeding, so a failed or cancelled scan stops the run
+  // before anything is produced. This covers the path that does not go through
+  // the workflow: a dataset committed by hand, where a missing ecosystem is
+  // invisible in every total and reads as a fall in adoption rather than as an
+  // absent measurement.
+  if (kind.requiresRaw && manifest.complete !== true && !manifest.partialReason) {
+    fail(name, `complete is ${JSON.stringify(manifest.complete)} and no partialReason is given. ` +
+      `The dataset covers ${manifest.ecosystemCount} ecosystem(s); a reader comparing its total ` +
+      'against a previous dataset would read the missing ones as a drop rather than as a gap.');
+  }
+
   if (kind.requiresProvenance) {
     for (const field of ['sourceRepository', 'sourceCommit', 'workflowRun']) {
       if (!manifest.provenance?.[field]) {
