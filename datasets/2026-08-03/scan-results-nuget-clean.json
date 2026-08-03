@@ -7,12 +7,13 @@
   "fetchErrors": 6855,
   "summary": {
     "scanned": 100000,
-    "weakExposed": 205,
-    "modernOnly": 1713,
+    "weakExposed": 204,
+    "modernOnly": 1707,
     "pqcReady": 0,
     "noCrypto": 98082,
     "weakExposureRate": 0.2,
-    "pqcAdoptionRate": 0
+    "pqcAdoptionRate": 0,
+    "withCrypto": 1911
   },
   "projects": [
     {
@@ -33181,5 +33182,5 @@
       "pqcRate": "0.0%"
     }
   },
-  "qcAppliedAt": "2026-08-03T22:15:39.903Z"
+  "qcAppliedAt": "2026-08-03T22:34:16.139Z"
 }

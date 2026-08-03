@@ -11,62 +11,71 @@
   "byEcosystem": {
     "npm": {
       "scanned": 1000000,
-      "weakExposed": 4988,
-      "modernOnly": 19075,
-      "pqcReady": 124
+      "weakExposed": 3146,
+      "modernOnly": 7035,
+      "pqcReady": 68
     },
     "pypi": {
       "scanned": 150000,
-      "weakExposed": 204,
-      "modernOnly": 4843,
+      "weakExposed": 201,
+      "modernOnly": 4799,
       "pqcReady": 19
     },
     "go": {
       "scanned": 200117,
-      "weakExposed": 3620,
-      "modernOnly": 12435,
+      "weakExposed": 3244,
+      "modernOnly": 10094,
       "pqcReady": 5
     },
     "maven": {
       "scanned": 103400,
-      "weakExposed": 2100,
-      "modernOnly": 1842,
-      "pqcReady": 0
+      "weakExposed": 895,
+      "modernOnly": 1062,
+      "pqcReady": 0,
+      "enumeration": {
+        "truncated": true,
+        "reason": "wall-clock budget reached",
+        "requested": 150000,
+        "collected": 103400,
+        "unit": "artifacts",
+        "budgetMinutes": 240,
+        "elapsedMinutes": 240.39
+      }
     },
     "crates": {
       "scanned": 302477,
-      "weakExposed": 4558,
-      "modernOnly": 24955,
-      "pqcReady": 263
+      "weakExposed": 4460,
+      "modernOnly": 24485,
+      "pqcReady": 259
     },
     "packagist": {
       "scanned": 100000,
       "weakExposed": 177,
-      "modernOnly": 977,
+      "modernOnly": 976,
       "pqcReady": 0
     },
     "nuget": {
       "scanned": 100000,
-      "weakExposed": 205,
-      "modernOnly": 1713,
+      "weakExposed": 204,
+      "modernOnly": 1707,
       "pqcReady": 0
     },
     "rubygems": {
       "scanned": 100000,
       "weakExposed": 83,
-      "modernOnly": 1243,
+      "modernOnly": 1231,
       "pqcReady": 0
     },
     "hex": {
       "scanned": 15000,
       "weakExposed": 3,
-      "modernOnly": 318,
+      "modernOnly": 314,
       "pqcReady": 0
     },
     "pub": {
       "scanned": 50000,
       "weakExposed": 0,
-      "modernOnly": 864,
+      "modernOnly": 860,
       "pqcReady": 2
     },
     "cocoapods": {

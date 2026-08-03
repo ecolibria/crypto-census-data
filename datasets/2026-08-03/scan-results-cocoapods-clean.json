@@ -12,7 +12,8 @@
     "pqcReady": 0,
     "noCrypto": 49643,
     "weakExposureRate": 0.1,
-    "pqcAdoptionRate": 0
+    "pqcAdoptionRate": 0,
+    "withCrypto": 357
   },
   "projects": [
     {
@@ -5952,5 +5953,5 @@
       "pqcRate": "0.0%"
     }
   },
-  "qcAppliedAt": "2026-08-03T22:15:40.117Z"
+  "qcAppliedAt": "2026-08-03T22:34:16.416Z"
 }

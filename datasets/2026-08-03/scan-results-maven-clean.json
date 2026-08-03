@@ -16,12 +16,13 @@
   },
   "summary": {
     "scanned": 103400,
-    "weakExposed": 2100,
-    "modernOnly": 1842,
+    "weakExposed": 895,
+    "modernOnly": 1062,
     "pqcReady": 0,
     "noCrypto": 99458,
     "weakExposureRate": 2,
-    "pqcAdoptionRate": 0
+    "pqcAdoptionRate": 0,
+    "withCrypto": 1957
   },
   "projects": [
     {
@@ -36147,5 +36148,5 @@
       "pqcRate": "0.0%"
     }
   },
-  "qcAppliedAt": "2026-08-03T22:15:39.754Z"
+  "qcAppliedAt": "2026-08-03T22:34:15.947Z"
 }

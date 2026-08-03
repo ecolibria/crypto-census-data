@@ -7,12 +7,13 @@
   "parseErrors": 12,
   "summary": {
     "scanned": 302477,
-    "weakExposed": 4558,
-    "modernOnly": 24955,
-    "pqcReady": 263,
+    "weakExposed": 4460,
+    "modernOnly": 24485,
+    "pqcReady": 259,
     "noCrypto": 272701,
     "weakExposureRate": 1.5,
-    "pqcAdoptionRate": 0.1
+    "pqcAdoptionRate": 0.1,
+    "withCrypto": 29204
   },
   "projects": [
     {
@@ -608955,5 +608956,5 @@
       "pqcRate": "0.1%"
     }
   },
-  "qcAppliedAt": "2026-08-03T22:15:39.025Z"
+  "qcAppliedAt": "2026-08-03T22:34:15.517Z"
 }
