@@ -1,0 +1,119 @@
+{
+  "dataset": "CryptoServe Census corpus layer, raw per-package scan output",
+  "kind": "raw+aggregate",
+  "generatedAt": "2026-08-03T22:16:13.373Z",
+  "license": "CC-BY-4.0",
+  "provenance": {
+    "sourceRepository": "opena2a-org/crypto-census",
+    "sourceCommit": "aa80da4b446abdac0e9d137d42da5e55446be63d",
+    "workflowRun": "https://github.com/opena2a-org/crypto-census/actions/runs/30839067824"
+  },
+  "corpus": {
+    "file": "corpus-2026-08-03.json",
+    "collectedAt": "2026-08-03",
+    "packagesScanned": 2170994,
+    "packagesWithCrypto": 65686,
+    "bytes": 40485,
+    "sha256": "d0872c9e98372bc6d12f8e7e7f7b6067b9d637c0919a91003a89fcbc7cd92889"
+  },
+  "knownIssues": [],
+  "ecosystemCount": 11,
+  "totalScanned": 2170994,
+  "totalWithCrypto": 65686,
+  "ecosystemsMissingCounts": [],
+  "ecosystemsBelowPlausibleMinimum": [],
+  "ecosystemsWithNoDetections": [],
+  "ecosystemsWithoutPlausibleMinimum": [],
+  "complete": true,
+  "note": "Each file is the quality-controlled output of one ecosystem scan: deduplicated, spam-filtered, namespace-consolidated. Counts are of packages examined, not of packages using cryptography -- see totalWithCrypto per ecosystem. Scan limits are recorded per ecosystem in the workflow that produced this run and are not tuned to reproduce any previously published figure.",
+  "ecosystems": [
+    {
+      "ecosystem": "cocoapods",
+      "file": "scan-results-cocoapods-clean.json",
+      "totalScanned": 50000,
+      "totalWithCrypto": 357,
+      "bytes": 121076,
+      "sha256": "d74ce61061be59aa8d002f04df540fa9f575627f0b2997aea4d9fde5212c169c"
+    },
+    {
+      "ecosystem": "crates",
+      "file": "scan-results-crates-clean.json",
+      "totalScanned": 302477,
+      "totalWithCrypto": 29204,
+      "bytes": 12102247,
+      "sha256": "025d53cbf05c460dda8525825a5ae4b5e7ff902569d58746f63a1f93d6995f73"
+    },
+    {
+      "ecosystem": "go",
+      "file": "scan-results-go-clean.json",
+      "totalScanned": 200117,
+      "totalWithCrypto": 13343,
+      "bytes": 5090826,
+      "sha256": "cd10451c36c96c9c5daef7399e7021b7e7bfd4c2dcc70c440ba9984f12732180"
+    },
+    {
+      "ecosystem": "hex",
+      "file": "scan-results-hex-clean.json",
+      "totalScanned": 15000,
+      "totalWithCrypto": 317,
+      "bytes": 109177,
+      "sha256": "308f6bc0a583ee78292438ef62f53ec23e3202fe03a9e23fb01faad95cdde1d9"
+    },
+    {
+      "ecosystem": "maven",
+      "file": "scan-results-maven-clean.json",
+      "totalScanned": 103400,
+      "totalWithCrypto": 1957,
+      "bytes": 820823,
+      "sha256": "7eb4b9b05fa13dc50d8f82ee3d580d36ccb3117ffa7d6914cdeaac04c12512cb"
+    },
+    {
+      "ecosystem": "npm",
+      "file": "scan-results-npm-clean.json",
+      "totalScanned": 1000000,
+      "totalWithCrypto": 10249,
+      "bytes": 3668265,
+      "sha256": "1721bd42174cbc57eebe860a81a5e18f6405b57abe3ce64d4e95a6ec27c4bebf"
+    },
+    {
+      "ecosystem": "nuget",
+      "file": "scan-results-nuget-clean.json",
+      "totalScanned": 100000,
+      "totalWithCrypto": 1911,
+      "bytes": 721803,
+      "sha256": "7ff694f9f9144f309264c37bbef1b0275e1d473034305332a00819779d6cb92d"
+    },
+    {
+      "ecosystem": "packagist",
+      "file": "scan-results-packagist-clean.json",
+      "totalScanned": 100000,
+      "totalWithCrypto": 1153,
+      "bytes": 407272,
+      "sha256": "2bc6a17258f3874a4b84a7e564339febca3d15f0fd81a61a4753a999f2503cbe"
+    },
+    {
+      "ecosystem": "pub",
+      "file": "scan-results-pub-clean.json",
+      "totalScanned": 50000,
+      "totalWithCrypto": 862,
+      "bytes": 298263,
+      "sha256": "a20c0e126f236a03a8f1d7e4ccc19e807dcf834a97ee6e49ef7845bd69c024c0"
+    },
+    {
+      "ecosystem": "pypi",
+      "file": "scan-results-pypi-clean.json",
+      "totalScanned": 150000,
+      "totalWithCrypto": 5019,
+      "bytes": 1761487,
+      "sha256": "0c6296e3b57551b711f9dcddaaf5898b7b719e84991d9979b353999a0261467a"
+    },
+    {
+      "ecosystem": "rubygems",
+      "file": "scan-results-rubygems-clean.json",
+      "totalScanned": 100000,
+      "totalWithCrypto": 1314,
+      "bytes": 438264,
+      "sha256": "18127b6b6995a981752adf94330a6f0911bcc444acb82b756a4e17905c1eb8e2"
+    }
+  ]
+}

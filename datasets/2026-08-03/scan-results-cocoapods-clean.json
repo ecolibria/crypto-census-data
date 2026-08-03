@@ -1,0 +1,5956 @@
+{
+  "ecosystem": "cocoapods",
+  "scannedAt": "2026-08-03T18:29:03.655Z",
+  "totalScanned": 50000,
+  "totalWithCrypto": 357,
+  "totalWithoutCrypto": 49643,
+  "fetchErrors": 1,
+  "summary": {
+    "scanned": 50000,
+    "weakExposed": 52,
+    "modernOnly": 305,
+    "pqcReady": 0,
+    "noCrypto": 49643,
+    "weakExposureRate": 0.1,
+    "pqcAdoptionRate": 0
+  },
+  "projects": [
+    {
+      "name": "bfy",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "VGAMESDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "DFIDSwift",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "YouverseSDKmrz",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Cenarius",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "HBPPodTest",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ParaClient",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "CBLoyality",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "DoubleRatchet",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "sodium",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "GeekDataKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Cryptex",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SSLE",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ScanSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "DebuggIt",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "rncryptor",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "eNotesSDKPre",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Personalization",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "KonboardingKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "OP_NFCPassportReader",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "WalletConnectSwift",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "REIOSSDK_48469b6c_7024_41a4_97b3_702b052eb6e4",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "idzswiftcommoncrypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "TTCSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "teemov2",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "rncryptor",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Poco-standard",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Nervos",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "sodium",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "IngenicoConnectKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "CoreBitcoin",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "looisweb3swift",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "HPBWeb3SDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "BGPaySDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "AppManager",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "NetworkingServiceKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "IDCardReader",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "RTMTokenBuilder",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "XRAnalyticsSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Vite_HDWalletKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "CoinQPay",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "WorldlineConnectKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "MeteorDDP",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ParticleMPCCore",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "JRUtils",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Evoker",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "RMStore",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "PodTFRecords",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "FDencryptionTool",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "RNWebAuthnKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ContractSwift.Library",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "DUCommon",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "testsss",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Straal",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "idzswiftcommoncrypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "DDView",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "REIOSSDKDev4",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "checkidsdk",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "JRwhitecard",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ZelloSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "DuiduiBabeUtil",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "FPhiNFCiOS",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "BCDramaPureLib",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "checkid_ios",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ProjectBaseEnv",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "HFSecurity",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "rncryptor",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "lib-auth",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SwiftCommonsData",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "VideoKYC",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "BluFi",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "EventflitSwift",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "XBLoginSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "web3swift-beta",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "NeoSDKCall",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Web3Forked",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ScryptSwift",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "AiTmedSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "sodium",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "UDWrapper",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "OkayIDLite",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "IAWExtensionTool",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "rncryptor",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "OkayID",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "PKCS12",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Commerce",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "NestAdsSdkDev",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "KrakenCrypto",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "YJDownloader",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SwifterUtils",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "HVNFCReaderSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "MySwiftPods",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "CruxPay",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "GizwitsiOSSDKThirdDevice",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "XXMTools",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "WintopaySDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "goSellAppClipSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "PlusPagosFirm",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "xiluAdSdk",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "JNDZUtilsForPods",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "NFCPassportReader",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "CarloudyiOS",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SuitestBeta",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "scrypt",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SolanaWeb3",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "tweetnacl",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "LFLiveKit_",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "IngenicoDirectKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "WC-Swift",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "PbSwiftLibrary",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "shareid-sdk-ios",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "privatepjsip",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SnappyImg",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Blockstack",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "VBotPhoneSDKiOS-Private",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "GhostPlusSwift",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "RcBaseModule",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SocialWalletSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Authentication",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "reoqooKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "cagrpc",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "PublicToolsKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "MMAnalyticsSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "HaventecCommon",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "HbpSdk",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "REIOSSDK_8029a331_0cb7_4e02_8bbf_125f9472c3ea",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "idzswiftcommoncrypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "DMSOpenPGP",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "BVSmartHome",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "PrimedSwift",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "MyTestLibrary",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "TokenRealmCore",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "MICRReader",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "rncryptor",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "LivenessCloud",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "TryFrameworkz",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "MandrakeCore",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ValifyFR",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "VerifyStoreReceipt",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "iosutilities",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "TTCPay",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "TBPagarME",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "GWIoTKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SessionMetadataKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "dynapins-ios",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "joseswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "GHBigNum",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "FoxOneOpenSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "MIHCrypto",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "MimikBeam",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "EnVerify",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "MinterCore",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "IOSLoginBundle",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "AJLibrary-Testbed",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "sodium",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "BeaconCore",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "sodium",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "FaceDetector",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "UtilCore",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "KinCoreSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "sodium",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ConnectyCube",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "web3swift-zksync2",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "NSLib",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "CBBase58",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "YCPaySwift",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Suitest",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "NANJFrameworks",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "AddressBookSync",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "idzswiftcommoncrypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "YouverseSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "MobpayiOS",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "REIOSSDK_Dev",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "idzswiftcommoncrypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "AppSpectorSDKE2E",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "themis",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "aircall-pjsip",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "TronWalletWeb3Swift",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "BankingLayer",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "bluecryptor",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "WYJKits",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "BandiCryptoIOS",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "apptrove-ios-sdk",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "IOSKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ICONKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "BucketList",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "rncryptor",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "HAT-API-for-iOS",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "CiCareSDKCall",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "MBNetworking",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "CommonDataModelsSandbox-Kit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Flipper-Folly",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "CIPlayerAssistor",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "GACSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "objectivepgp",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SwiftLeeTools",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ResTest07051990",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "LooisKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "CardWalletSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "AsteriaSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "LKSportSDKApe",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "EFCore",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "WDQExtension",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "NestAdsDev",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ArtSignProSdk",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "zy_banbif_bio_lib_ios_v2",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ServerManager",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "MessageCenterSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Mosquitto",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "AlibabaCloudRoaUtils",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SpeedComboSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "NFCPassportReader2",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Beekeeper",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "AppDevelopModule",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "platonWeb3",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "BluetoothMessageProtocol",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "infinovoBLESDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "scrypto",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "PoringKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "FusionCloud",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "idzswiftcommoncrypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "RevolutionRoboticsBluetooth",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "BLESDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "scrypto",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "CryptoPrephirences",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "DolphinPlayerFrameworkOnsports",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "TTPayments",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "P2PCore",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "WibmoAuthenticator",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "rncryptor",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 3,
+      "pqcDeps": 0
+    },
+    {
+      "name": "PusherSwiftWithEncryption",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "tweetnacl",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "TengShiLive_iOS",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SWFFramework",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ACNSDK_ios",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "DolphinPlayerONSports",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "BCDramaLib",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "libpomelo2",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "NGAEssentials",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "BringgDriverSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "REIOSSDKDev2",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "RainbowSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "CASHUSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "scrypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "TPayment",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "GenuinSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "MBCache",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "JUBaseTool",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "DolphinPlayerGbox",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "KycSDKKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Web3Core",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ERPINCodeViewController",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "IKCryptoKeyboard",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "CRNetworkKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "PCCWFoundationSwift",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "OverifySDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "DolphinPlayerHTVC",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SiniNetworking",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "HellyerFoundation",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "CryptomatorCryptoLib",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "TezosCrypto",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "sodium",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Bringg-iOS-DriverSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "WibmoPaySDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "GoloSwift",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "HDWeb3",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "KinSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "sodium",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Torus-web3swift",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "OkayNFC",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        },
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "mixed",
+      "weakDeps": 1,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SwiftyBootpay",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "HMSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "RimacComponents",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "CSUSTKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "FiveCrossSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "RTBackendTalk",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "PodsTest_AAAA",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "GofunUDID",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "OptimusLibrary",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "aescrypt-objc",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "MSExerciseModule",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Checkout3DS",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "joseswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "IBMCloudAppID",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "joseswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ZijiaFirstSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ApprooSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "PreDID",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "bluersa",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "bluecryptor",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SecureAccessBLE",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "AsteriaSDK-iOS",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Code1PassportLib",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "EzekielClient",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "scrypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SwiftyLocalKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "NSString+BBRSACryptor",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Checkout-IOS",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "C3Lib",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "KSTSmartKit_iOS",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ALFLibrary",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "sodium",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "KCStoreKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Web3-Swift",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "IBMSMTPPod",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "bluecryptor",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ValifyKYC-ABK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "BlockChainKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "StitchWidget",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Cidaas-SDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "MBP",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "WeMallSDK-Public",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "rncryptor",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Card-iOS",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Owl",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "rncryptor",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "TomoWalletCore",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SwiftBasicKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "PocketSwift",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "rncryptor",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "MisfitSDKPartner",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "objectivepgp",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Web3Sw1ft",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "KinMigrationModule",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "sodium",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "AvTakuAdapter",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SwiftyPlayerKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SmartBuy",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "EthereumAddress",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "WnsSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ACNSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Link4Pay",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "bluecryptor",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SelfKYC",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "TronWalletKeystore",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "CoinbaseSocketSwift",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "DDCryptor",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ReadiumLCP",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "goSellSDKX",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ZaifSwift",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "zy_encrypt_util",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "WebyclipSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SpeedGameSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SwiftyyAds",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "X3DH",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "sodium",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "CEXDirect",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ios-trusted-device",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SwiftMKit_Demo",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "IKMToolModuleSwift",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Activeledger-SDK-IOS",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Easy",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SkyBoxInApp",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "FPCrypto",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Onewaylane",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "topsiOSPro",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SafeRider",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "HDWalletKit1",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "UnstoppableDomainsResolution",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "iotex-antenna-swift",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SCPStoreKitManager",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SwiftDDP",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "CKMnemonic",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ERCTools",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "XLpjsip",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Wibmo3ds",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "swcrypt",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 3,
+      "pqcDeps": 0
+    },
+    {
+      "name": "MithVaultSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "KNSDKCore",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "rncryptor",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "OkayDoc",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "HDWalletKit-netis",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "KBTools",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "HKPayModule",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ANQiNiuAPI",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "JKSwiftNetProcessor",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ArtikCloudSwift",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "CardWalletSDKNightlyBuilds",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "CardWalletSDKLoyalty",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "NanterLoggs",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "forinvest-dob-ios",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Apptracr",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "rncryptor",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SafexPay",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SwiftScanSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "EtherKit",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "HookedAlumniSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "zy_multicompany_bio_lib_ios_protecta",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "zy_lib_nfc_passportreader_ios",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Nashid_SDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "MintSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "OpenTimeSDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "scrypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Cardstream",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "SwiftBTCAddressValidator",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "FPhiMembiOS",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Tesseract.EthereumTypes",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "YouverseSDKKyc",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "VerifyURL",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "AwsSign",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "xvaluewetness",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "nashidVerifySDK",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "openssl-universal",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "AzureStorageApiClient",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "Qrypto",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "swiftyrsa",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "OkayIDTest",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "MSExamModule",
+      "ecosystem": "cocoapods",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "cryptoswift",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    }
+  ],
+  "qcReport": {
+    "ecosystem": "cocoapods",
+    "raw": {
+      "total": 50000,
+      "withCrypto": 357
+    },
+    "filters": {
+      "deduplication": {
+        "inputCount": 357,
+        "exactDuplicates": 0,
+        "normalizedDuplicates": 0,
+        "totalRemoved": 0,
+        "outputCount": 357
+      },
+      "spamRemoval": {
+        "inputCount": 357,
+        "removed": 0,
+        "outputCount": 357,
+        "topPatterns": []
+      },
+      "activityCheck": {
+        "withDownloads": 0,
+        "withoutDownloads": 357,
+        "note": "Zero-download packages flagged but retained (download data incomplete for most ecosystems)"
+      },
+      "namespaceConsolidation": {
+        "inputCount": 357,
+        "groupsConsolidated": 0,
+        "packagesConsolidated": 0,
+        "outputCount": 357,
+        "largestGroups": []
+      },
+      "abandonedCheck": {
+        "abandoned": 0,
+        "note": "No timestamp data available in scan results; abandoned detection skipped"
+      }
+    },
+    "removed": {
+      "duplicates": 0,
+      "spam": 0,
+      "lowActivity": 0,
+      "namespaceConsolidated": 0,
+      "abandoned": 0
+    },
+    "qualityMetrics": {
+      "averageConfidence": 20,
+      "highConfidence": 0,
+      "mediumConfidence": 0,
+      "lowConfidence": 357
+    },
+    "afterQC": {
+      "total": 50000,
+      "withCrypto": 357
+    },
+    "summary": {
+      "scanned": 50000,
+      "withCrypto": 357,
+      "weakExposed": 52,
+      "modernOnly": 305,
+      "pqcReady": 0,
+      "weakRate": "0.1%",
+      "pqcRate": "0.0%"
+    }
+  },
+  "qcAppliedAt": "2026-08-03T22:15:40.117Z"
+}
