@@ -1,0 +1,5494 @@
+{
+  "ecosystem": "hex",
+  "scannedAt": "2026-08-03T20:29:06.268Z",
+  "totalScanned": 15000,
+  "totalWithCrypto": 317,
+  "totalWithoutCrypto": 14679,
+  "fetchErrors": 0,
+  "coverage": {
+    "listed": 15000,
+    "scanned": 15000,
+    "absent": 0,
+    "unresolved": 0,
+    "unversioned": 0
+  },
+  "summary": {
+    "scanned": 15000,
+    "weakExposed": 3,
+    "modernOnly": 314,
+    "pqcReady": 0,
+    "noCrypto": 14679,
+    "weakExposureRate": 0,
+    "pqcAdoptionRate": 0,
+    "withCrypto": 317
+  },
+  "projects": [
+    {
+      "name": "plug",
+      "ecosystem": "hex",
+      "downloads": 161972278,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "phoenix",
+      "ecosystem": "hex",
+      "downloads": 152921266,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "joken",
+      "ecosystem": "hex",
+      "downloads": 56764401,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "bcrypt_elixir",
+      "ecosystem": "hex",
+      "downloads": 53279596,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ex_twilio",
+      "ecosystem": "hex",
+      "downloads": 27676924,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "pigeon",
+      "ecosystem": "hex",
+      "downloads": 27084671,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "guardian",
+      "ecosystem": "hex",
+      "downloads": 16039575,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "goth",
+      "ecosystem": "hex",
+      "downloads": 13541426,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "argon2_elixir",
+      "ecosystem": "hex",
+      "downloads": 8308567,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "cloak_ecto",
+      "ecosystem": "hex",
+      "downloads": 5980862,
+      "cryptoDeps": [
+        {
+          "name": "cloak",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "paginator",
+      "ecosystem": "hex",
+      "downloads": 4802342,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "joken_jwks",
+      "ecosystem": "hex",
+      "downloads": 4117603,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "guardian_db",
+      "ecosystem": "hex",
+      "downloads": 2980343,
+      "cryptoDeps": [
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "pbkdf2_elixir",
+      "ecosystem": "hex",
+      "downloads": 2764231,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "guardian_phoenix",
+      "ecosystem": "hex",
+      "downloads": 2119007,
+      "cryptoDeps": [
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "abi",
+      "ecosystem": "hex",
+      "downloads": 1714477,
+      "cryptoDeps": [
+        {
+          "name": "ex_sha3",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "altworx_runbox",
+      "ecosystem": "hex",
+      "downloads": 908928,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "access_pass",
+      "ecosystem": "hex",
+      "downloads": 826015,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "openid_connect",
+      "ecosystem": "hex",
+      "downloads": 796842,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ash_authentication",
+      "ecosystem": "hex",
+      "downloads": 783624,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "oidcc",
+      "ecosystem": "hex",
+      "downloads": 768739,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ash_authentication_phoenix",
+      "ecosystem": "hex",
+      "downloads": 688191,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "kcl",
+      "ecosystem": "hex",
+      "downloads": 654493,
+      "cryptoDeps": [
+        {
+          "name": "curve25519",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "plug_rails_cookie_session_store",
+      "ecosystem": "hex",
+      "downloads": 632346,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "snowflex",
+      "ecosystem": "hex",
+      "downloads": 523679,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "boruta",
+      "ecosystem": "hex",
+      "downloads": 478883,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "mux",
+      "ecosystem": "hex",
+      "downloads": 356082,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ueberauth_cognito",
+      "ecosystem": "hex",
+      "downloads": 319385,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "web_push_encryption",
+      "ecosystem": "hex",
+      "downloads": 309340,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "wax_",
+      "ecosystem": "hex",
+      "downloads": 281152,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "addict",
+      "ecosystem": "hex",
+      "downloads": 246512,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "atecc508a",
+      "ecosystem": "hex",
+      "downloads": 240800,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "coherence",
+      "ecosystem": "hex",
+      "downloads": 218167,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ueberauth_apple",
+      "ecosystem": "hex",
+      "downloads": 216313,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "avalanche",
+      "ecosystem": "hex",
+      "downloads": 214110,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "prima_auth0_ex",
+      "ecosystem": "hex",
+      "downloads": 204415,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "quarto",
+      "ecosystem": "hex",
+      "downloads": 177045,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "test_server",
+      "ecosystem": "hex",
+      "downloads": 175130,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "p1_acme",
+      "ecosystem": "hex",
+      "downloads": 164354,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "nerves_hub_cli",
+      "ecosystem": "hex",
+      "downloads": 163925,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "livebook",
+      "ecosystem": "hex",
+      "downloads": 152945,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "acme",
+      "ecosystem": "hex",
+      "downloads": 151451,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "accountable",
+      "ecosystem": "hex",
+      "downloads": 140394,
+      "cryptoDeps": [
+        {
+          "name": "argon2_elixir",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 3,
+      "pqcDeps": 0
+    },
+    {
+      "name": "nerves_hub_user_api",
+      "ecosystem": "hex",
+      "downloads": 128799,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "acme_ex",
+      "ecosystem": "hex",
+      "downloads": 118001,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "doorman",
+      "ecosystem": "hex",
+      "downloads": 117404,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ex_nudge",
+      "ecosystem": "hex",
+      "downloads": 114069,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "site_encrypt",
+      "ecosystem": "hex",
+      "downloads": 113383,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "nerves_hub_link",
+      "ecosystem": "hex",
+      "downloads": 111350,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "nerves_hub_ca_store",
+      "ecosystem": "hex",
+      "downloads": 109013,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ex_firebase_auth",
+      "ecosystem": "hex",
+      "downloads": 106011,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "aether_atproto",
+      "ecosystem": "hex",
+      "downloads": 100526,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ex_azure_key_vault",
+      "ecosystem": "hex",
+      "downloads": 98152,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "libp2p_crypto",
+      "ecosystem": "hex",
+      "downloads": 86523,
+      "cryptoDeps": [
+        {
+          "name": "enacl",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "docusign",
+      "ecosystem": "hex",
+      "downloads": 85749,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "aeacus",
+      "ecosystem": "hex",
+      "downloads": 84938,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ueberauth_oidc",
+      "ecosystem": "hex",
+      "downloads": 84158,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ueberauth_adfs",
+      "ecosystem": "hex",
+      "downloads": 83902,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "acmex",
+      "ecosystem": "hex",
+      "downloads": 74309,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "lti_1p3",
+      "ecosystem": "hex",
+      "downloads": 72334,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "kitten_blue",
+      "ecosystem": "hex",
+      "downloads": 62779,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "authable",
+      "ecosystem": "hex",
+      "downloads": 61432,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "web_push_elixir",
+      "ecosystem": "hex",
+      "downloads": 59764,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "shopifex",
+      "ecosystem": "hex",
+      "downloads": 59359,
+      "cryptoDeps": [
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "mnemonic",
+      "ecosystem": "hex",
+      "downloads": 53433,
+      "cryptoDeps": [
+        {
+          "name": "pbkdf2_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ecto_interface",
+      "ecosystem": "hex",
+      "downloads": 46451,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ejabberd",
+      "ecosystem": "hex",
+      "downloads": 46184,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ash_events",
+      "ecosystem": "hex",
+      "downloads": 45393,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "signet",
+      "ecosystem": "hex",
+      "downloads": 44841,
+      "cryptoDeps": [
+        {
+          "name": "ex_sha3",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "auth_plug",
+      "ecosystem": "hex",
+      "downloads": 43868,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "fusion_jwt_authentication",
+      "ecosystem": "hex",
+      "downloads": 43357,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "keycloak_ex",
+      "ecosystem": "hex",
+      "downloads": 42396,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "openmaize",
+      "ecosystem": "hex",
+      "downloads": 40392,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "authex",
+      "ecosystem": "hex",
+      "downloads": 39026,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "arke_auth",
+      "ecosystem": "hex",
+      "downloads": 37587,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "guardian_backdoor",
+      "ecosystem": "hex",
+      "downloads": 35850,
+      "cryptoDeps": [
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "sans_password",
+      "ecosystem": "hex",
+      "downloads": 35078,
+      "cryptoDeps": [
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "eip_55",
+      "ecosystem": "hex",
+      "downloads": 34761,
+      "cryptoDeps": [
+        {
+          "name": "ex_sha3",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "piazza_core",
+      "ecosystem": "hex",
+      "downloads": 34735,
+      "cryptoDeps": [
+        {
+          "name": "ex_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "antigone",
+      "ecosystem": "hex",
+      "downloads": 33924,
+      "cryptoDeps": [
+        {
+          "name": "argon2_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "jose_utils",
+      "ecosystem": "hex",
+      "downloads": 33910,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ex_secrets",
+      "ecosystem": "hex",
+      "downloads": 33807,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "elixir_plaid",
+      "ecosystem": "hex",
+      "downloads": 32976,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "btrz_ex_auth_api",
+      "ecosystem": "hex",
+      "downloads": 31436,
+      "cryptoDeps": [
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "phoenix_kit",
+      "ecosystem": "hex",
+      "downloads": 30023,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "auth0_jwks",
+      "ecosystem": "hex",
+      "downloads": 27293,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "nimble_zta",
+      "ecosystem": "hex",
+      "downloads": 27002,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "fields",
+      "ecosystem": "hex",
+      "downloads": 26650,
+      "cryptoDeps": [
+        {
+          "name": "argon2_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "simple_xml",
+      "ecosystem": "hex",
+      "downloads": 25588,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "keycloak",
+      "ecosystem": "hex",
+      "downloads": 25195,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "big_query",
+      "ecosystem": "hex",
+      "downloads": 24895,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ex_firebase",
+      "ecosystem": "hex",
+      "downloads": 24776,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "krug",
+      "ecosystem": "hex",
+      "downloads": 24695,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "elixium_core",
+      "ecosystem": "hex",
+      "downloads": 23969,
+      "cryptoDeps": [
+        {
+          "name": "keccakf1600",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "spawn_statestores",
+      "ecosystem": "hex",
+      "downloads": 21612,
+      "cryptoDeps": [
+        {
+          "name": "cloak_ecto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "spawn_statestores_postgres",
+      "ecosystem": "hex",
+      "downloads": 20538,
+      "cryptoDeps": [
+        {
+          "name": "cloak_ecto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "authsense",
+      "ecosystem": "hex",
+      "downloads": 20140,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "pbkdf2_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "simple_auth",
+      "ecosystem": "hex",
+      "downloads": 20093,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "simple_saml",
+      "ecosystem": "hex",
+      "downloads": 19811,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "alphonse",
+      "ecosystem": "hex",
+      "downloads": 19547,
+      "cryptoDeps": [
+        {
+          "name": "cipher",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "cloudflare_access_ex",
+      "ecosystem": "hex",
+      "downloads": 18926,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "mnemo",
+      "ecosystem": "hex",
+      "downloads": 18504,
+      "cryptoDeps": [
+        {
+          "name": "pbkdf2_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "spawn_statestores_cockroachdb",
+      "ecosystem": "hex",
+      "downloads": 17982,
+      "cryptoDeps": [
+        {
+          "name": "cloak_ecto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "test_plug_auth",
+      "ecosystem": "hex",
+      "downloads": 17551,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "acme_client",
+      "ecosystem": "hex",
+      "downloads": 17348,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "oauth_mock_server",
+      "ecosystem": "hex",
+      "downloads": 17025,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ad_cloak_ecto",
+      "ecosystem": "hex",
+      "downloads": 16975,
+      "cryptoDeps": [
+        {
+          "name": "cloak",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "sedex",
+      "ecosystem": "hex",
+      "downloads": 16688,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "spawn_statestores_sqlite",
+      "ecosystem": "hex",
+      "downloads": 16665,
+      "cryptoDeps": [
+        {
+          "name": "cloak_ecto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "aerospike_driver",
+      "ecosystem": "hex",
+      "downloads": 16631,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "spawn_statestores_mssql",
+      "ecosystem": "hex",
+      "downloads": 16602,
+      "cryptoDeps": [
+        {
+          "name": "cloak_ecto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "spawn_statestores_mysql",
+      "ecosystem": "hex",
+      "downloads": 16595,
+      "cryptoDeps": [
+        {
+          "name": "cloak_ecto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "accrue",
+      "ecosystem": "hex",
+      "downloads": 16165,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "clerk",
+      "ecosystem": "hex",
+      "downloads": 15804,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "metabase",
+      "ecosystem": "hex",
+      "downloads": 15776,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "lexdee",
+      "ecosystem": "hex",
+      "downloads": 15415,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "lemon_ex",
+      "ecosystem": "hex",
+      "downloads": 15279,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "web_authn_lite",
+      "ecosystem": "hex",
+      "downloads": 15027,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ash_authentication_oauth2_server",
+      "ecosystem": "hex",
+      "downloads": 14989,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "enoise",
+      "ecosystem": "hex",
+      "downloads": 14275,
+      "cryptoDeps": [
+        {
+          "name": "enacl",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "authtoken",
+      "ecosystem": "hex",
+      "downloads": 13729,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "guard",
+      "ecosystem": "hex",
+      "downloads": 13331,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 3,
+      "pqcDeps": 0
+    },
+    {
+      "name": "api_auth",
+      "ecosystem": "hex",
+      "downloads": 12844,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "secure_password",
+      "ecosystem": "hex",
+      "downloads": 12565,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "app_store",
+      "ecosystem": "hex",
+      "downloads": 12226,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "gemini_ex",
+      "ecosystem": "hex",
+      "downloads": 12134,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "diode_client",
+      "ecosystem": "hex",
+      "downloads": 12106,
+      "cryptoDeps": [
+        {
+          "name": "curve25519",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ex_sha3",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "nerves_hub",
+      "ecosystem": "hex",
+      "downloads": 11750,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "arweave_sdk_ex",
+      "ecosystem": "hex",
+      "downloads": 11747,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "auth0_plug",
+      "ecosystem": "hex",
+      "downloads": 11587,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "stein",
+      "ecosystem": "hex",
+      "downloads": 11391,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "rivet_utils",
+      "ecosystem": "hex",
+      "downloads": 11279,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "eth_wallet",
+      "ecosystem": "hex",
+      "downloads": 11235,
+      "cryptoDeps": [
+        {
+          "name": "ex_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "magic_admin",
+      "ecosystem": "hex",
+      "downloads": 11022,
+      "cryptoDeps": [
+        {
+          "name": "ex_sha3",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "k8s_webhoox",
+      "ecosystem": "hex",
+      "downloads": 10992,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "paladin_client",
+      "ecosystem": "hex",
+      "downloads": 10482,
+      "cryptoDeps": [
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "u2f_ex",
+      "ecosystem": "hex",
+      "downloads": 10370,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ex_web3",
+      "ecosystem": "hex",
+      "downloads": 9920,
+      "cryptoDeps": [
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "icp_agent",
+      "ecosystem": "hex",
+      "downloads": 9810,
+      "cryptoDeps": [
+        {
+          "name": "ex_sha3",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "cartouche",
+      "ecosystem": "hex",
+      "downloads": 9794,
+      "cryptoDeps": [
+        {
+          "name": "ex_sha3",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "phoenix_token_auth",
+      "ecosystem": "hex",
+      "downloads": 9384,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "arclight",
+      "ecosystem": "hex",
+      "downloads": 9381,
+      "cryptoDeps": [
+        {
+          "name": "enacl",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "magic_auth",
+      "ecosystem": "hex",
+      "downloads": 9344,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "wallet_passes",
+      "ecosystem": "hex",
+      "downloads": 9339,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ultradark_core",
+      "ecosystem": "hex",
+      "downloads": 9138,
+      "cryptoDeps": [
+        {
+          "name": "keccakf1600",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "apple_weather_kit",
+      "ecosystem": "hex",
+      "downloads": 8950,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "macaroon",
+      "ecosystem": "hex",
+      "downloads": 8945,
+      "cryptoDeps": [
+        {
+          "name": "enacl",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "captain_hook_signature",
+      "ecosystem": "hex",
+      "downloads": 8877,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "guardian_firebase",
+      "ecosystem": "hex",
+      "downloads": 8861,
+      "cryptoDeps": [
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "rivet_ident",
+      "ecosystem": "hex",
+      "downloads": 8808,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 3,
+      "pqcDeps": 0
+    },
+    {
+      "name": "curator",
+      "ecosystem": "hex",
+      "downloads": 8710,
+      "cryptoDeps": [
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "web_push_ex",
+      "ecosystem": "hex",
+      "downloads": 8651,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "iam",
+      "ecosystem": "hex",
+      "downloads": 8486,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "nexthub_crypto",
+      "ecosystem": "hex",
+      "downloads": 8361,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ex_stream_client",
+      "ecosystem": "hex",
+      "downloads": 7959,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "authority_ecto",
+      "ecosystem": "hex",
+      "downloads": 7774,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "guardian_trackable",
+      "ecosystem": "hex",
+      "downloads": 7298,
+      "cryptoDeps": [
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "livekit",
+      "ecosystem": "hex",
+      "downloads": 7253,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "bitcoinlib",
+      "ecosystem": "hex",
+      "downloads": 7251,
+      "cryptoDeps": [
+        {
+          "name": "pbkdf2_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "box",
+      "ecosystem": "hex",
+      "downloads": 7185,
+      "cryptoDeps": [
+        {
+          "name": "ex_crypto",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "artsy_auth_ex",
+      "ecosystem": "hex",
+      "downloads": 6913,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "plug_jwt",
+      "ecosystem": "hex",
+      "downloads": 6699,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "blossom",
+      "ecosystem": "hex",
+      "downloads": 6503,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "cloak",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "cloak_ecto",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 4,
+      "pqcDeps": 0
+    },
+    {
+      "name": "blackbook",
+      "ecosystem": "hex",
+      "downloads": 6421,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "mob_dev",
+      "ecosystem": "hex",
+      "downloads": 6297,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "cubex",
+      "ecosystem": "hex",
+      "downloads": 6241,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ex_mcp",
+      "ecosystem": "hex",
+      "downloads": 6214,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "spawn_statestores_mariadb",
+      "ecosystem": "hex",
+      "downloads": 6152,
+      "cryptoDeps": [
+        {
+          "name": "cloak_ecto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "certmagex",
+      "ecosystem": "hex",
+      "downloads": 6124,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "express",
+      "ecosystem": "hex",
+      "downloads": 6109,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "apple",
+      "ecosystem": "hex",
+      "downloads": 5970,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "astarte_device",
+      "ecosystem": "hex",
+      "downloads": 5931,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "carbon",
+      "ecosystem": "hex",
+      "downloads": 5915,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "lyn",
+      "ecosystem": "hex",
+      "downloads": 5811,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "buckets",
+      "ecosystem": "hex",
+      "downloads": 5583,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "hologram",
+      "ecosystem": "hex",
+      "downloads": 5480,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "auth_shield",
+      "ecosystem": "hex",
+      "downloads": 5446,
+      "cryptoDeps": [
+        {
+          "name": "argon2_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "sesame",
+      "ecosystem": "hex",
+      "downloads": 5233,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "server_utils",
+      "ecosystem": "hex",
+      "downloads": 5128,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "branca_erl",
+      "ecosystem": "hex",
+      "downloads": 5080,
+      "cryptoDeps": [
+        {
+          "name": "enacl",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "sentinel",
+      "ecosystem": "hex",
+      "downloads": 4911,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 3,
+      "pqcDeps": 0
+    },
+    {
+      "name": "captain_hook",
+      "ecosystem": "hex",
+      "downloads": 4793,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "gust",
+      "ecosystem": "hex",
+      "downloads": 4761,
+      "cryptoDeps": [
+        {
+          "name": "cloak_ecto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "oasis",
+      "ecosystem": "hex",
+      "downloads": 4754,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "webauthn",
+      "ecosystem": "hex",
+      "downloads": 4609,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "cloud_storage",
+      "ecosystem": "hex",
+      "downloads": 4497,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "app_store_server_library",
+      "ecosystem": "hex",
+      "downloads": 4335,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "exrpc",
+      "ecosystem": "hex",
+      "downloads": 4334,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "attesto",
+      "ecosystem": "hex",
+      "downloads": 4325,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "github",
+      "ecosystem": "hex",
+      "downloads": 4082,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "jet_plugin_sdk",
+      "ecosystem": "hex",
+      "downloads": 4063,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "perspective",
+      "ecosystem": "hex",
+      "downloads": 4032,
+      "cryptoDeps": [
+        {
+          "name": "argon2_elixir",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ex_crypto",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 3,
+      "pqcDeps": 0
+    },
+    {
+      "name": "lattice_stripe",
+      "ecosystem": "hex",
+      "downloads": 3997,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "auth_introduct",
+      "ecosystem": "hex",
+      "downloads": 3852,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ibanity",
+      "ecosystem": "hex",
+      "downloads": 3774,
+      "cryptoDeps": [
+        {
+          "name": "ex_crypto",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "erps",
+      "ecosystem": "hex",
+      "downloads": 3738,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "supabase_auth",
+      "ecosystem": "hex",
+      "downloads": 3690,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "scales_cms",
+      "ecosystem": "hex",
+      "downloads": 3553,
+      "cryptoDeps": [
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "nerves_hub_link_http",
+      "ecosystem": "hex",
+      "downloads": 3488,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "condukt",
+      "ecosystem": "hex",
+      "downloads": 3449,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "raxx_session",
+      "ecosystem": "hex",
+      "downloads": 3442,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "game_server_core",
+      "ecosystem": "hex",
+      "downloads": 3431,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 3,
+      "pqcDeps": 0
+    },
+    {
+      "name": "potion_ingredients",
+      "ecosystem": "hex",
+      "downloads": 3279,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "api_authentication",
+      "ecosystem": "hex",
+      "downloads": 3264,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "bot_framework",
+      "ecosystem": "hex",
+      "downloads": 3223,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "gotham",
+      "ecosystem": "hex",
+      "downloads": 3104,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "tradehub",
+      "ecosystem": "hex",
+      "downloads": 3036,
+      "cryptoDeps": [
+        {
+          "name": "pbkdf2_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ex_acme",
+      "ecosystem": "hex",
+      "downloads": 2981,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "tpm",
+      "ecosystem": "hex",
+      "downloads": 2958,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "sigra",
+      "ecosystem": "hex",
+      "downloads": 2926,
+      "cryptoDeps": [
+        {
+          "name": "argon2_elixir",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "cloak_ecto",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "nimble_totp",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 4,
+      "pqcDeps": 0
+    },
+    {
+      "name": "servicex",
+      "ecosystem": "hex",
+      "downloads": 2919,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 3,
+      "pqcDeps": 0
+    },
+    {
+      "name": "pushx",
+      "ecosystem": "hex",
+      "downloads": 2880,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "passport",
+      "ecosystem": "hex",
+      "downloads": 2842,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "axiom_ai",
+      "ecosystem": "hex",
+      "downloads": 2829,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "certbot",
+      "ecosystem": "hex",
+      "downloads": 2820,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "application_auth",
+      "ecosystem": "hex",
+      "downloads": 2801,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "pbkdf2_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "livekitex",
+      "ecosystem": "hex",
+      "downloads": 2795,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "edgedb",
+      "ecosystem": "hex",
+      "downloads": 2626,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "planga_phoenix",
+      "ecosystem": "hex",
+      "downloads": 2554,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "jwt_test_utils",
+      "ecosystem": "hex",
+      "downloads": 2542,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "shinkansen",
+      "ecosystem": "hex",
+      "downloads": 2541,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "service_watcher_sup",
+      "ecosystem": "hex",
+      "downloads": 2515,
+      "cryptoDeps": [
+        {
+          "name": "cipher",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "streamex",
+      "ecosystem": "hex",
+      "downloads": 2454,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "google_token",
+      "ecosystem": "hex",
+      "downloads": 2452,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ueberauth_id_austria",
+      "ecosystem": "hex",
+      "downloads": 2427,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "pony_express",
+      "ecosystem": "hex",
+      "downloads": 2393,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "id_token",
+      "ecosystem": "hex",
+      "downloads": 2336,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "entrance",
+      "ecosystem": "hex",
+      "downloads": 2301,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "element_kit",
+      "ecosystem": "hex",
+      "downloads": 2228,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ex_shopify_app",
+      "ecosystem": "hex",
+      "downloads": 2163,
+      "cryptoDeps": [
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "hieroglyph",
+      "ecosystem": "hex",
+      "downloads": 2116,
+      "cryptoDeps": [
+        {
+          "name": "ex_sha3",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "fireauth",
+      "ecosystem": "hex",
+      "downloads": 2114,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "prx_auth",
+      "ecosystem": "hex",
+      "downloads": 2086,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "drm",
+      "ecosystem": "hex",
+      "downloads": 2055,
+      "cryptoDeps": [
+        {
+          "name": "cloak",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ex_firebase_admin",
+      "ecosystem": "hex",
+      "downloads": 1997,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "supabase_surface",
+      "ecosystem": "hex",
+      "downloads": 1978,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "quenya",
+      "ecosystem": "hex",
+      "downloads": 1956,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "qitech",
+      "ecosystem": "hex",
+      "downloads": 1913,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "combo",
+      "ecosystem": "hex",
+      "downloads": 1852,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "extmpfs",
+      "ecosystem": "hex",
+      "downloads": 1843,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "companion_ex",
+      "ecosystem": "hex",
+      "downloads": 1810,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "materia",
+      "ecosystem": "hex",
+      "downloads": 1792,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 3,
+      "pqcDeps": 0
+    },
+    {
+      "name": "imagine_cms",
+      "ecosystem": "hex",
+      "downloads": 1763,
+      "cryptoDeps": [
+        {
+          "name": "argon2_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ex_vault_jwk_set",
+      "ecosystem": "hex",
+      "downloads": 1762,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "eddb",
+      "ecosystem": "hex",
+      "downloads": 1759,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "attest",
+      "ecosystem": "hex",
+      "downloads": 1733,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "orbit",
+      "ecosystem": "hex",
+      "downloads": 1722,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "apiac_auth_mtls",
+      "ecosystem": "hex",
+      "downloads": 1685,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ibmcloud",
+      "ecosystem": "hex",
+      "downloads": 1683,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "bartender",
+      "ecosystem": "hex",
+      "downloads": 1680,
+      "cryptoDeps": [
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ueberauth_workos_authkit",
+      "ecosystem": "hex",
+      "downloads": 1674,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "superls",
+      "ecosystem": "hex",
+      "downloads": 1614,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "firebase_auth_verifier",
+      "ecosystem": "hex",
+      "downloads": 1601,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "gomomento",
+      "ecosystem": "hex",
+      "downloads": 1597,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "dala_dev",
+      "ecosystem": "hex",
+      "downloads": 1545,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "firebase_token",
+      "ecosystem": "hex",
+      "downloads": 1536,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "fast",
+      "ecosystem": "hex",
+      "downloads": 1533,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "farmbot",
+      "ecosystem": "hex",
+      "downloads": 1486,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "boldsign",
+      "ecosystem": "hex",
+      "downloads": 1483,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ueberauth_passwordless",
+      "ecosystem": "hex",
+      "downloads": 1468,
+      "cryptoDeps": [
+        {
+          "name": "ex_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "guardian_paseto",
+      "ecosystem": "hex",
+      "downloads": 1453,
+      "cryptoDeps": [
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ash_authentication_firebase",
+      "ecosystem": "hex",
+      "downloads": 1409,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "udia",
+      "ecosystem": "hex",
+      "downloads": 1375,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 3,
+      "pqcDeps": 0
+    },
+    {
+      "name": "bank_stone",
+      "ecosystem": "hex",
+      "downloads": 1361,
+      "cryptoDeps": [
+        {
+          "name": "argon2_elixir",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "firestorm_data",
+      "ecosystem": "hex",
+      "downloads": 1341,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "firebase_jwt",
+      "ecosystem": "hex",
+      "downloads": 1307,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "voile",
+      "ecosystem": "hex",
+      "downloads": 1305,
+      "cryptoDeps": [
+        {
+          "name": "pbkdf2_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "webpush",
+      "ecosystem": "hex",
+      "downloads": 1302,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "atex",
+      "ecosystem": "hex",
+      "downloads": 1294,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ptolemy",
+      "ecosystem": "hex",
+      "downloads": 1275,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "fireblocks_sdk",
+      "ecosystem": "hex",
+      "downloads": 1273,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "hit_pay",
+      "ecosystem": "hex",
+      "downloads": 1261,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "oauth2_server",
+      "ecosystem": "hex",
+      "downloads": 1229,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "keen_auth",
+      "ecosystem": "hex",
+      "downloads": 1187,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "dankuserservice",
+      "ecosystem": "hex",
+      "downloads": 1170,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "gjwt",
+      "ecosystem": "hex",
+      "downloads": 1145,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "plug_mishka_auth",
+      "ecosystem": "hex",
+      "downloads": 1101,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 4,
+      "pqcDeps": 0
+    },
+    {
+      "name": "microsoft_translator",
+      "ecosystem": "hex",
+      "downloads": 1072,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "gandalf",
+      "ecosystem": "hex",
+      "downloads": 1022,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "argon2_elixir_winfix",
+      "ecosystem": "hex",
+      "downloads": 1001,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "fire_auth",
+      "ecosystem": "hex",
+      "downloads": 976,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "zerossl",
+      "ecosystem": "hex",
+      "downloads": 972,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "maat_feather",
+      "ecosystem": "hex",
+      "downloads": 967,
+      "cryptoDeps": [
+        {
+          "name": "argon2_elixir",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "nimble_totp",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 4,
+      "pqcDeps": 0
+    },
+    {
+      "name": "glific",
+      "ecosystem": "hex",
+      "downloads": 933,
+      "cryptoDeps": [
+        {
+          "name": "cloak_ecto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "wizardry",
+      "ecosystem": "hex",
+      "downloads": 900,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "apns_token",
+      "ecosystem": "hex",
+      "downloads": 871,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "fitz",
+      "ecosystem": "hex",
+      "downloads": 846,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ghost_publisher",
+      "ecosystem": "hex",
+      "downloads": 825,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "sqrl",
+      "ecosystem": "hex",
+      "downloads": 805,
+      "cryptoDeps": [
+        {
+          "name": "ex_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "scrapped_twitch_api",
+      "ecosystem": "hex",
+      "downloads": 805,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "kevo_ex",
+      "ecosystem": "hex",
+      "downloads": 793,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "vrchat",
+      "ecosystem": "hex",
+      "downloads": 785,
+      "cryptoDeps": [
+        {
+          "name": "nimble_totp",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ex_weatherkit",
+      "ecosystem": "hex",
+      "downloads": 781,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ex_stone_openbank",
+      "ecosystem": "hex",
+      "downloads": 768,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "guardsix",
+      "ecosystem": "hex",
+      "downloads": 766,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "drupal7_password_hash",
+      "ecosystem": "hex",
+      "downloads": 761,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "discord_oauth2_server",
+      "ecosystem": "hex",
+      "downloads": 752,
+      "cryptoDeps": [
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "apple_auth",
+      "ecosystem": "hex",
+      "downloads": 746,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "simple_jwt_authentication",
+      "ecosystem": "hex",
+      "downloads": 745,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "user_manager",
+      "ecosystem": "hex",
+      "downloads": 742,
+      "cryptoDeps": [
+        {
+          "name": "cipher",
+          "tier": "weak",
+          "direct": true
+        },
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "mixed",
+      "weakDeps": 1,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "pushito",
+      "ecosystem": "hex",
+      "downloads": 725,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "spaceentropy",
+      "ecosystem": "hex",
+      "downloads": 724,
+      "cryptoDeps": [
+        {
+          "name": "bcrypt_elixir",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "firebase_auth",
+      "ecosystem": "hex",
+      "downloads": 697,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "toks",
+      "ecosystem": "hex",
+      "downloads": 690,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "curator_database_authenticatable",
+      "ecosystem": "hex",
+      "downloads": 681,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "yandex_translate",
+      "ecosystem": "hex",
+      "downloads": 677,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "concierge",
+      "ecosystem": "hex",
+      "downloads": 670,
+      "cryptoDeps": [
+        {
+          "name": "comeonin",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "lockspire",
+      "ecosystem": "hex",
+      "downloads": 666,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "foodog",
+      "ecosystem": "hex",
+      "downloads": 652,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "slip39",
+      "ecosystem": "hex",
+      "downloads": 651,
+      "cryptoDeps": [
+        {
+          "name": "plug_crypto",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "flowy",
+      "ecosystem": "hex",
+      "downloads": 649,
+      "cryptoDeps": [
+        {
+          "name": "joken",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "moqx",
+      "ecosystem": "hex",
+      "downloads": 648,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ex_did",
+      "ecosystem": "hex",
+      "downloads": 632,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "guardian_jwe",
+      "ecosystem": "hex",
+      "downloads": 616,
+      "cryptoDeps": [
+        {
+          "name": "guardian",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "eventsourcingdb",
+      "ecosystem": "hex",
+      "downloads": 614,
+      "cryptoDeps": [
+        {
+          "name": "jose",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "cloak_wrapper",
+      "ecosystem": "hex",
+      "downloads": 602,
+      "cryptoDeps": [
+        {
+          "name": "cloak",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "bbox",
+      "ecosystem": "hex",
+      "downloads": 593,
+      "cryptoDeps": [
+        {
+          "name": "x509",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "modern",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    }
+  ],
+  "qcReport": {
+    "ecosystem": "hex",
+    "raw": {
+      "total": 15000,
+      "withCrypto": 321
+    },
+    "filters": {
+      "deduplication": {
+        "inputCount": 321,
+        "exactDuplicates": 1,
+        "normalizedDuplicates": 1,
+        "totalRemoved": 2,
+        "outputCount": 319
+      },
+      "spamRemoval": {
+        "inputCount": 319,
+        "removed": 2,
+        "outputCount": 317,
+        "topPatterns": [
+          {
+            "pattern": "name-too-short",
+            "count": 2
+          }
+        ]
+      },
+      "activityCheck": {
+        "withDownloads": 317,
+        "withoutDownloads": 0,
+        "note": "Zero-download packages flagged but retained (download data incomplete for most ecosystems)"
+      },
+      "namespaceConsolidation": {
+        "inputCount": 317,
+        "groupsConsolidated": 0,
+        "packagesConsolidated": 0,
+        "outputCount": 317,
+        "largestGroups": []
+      },
+      "abandonedCheck": {
+        "abandoned": 0,
+        "note": "No timestamp data available in scan results; abandoned detection skipped"
+      }
+    },
+    "removed": {
+      "duplicates": 2,
+      "spam": 2,
+      "lowActivity": 0,
+      "namespaceConsolidated": 0,
+      "abandoned": 0
+    },
+    "qualityMetrics": {
+      "averageConfidence": 58.8,
+      "highConfidence": 0,
+      "mediumConfidence": 317,
+      "lowConfidence": 0
+    },
+    "afterQC": {
+      "total": 14996,
+      "withCrypto": 317
+    },
+    "summary": {
+      "scanned": 14996,
+      "withCrypto": 317,
+      "weakExposed": 3,
+      "modernOnly": 314,
+      "pqcReady": 0,
+      "weakRate": "0.0%",
+      "pqcRate": "0.0%"
+    }
+  },
+  "qcAppliedAt": "2026-08-03T22:34:16.289Z"
+}

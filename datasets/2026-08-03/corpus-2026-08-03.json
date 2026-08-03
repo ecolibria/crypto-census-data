@@ -1,0 +1,2017 @@
+{
+  "collectedAt": "2026-08-03",
+  "packagesScanned": 2170994,
+  "packagesWithCrypto": 65686,
+  "withWeakCrypto": 12465,
+  "withModernOnly": 52868,
+  "withPqcReady": 353,
+  "withNoCrypto": 2105308,
+  "weakShareOfCryptoUsing": 19,
+  "pqcShareOfCryptoUsing": 0.54,
+  "byEcosystem": {
+    "npm": {
+      "scanned": 1000000,
+      "weakExposed": 3146,
+      "modernOnly": 7035,
+      "pqcReady": 68
+    },
+    "pypi": {
+      "scanned": 150000,
+      "weakExposed": 201,
+      "modernOnly": 4799,
+      "pqcReady": 19
+    },
+    "go": {
+      "scanned": 200117,
+      "weakExposed": 3244,
+      "modernOnly": 10094,
+      "pqcReady": 5
+    },
+    "maven": {
+      "scanned": 103400,
+      "weakExposed": 895,
+      "modernOnly": 1062,
+      "pqcReady": 0,
+      "enumeration": {
+        "truncated": true,
+        "reason": "wall-clock budget reached",
+        "requested": 150000,
+        "collected": 103400,
+        "unit": "artifacts",
+        "budgetMinutes": 240,
+        "elapsedMinutes": 240.39
+      }
+    },
+    "crates": {
+      "scanned": 302477,
+      "weakExposed": 4460,
+      "modernOnly": 24485,
+      "pqcReady": 259
+    },
+    "packagist": {
+      "scanned": 100000,
+      "weakExposed": 177,
+      "modernOnly": 976,
+      "pqcReady": 0
+    },
+    "nuget": {
+      "scanned": 100000,
+      "weakExposed": 204,
+      "modernOnly": 1707,
+      "pqcReady": 0
+    },
+    "rubygems": {
+      "scanned": 100000,
+      "weakExposed": 83,
+      "modernOnly": 1231,
+      "pqcReady": 0
+    },
+    "hex": {
+      "scanned": 15000,
+      "weakExposed": 3,
+      "modernOnly": 314,
+      "pqcReady": 0
+    },
+    "pub": {
+      "scanned": 50000,
+      "weakExposed": 0,
+      "modernOnly": 860,
+      "pqcReady": 2
+    },
+    "cocoapods": {
+      "scanned": 50000,
+      "weakExposed": 52,
+      "modernOnly": 305,
+      "pqcReady": 0
+    }
+  },
+  "topExposedProjects": [
+    {
+      "name": "google-auth",
+      "ecosystem": "pypi",
+      "downloads": 590070847,
+      "cryptoDeps": [
+        {
+          "name": "cryptography",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "pyjwt",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "rsa",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "mixed",
+      "weakDeps": 1,
+      "modernDeps": 2,
+      "pqcDeps": 0
+    },
+    {
+      "name": "awscli",
+      "ecosystem": "pypi",
+      "downloads": 339630578,
+      "cryptoDeps": [
+        {
+          "name": "rsa",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "gcloud-aio-storage",
+      "ecosystem": "pypi",
+      "downloads": 46983440,
+      "cryptoDeps": [
+        {
+          "name": "rsa",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "python-jose",
+      "ecosystem": "pypi",
+      "downloads": 45854144,
+      "cryptoDeps": [
+        {
+          "name": "ecdsa",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "rsa",
+          "tier": "weak",
+          "direct": true
+        },
+        {
+          "name": "cryptography",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "pycrypto",
+          "tier": "weak",
+          "direct": true
+        },
+        {
+          "name": "pycryptodome",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "mixed",
+      "weakDeps": 2,
+      "modernDeps": 3,
+      "pqcDeps": 0
+    },
+    {
+      "name": "oauth2client",
+      "ecosystem": "pypi",
+      "downloads": 37346291,
+      "cryptoDeps": [
+        {
+          "name": "rsa",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "telethon",
+      "ecosystem": "pypi",
+      "downloads": 3727765,
+      "cryptoDeps": [
+        {
+          "name": "rsa",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "gitlab_support_readiness",
+      "ecosystem": "rubygems",
+      "downloads": 1483212,
+      "cryptoDeps": [
+        {
+          "name": "digest",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ably",
+      "ecosystem": "pypi",
+      "downloads": 1385602,
+      "cryptoDeps": [
+        {
+          "name": "pycryptodome",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "pycrypto",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "mixed",
+      "weakDeps": 1,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "fastlane-plugin-dynatrace",
+      "ecosystem": "rubygems",
+      "downloads": 1200649,
+      "cryptoDeps": [
+        {
+          "name": "digest",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "bosh-core",
+      "ecosystem": "rubygems",
+      "downloads": 1054201,
+      "cryptoDeps": [
+        {
+          "name": "gibberish",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "opentok",
+      "ecosystem": "pypi",
+      "downloads": 1023853,
+      "cryptoDeps": [
+        {
+          "name": "pyjwt",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "rsa",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "mixed",
+      "weakDeps": 1,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "multipass",
+      "ecosystem": "rubygems",
+      "downloads": 952009,
+      "cryptoDeps": [
+        {
+          "name": "ezcrypto",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "appengine-python-standard",
+      "ecosystem": "pypi",
+      "downloads": 872814,
+      "cryptoDeps": [
+        {
+          "name": "rsa",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "aider-chat",
+      "ecosystem": "pypi",
+      "downloads": 851208,
+      "cryptoDeps": [
+        {
+          "name": "cryptography",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "rsa",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "mixed",
+      "weakDeps": 1,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "gcs-oauth2-boto-plugin",
+      "ecosystem": "pypi",
+      "downloads": 654597,
+      "cryptoDeps": [
+        {
+          "name": "rsa",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "localstack-ext",
+      "ecosystem": "pypi",
+      "downloads": 482203,
+      "cryptoDeps": [
+        {
+          "name": "cryptography",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "pyotp",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "pyjwt",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "rsa",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "mixed",
+      "weakDeps": 1,
+      "modernDeps": 3,
+      "pqcDeps": 0
+    },
+    {
+      "name": "ansible-sign",
+      "ecosystem": "pypi",
+      "downloads": 412059,
+      "cryptoDeps": [
+        {
+          "name": "python-gnupg",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "active_record_proxy_adapters",
+      "ecosystem": "rubygems",
+      "downloads": 317054,
+      "cryptoDeps": [
+        {
+          "name": "digest",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "google-oauth2-tool",
+      "ecosystem": "pypi",
+      "downloads": 286580,
+      "cryptoDeps": [
+        {
+          "name": "rsa",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "mail-gpg",
+      "ecosystem": "rubygems",
+      "downloads": 253623,
+      "cryptoDeps": [
+        {
+          "name": "gpgme",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "dotgpg",
+      "ecosystem": "rubygems",
+      "downloads": 250472,
+      "cryptoDeps": [
+        {
+          "name": "gpgme",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "dbi-dbrc",
+      "ecosystem": "rubygems",
+      "downloads": 113057,
+      "cryptoDeps": [
+        {
+          "name": "gpgme",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "salt",
+      "ecosystem": "pypi",
+      "downloads": 105230,
+      "cryptoDeps": [
+        {
+          "name": "cryptography",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "python-gnupg",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "mixed",
+      "weakDeps": 1,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "hiera-gpg",
+      "ecosystem": "rubygems",
+      "downloads": 59425,
+      "cryptoDeps": [
+        {
+          "name": "gpgme",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "gooder_data",
+      "ecosystem": "rubygems",
+      "downloads": 57250,
+      "cryptoDeps": [
+        {
+          "name": "gpgme",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "mbleigh-twitter-auth",
+      "ecosystem": "rubygems",
+      "downloads": 54087,
+      "cryptoDeps": [
+        {
+          "name": "ezcrypto",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "kit_cms",
+      "ecosystem": "rubygems",
+      "downloads": 52812,
+      "cryptoDeps": [
+        {
+          "name": "fast-aes",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "highway",
+      "ecosystem": "rubygems",
+      "downloads": 50556,
+      "cryptoDeps": [
+        {
+          "name": "gpgme",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "leeloo",
+      "ecosystem": "rubygems",
+      "downloads": 49454,
+      "cryptoDeps": [
+        {
+          "name": "gpgme",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "akabei",
+      "ecosystem": "rubygems",
+      "downloads": 47434,
+      "cryptoDeps": [
+        {
+          "name": "gpgme",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "fuzzy_notes",
+      "ecosystem": "rubygems",
+      "downloads": 47341,
+      "cryptoDeps": [
+        {
+          "name": "gibberish",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "minfra-cli",
+      "ecosystem": "rubygems",
+      "downloads": 40254,
+      "cryptoDeps": [
+        {
+          "name": "gpgme",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "arver",
+      "ecosystem": "rubygems",
+      "downloads": 39032,
+      "cryptoDeps": [
+        {
+          "name": "gpgme",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "flo",
+      "ecosystem": "rubygems",
+      "downloads": 34975,
+      "cryptoDeps": [
+        {
+          "name": "gpgme",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "couch_potato-extensions",
+      "ecosystem": "rubygems",
+      "downloads": 34059,
+      "cryptoDeps": [
+        {
+          "name": "ezcrypto",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "carpool",
+      "ecosystem": "rubygems",
+      "downloads": 33631,
+      "cryptoDeps": [
+        {
+          "name": "fast-aes",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "cook",
+      "ecosystem": "rubygems",
+      "downloads": 33135,
+      "cryptoDeps": [
+        {
+          "name": "gpgme",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "imagemaster3000",
+      "ecosystem": "rubygems",
+      "downloads": 32977,
+      "cryptoDeps": [
+        {
+          "name": "gpgme",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "mpw",
+      "ecosystem": "rubygems",
+      "downloads": 32593,
+      "cryptoDeps": [
+        {
+          "name": "gpgme",
+          "tier": "weak",
+          "direct": true
+        },
+        {
+          "name": "rotp",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "mixed",
+      "weakDeps": 1,
+      "modernDeps": 1,
+      "pqcDeps": 0
+    },
+    {
+      "name": "fni-docs-theme",
+      "ecosystem": "rubygems",
+      "downloads": 31815,
+      "cryptoDeps": [
+        {
+          "name": "digest",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "jekyll-content-security-policy-generator",
+      "ecosystem": "rubygems",
+      "downloads": 29907,
+      "cryptoDeps": [
+        {
+          "name": "digest",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "bastille",
+      "ecosystem": "rubygems",
+      "downloads": 28949,
+      "cryptoDeps": [
+        {
+          "name": "gibberish",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "cyberplat_pki",
+      "ecosystem": "rubygems",
+      "downloads": 28760,
+      "cryptoDeps": [
+        {
+          "name": "crypt",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "cryptatron",
+      "ecosystem": "rubygems",
+      "downloads": 28156,
+      "cryptoDeps": [
+        {
+          "name": "gibberish",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "databasedotcom-oauth2",
+      "ecosystem": "rubygems",
+      "downloads": 27969,
+      "cryptoDeps": [
+        {
+          "name": "gibberish",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "donjon",
+      "ecosystem": "rubygems",
+      "downloads": 27713,
+      "cryptoDeps": [
+        {
+          "name": "gibberish",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "mpex",
+      "ecosystem": "rubygems",
+      "downloads": 25825,
+      "cryptoDeps": [
+        {
+          "name": "gpgme",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "jekyll-pdf",
+      "ecosystem": "rubygems",
+      "downloads": 24750,
+      "cryptoDeps": [
+        {
+          "name": "digest",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "catarse_full",
+      "ecosystem": "rubygems",
+      "downloads": 24729,
+      "cryptoDeps": [
+        {
+          "name": "ezcrypto",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    },
+    {
+      "name": "keychain",
+      "ecosystem": "rubygems",
+      "downloads": 20592,
+      "cryptoDeps": [
+        {
+          "name": "crypt",
+          "tier": "weak",
+          "direct": true
+        }
+      ],
+      "posture": "weak",
+      "weakDeps": 1,
+      "modernDeps": 0,
+      "pqcDeps": 0
+    }
+  ],
+  "topPqcProjects": [
+    {
+      "name": "age",
+      "ecosystem": "crates",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "aes",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "aes-gcm",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "chacha20poly1305",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "curve25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "hkdf",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "hmac",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ml-kem",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "p256",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "rsa",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "scrypt",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "sha2",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "sha3",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "subtle",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "x25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "zeroize",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "pqc-ready",
+      "weakDeps": 0,
+      "modernDeps": 14,
+      "pqcDeps": 1
+    },
+    {
+      "name": "mla",
+      "ecosystem": "crates",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "aes",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "aes-gcm",
+          "tier": "modern",
+          "direct": false
+        },
+        {
+          "name": "curve25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ed25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "hkdf",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ml-dsa",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "ml-kem",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "sha2",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "subtle",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "x25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "zeroize",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "pqc-ready",
+      "weakDeps": 0,
+      "modernDeps": 9,
+      "pqcDeps": 2
+    },
+    {
+      "name": "pgp",
+      "ecosystem": "crates",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "aes",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "aes-gcm",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "argon2",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "blowfish",
+          "tier": "weak",
+          "direct": true
+        },
+        {
+          "name": "cast5",
+          "tier": "weak",
+          "direct": true
+        },
+        {
+          "name": "curve25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "des",
+          "tier": "weak",
+          "direct": true
+        },
+        {
+          "name": "ecdsa",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ed25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "hkdf",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "idea",
+          "tier": "weak",
+          "direct": true
+        },
+        {
+          "name": "k256",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "md-5",
+          "tier": "weak",
+          "direct": true
+        },
+        {
+          "name": "ml-dsa",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "ml-kem",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "p256",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "p384",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ripemd",
+          "tier": "weak",
+          "direct": true
+        },
+        {
+          "name": "rsa",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "sha1",
+          "tier": "weak",
+          "direct": true
+        },
+        {
+          "name": "sha2",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "sha3",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "slh-dsa",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "subtle",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "x25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "zeroize",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "pqc-ready",
+      "weakDeps": 7,
+      "modernDeps": 16,
+      "pqcDeps": 3
+    },
+    {
+      "name": "qfe",
+      "ecosystem": "crates",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "chacha20poly1305",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "curve25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "hkdf",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "pqcrypto",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "sha2",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "pqc-ready",
+      "weakDeps": 0,
+      "modernDeps": 4,
+      "pqcDeps": 1
+    },
+    {
+      "name": "abir_guard",
+      "ecosystem": "crates",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "aes-gcm",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "argon2",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "hkdf",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ml-kem",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "ring",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "sha2",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "sha3",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "zeroize",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "pqc-ready",
+      "weakDeps": 0,
+      "modernDeps": 7,
+      "pqcDeps": 1
+    },
+    {
+      "name": "affinidi-crypto",
+      "ecosystem": "crates",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "aes",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ed25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "hmac",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "k256",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ml-dsa",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "p256",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "p384",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "sha2",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "slh-dsa",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "subtle",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "x25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "zeroize",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "pqc-ready",
+      "weakDeps": 0,
+      "modernDeps": 10,
+      "pqcDeps": 2
+    },
+    {
+      "name": "age-plugin-lupine",
+      "ecosystem": "crates",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "chacha20poly1305",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "hkdf",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ml-kem",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "sha2",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "zeroize",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "pqc-ready",
+      "weakDeps": 0,
+      "modernDeps": 4,
+      "pqcDeps": 1
+    },
+    {
+      "name": "agntcy-slim-datapath",
+      "ecosystem": "crates",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "aws-lc-rs",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "hkdf",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "hmac",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ml-kem",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "sha2",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "x25519-dalek",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "pqc-ready",
+      "weakDeps": 0,
+      "modernDeps": 5,
+      "pqcDeps": 1
+    },
+    {
+      "name": "anubis-age",
+      "ecosystem": "crates",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "chacha20poly1305",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "curve25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "hkdf",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "hmac",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "oqs",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "sha2",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "subtle",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "x25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "zeroize",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "pqc-ready",
+      "weakDeps": 0,
+      "modernDeps": 8,
+      "pqcDeps": 1
+    },
+    {
+      "name": "anubis-vault",
+      "ecosystem": "crates",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "argon2",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "blake3",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "chacha20poly1305",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "curve25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ed25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "pqcrypto-dilithium",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "pqcrypto-kyber",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "sha2",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "subtle",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "x25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "zeroize",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "pqc-ready",
+      "weakDeps": 0,
+      "modernDeps": 9,
+      "pqcDeps": 2
+    },
+    {
+      "name": "anubis-wormhole",
+      "ecosystem": "crates",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "hkdf",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "hmac",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "pqcrypto-dilithium",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "pqcrypto-kyber",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "sha2",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "subtle",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "zeroize",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "pqc-ready",
+      "weakDeps": 0,
+      "modernDeps": 5,
+      "pqcDeps": 2
+    },
+    {
+      "name": "anyhide",
+      "ecosystem": "crates",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "chacha20poly1305",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ed25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "hkdf",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ml-kem",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "sha2",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "sha3",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "x25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "zeroize",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "pqc-ready",
+      "weakDeps": 0,
+      "modernDeps": 7,
+      "pqcDeps": 1
+    },
+    {
+      "name": "ap-proxy-protocol",
+      "ecosystem": "crates",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "ed25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ml-dsa",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "sha2",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "pqc-ready",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 1
+    },
+    {
+      "name": "ap-relay-protocol",
+      "ecosystem": "crates",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "ed25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ml-dsa",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "sha2",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "pqc-ready",
+      "weakDeps": 0,
+      "modernDeps": 2,
+      "pqcDeps": 1
+    },
+    {
+      "name": "apfsds-crypto",
+      "ecosystem": "crates",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "aes-gcm",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ed25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "hmac",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ml-dsa",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "ml-kem",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "sha2",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "x25519-dalek",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "pqc-ready",
+      "weakDeps": 0,
+      "modernDeps": 5,
+      "pqcDeps": 2
+    },
+    {
+      "name": "arcanum-pqc",
+      "ecosystem": "crates",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "hkdf",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ml-dsa",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "ml-kem",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "sha2",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "subtle",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "x25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "zeroize",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "pqc-ready",
+      "weakDeps": 0,
+      "modernDeps": 5,
+      "pqcDeps": 2
+    },
+    {
+      "name": "arkhe-forge-platform",
+      "ecosystem": "crates",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "aes-gcm",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "argon2",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "blake3",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "chacha20poly1305",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ed25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ml-dsa",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "zeroize",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "pqc-ready",
+      "weakDeps": 0,
+      "modernDeps": 6,
+      "pqcDeps": 1
+    },
+    {
+      "name": "arkhe-kernel",
+      "ecosystem": "crates",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "blake3",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ed25519-dalek",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ml-dsa",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "zeroize",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "pqc-ready",
+      "weakDeps": 0,
+      "modernDeps": 3,
+      "pqcDeps": 1
+    },
+    {
+      "name": "auths-pairing-protocol",
+      "ecosystem": "crates",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "chacha20poly1305",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "hkdf",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "hmac",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ml-kem",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "p256",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "ring",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "sha2",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "subtle",
+          "tier": "modern",
+          "direct": true
+        },
+        {
+          "name": "zeroize",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "pqc-ready",
+      "weakDeps": 0,
+      "modernDeps": 8,
+      "pqcDeps": 1
+    },
+    {
+      "name": "axial",
+      "ecosystem": "crates",
+      "downloads": 0,
+      "cryptoDeps": [
+        {
+          "name": "pqcrypto",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "pqcrypto-dilithium",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "pqcrypto-kyber",
+          "tier": "pqc",
+          "direct": true
+        },
+        {
+          "name": "ring",
+          "tier": "modern",
+          "direct": true
+        }
+      ],
+      "posture": "pqc-ready",
+      "weakDeps": 0,
+      "modernDeps": 1,
+      "pqcDeps": 3
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+This repository publishes data, not software.
+
+Its content is dated, immutable datasets under datasets/<date>/. The only
+executable code is scripts/validate-dataset.mjs and scripts/check-immutable.mjs,
+both run by .github/workflows/validate.yml on every pull request, which is the
+check that actually matters here: a dataset is verified by its validator and its
+immutability guard, not by a CLI walkthrough.
+
+Scope, stated because a repo-root file cannot express it: this opt-out is for
+DATA commits. A change to scripts/ or to the workflow is a change to the thing
+that certifies every dataset in here, and should get the full review despite
+this file.

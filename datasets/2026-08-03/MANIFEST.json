@@ -1,0 +1,137 @@
+{
+  "dataset": "CryptoServe Census corpus layer, raw per-package scan output",
+  "kind": "raw+aggregate",
+  "generatedAt": "2026-08-03T22:42:24.490Z",
+  "license": "CC-BY-4.0",
+  "provenance": {
+    "sourceRepository": "opena2a-org/crypto-census",
+    "sourceCommit": "aa80da4b446abdac0e9d137d42da5e55446be63d",
+    "workflowRun": "https://github.com/opena2a-org/crypto-census/actions/runs/30839067824"
+  },
+  "corpus": {
+    "file": "corpus-2026-08-03.json",
+    "collectedAt": "2026-08-03",
+    "packagesScanned": 2170994,
+    "packagesWithCrypto": 65686,
+    "bytes": 40738,
+    "sha256": "6e9e6face1c73f8fa78ab7b30d7dc9520dbd9ea537763548032977c9073ca09a"
+  },
+  "knownIssues": [],
+  "truncatedEcosystems": [
+    {
+      "ecosystem": "maven",
+      "reason": "wall-clock budget reached",
+      "requested": 150000,
+      "collected": 103400,
+      "unit": "artifacts"
+    }
+  ],
+  "ecosystemCount": 11,
+  "totalScanned": 2170994,
+  "totalWithCrypto": 65686,
+  "ecosystemsMissingCounts": [],
+  "ecosystemsBelowPlausibleMinimum": [],
+  "ecosystemsWithNoDetections": [],
+  "ecosystemsWithoutPlausibleMinimum": [],
+  "complete": true,
+  "note": "Each file is the quality-controlled output of one ecosystem scan: deduplicated, spam-filtered, namespace-consolidated. Counts are of packages examined, not of packages using cryptography -- see totalWithCrypto per ecosystem. Scan limits are recorded per ecosystem in the workflow that produced this run and are not tuned to reproduce any previously published figure.",
+  "ecosystems": [
+    {
+      "ecosystem": "cocoapods",
+      "file": "scan-results-cocoapods-clean.json",
+      "totalScanned": 50000,
+      "totalWithCrypto": 357,
+      "bytes": 121099,
+      "sha256": "2b1e393def0e37f5c0105d466fe630b78d752feb5cdfd9d5a9073533f5ffe5ba"
+    },
+    {
+      "ecosystem": "crates",
+      "file": "scan-results-crates-clean.json",
+      "totalScanned": 302477,
+      "totalWithCrypto": 29204,
+      "bytes": 12102272,
+      "sha256": "d60c59383d2135cd1334813c14280d41b12e6f9e8ca04679995162ce8645c8f7"
+    },
+    {
+      "ecosystem": "go",
+      "file": "scan-results-go-clean.json",
+      "totalScanned": 200117,
+      "totalWithCrypto": 13343,
+      "bytes": 5090851,
+      "sha256": "406070df6f4563cc25a860a7acacd67f08b4110f9ad7ad466ce8e2b56d0df554"
+    },
+    {
+      "ecosystem": "hex",
+      "file": "scan-results-hex-clean.json",
+      "totalScanned": 15000,
+      "totalWithCrypto": 317,
+      "bytes": 109200,
+      "sha256": "48346ca25bc86e602d84c501148eff8d384452a63f4515bd09b7b6fd0de06069"
+    },
+    {
+      "ecosystem": "maven",
+      "file": "scan-results-maven-clean.json",
+      "totalScanned": 103400,
+      "totalWithCrypto": 1957,
+      "bytes": 820846,
+      "sha256": "f4479c3ac5f50c32877d0b78acd4fa72502ba04cd9a43aa619342295b63ddad4",
+      "enumeration": {
+        "truncated": true,
+        "reason": "wall-clock budget reached",
+        "requested": 150000,
+        "collected": 103400,
+        "unit": "artifacts",
+        "budgetMinutes": 240,
+        "elapsedMinutes": 240.39
+      }
+    },
+    {
+      "ecosystem": "npm",
+      "file": "scan-results-npm-clean.json",
+      "totalScanned": 1000000,
+      "totalWithCrypto": 10249,
+      "bytes": 3668288,
+      "sha256": "0fab709e5df99f8a9c93a4bf408918247ffec9fe609a5a446b86da65d2a4b750"
+    },
+    {
+      "ecosystem": "nuget",
+      "file": "scan-results-nuget-clean.json",
+      "totalScanned": 100000,
+      "totalWithCrypto": 1911,
+      "bytes": 721827,
+      "sha256": "5baa0c6cc8ad3647e643e0c5e0383e291ffbcc4ed8b0054831a2f1597a4feb6c"
+    },
+    {
+      "ecosystem": "packagist",
+      "file": "scan-results-packagist-clean.json",
+      "totalScanned": 100000,
+      "totalWithCrypto": 1153,
+      "bytes": 407296,
+      "sha256": "76562ba557d66813e587d46c5a4ca8786b123c6a29a27f4a56a4e6395b76a937"
+    },
+    {
+      "ecosystem": "pub",
+      "file": "scan-results-pub-clean.json",
+      "totalScanned": 50000,
+      "totalWithCrypto": 862,
+      "bytes": 298286,
+      "sha256": "57afa773d67b7002f68cd342835b1c51f850b2671972a91e59b127beb9df8c84"
+    },
+    {
+      "ecosystem": "pypi",
+      "file": "scan-results-pypi-clean.json",
+      "totalScanned": 150000,
+      "totalWithCrypto": 5019,
+      "bytes": 1761511,
+      "sha256": "d1884589c3f029905b21625710e3a2842bfb6666eb44596f2ff0e912f1fbdfc2"
+    },
+    {
+      "ecosystem": "rubygems",
+      "file": "scan-results-rubygems-clean.json",
+      "totalScanned": 100000,
+      "totalWithCrypto": 1314,
+      "bytes": 438288,
+      "sha256": "fe73f9602f95f65b2b03ea52049912984e386676c1367f5b708bad55d01a20fc"
+    }
+  ]
+}
