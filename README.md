@@ -64,15 +64,19 @@ published dataset; they are not backfilled into this one.
 
 Cite the dated dataset, not the repository:
 
-> CryptoServe Census, corpus layer, 2026-08-03. https://github.com/opena2a-org/crypto-census-data
+> CryptoServe Census, corpus layer, 2026-08-03. https://doi.org/10.5281/zenodo.21791658
 
 Each published dataset is deposited to Zenodo from the tag that pins it, so a
 citation resolves to fixed bytes rather than to a moving branch.
 
 | Dataset | DOI |
 |---|---|
-| [`2026-08-03`](datasets/2026-08-03) | _minting; added when Zenodo returns it_ |
+| [`2026-08-03`](datasets/2026-08-03) | [10.5281/zenodo.21791658](https://doi.org/10.5281/zenodo.21791658) |
 | [`2026-03-18`](datasets/2026-03-18) | none — predates the deposit workflow |
+
+`10.5281/zenodo.21791657` is the concept DOI. It resolves to whichever dataset
+was deposited most recently, which is the one thing a citation must not do:
+quote the dated DOI above, so a reader gets the bytes you actually read.
 
 ## Schema
 
