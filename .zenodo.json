@@ -22,7 +22,6 @@
     {
       "identifier": "https://census.cryptoserve.dev",
       "relation": "isDocumentedBy",
-      "resource_type": "publication-webpage",
       "scheme": "url"
     },
     {
