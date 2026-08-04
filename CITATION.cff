@@ -10,6 +10,16 @@ authors:
 license: CC-BY-4.0
 repository-code: https://github.com/opena2a-org/crypto-census-data
 url: https://census.cryptoserve.dev
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.21791658
+    description: >-
+      The 2026-08-03 dataset. Cite this one if that is the data you read.
+  - type: doi
+    value: 10.5281/zenodo.21791657
+    description: >-
+      Concept DOI for the series. It resolves to the most recently deposited
+      dataset, so it names the collection rather than the bytes.
 abstract: >-
   Cryptographic dependency adoption across eleven public package registries.
   Each dataset records, per ecosystem, how many packages were examined and how
