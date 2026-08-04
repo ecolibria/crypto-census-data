@@ -1,0 +1,35 @@
+{
+  "title": "CryptoServe Census: cryptographic dependency adoption across eleven public package registries",
+  "upload_type": "dataset",
+  "access_right": "open",
+  "license": "cc-by-4.0",
+  "version": "dataset-2026-08-03",
+  "creators": [
+    {
+      "name": "CryptoServe"
+    }
+  ],
+  "description": "<p>Raw output from the CryptoServe Cryptographic Census: how many packages in each public registry depend on a catalogued cryptographic library, and how those dependencies split across weak, modern and post-quantum tiers.</p><p><strong>This deposit archives the repository at a tag, and the repository holds more than one dataset.</strong> Each directory under <code>datasets/</code> is an independent, immutable release with its own collection date, its own <code>MANIFEST.json</code> and its own SHA-256 per file. Cite the dated dataset you actually used, not this record as a whole. Datasets included at this tag:</p><ul><li><code>datasets/2026-08-03</code> (raw+aggregate): 2,170,994 packages examined across 11 ecosystems, 65,686 of them depending on a catalogued cryptographic library. Of that crypto-using subset, 12,465 use weak cryptography and 353 are post-quantum ready. Published with per-package output, one file per ecosystem, so every figure can be recomputed.</li><li><code>datasets/2026-03-18</code> (aggregate-only): 2,809,479 packages examined across 11 ecosystems, 108,145 depending on a catalogued cryptographic library. Its raw per-package output does not exist and cannot be reconstructed; the aggregate survived because it was committed. Two ecosystem rows are annotated in place as known-wrong, both understating, and are not corrected retroactively.</li></ul><p><strong>Read the denominator before quoting a percentage.</strong> The scanned totals count packages <em>examined</em>, not packages using cryptography; the two differ by roughly a factor of 26. Every share published by this project is over the crypto-using subset. On that basis, post-quantum readiness moved from 0.17% in March 2026 to 0.54% in August 2026, and weak-cryptography use is flat at about 19%.</p><p>The August run examined fewer packages than March. That is not a regression: the March run enumerated more while classifying two ecosystems wrongly, and the current pipeline refuses to publish an ecosystem that enumerated implausibly little or matched nothing at all.</p><p>A published dataset is never rewritten. CI rejects any change that modifies or deletes a file under an existing dataset directory, and a correction is published as a new dated dataset that supersedes the old one and says so. That is the property this DOI depends on.</p>",
+  "keywords": [
+    "cryptography",
+    "post-quantum cryptography",
+    "software supply chain",
+    "package registries",
+    "dependency analysis",
+    "open data"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://census.cryptoserve.dev",
+      "relation": "isDocumentedBy",
+      "resource_type": "publication-webpage",
+      "scheme": "url"
+    },
+    {
+      "identifier": "https://github.com/opena2a-org/crypto-census",
+      "relation": "isSupplementTo",
+      "resource_type": "software",
+      "scheme": "url"
+    }
+  ]
+}

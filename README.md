@@ -10,7 +10,7 @@ published.
 ```console
 $ git clone https://github.com/opena2a-org/crypto-census-data
 $ node scripts/validate-dataset.mjs
-1 dataset(s) validated: 2026-03-18
+2 dataset(s) validated: 2026-03-18, 2026-08-03
 ```
 
 Every file is verified against the SHA-256 recorded in its `MANIFEST.json`, so a
@@ -19,9 +19,21 @@ reading as valid.
 
 ## What is published
 
-| Dataset | Kind | Packages scanned | Ecosystems |
-|---|---|---|---|
-| [`2026-03-18`](datasets/2026-03-18) | aggregate-only | 2,809,479 | 11 |
+| Dataset | Kind | Packages scanned | Using crypto | Ecosystems |
+|---|---|---|---|---|
+| [`2026-08-03`](datasets/2026-08-03) | raw+aggregate | 2,170,994 | 65,686 | 11 |
+| [`2026-03-18`](datasets/2026-03-18) | aggregate-only | 2,809,479 | 108,145 | 11 |
+
+The August dataset is the first published with its raw per-package output, one
+file per ecosystem, so a reader can recompute every figure rather than take the
+aggregate on trust.
+
+**It scanned fewer packages than March and that is not a regression.** March
+enumerated more packages while classifying two ecosystems wrongly (below), and
+the August run refuses to publish an ecosystem that enumerated implausibly
+little. Compare the shares, which are over the crypto-using subset in both:
+post-quantum-ready went 0.17% to 0.54%, roughly a tripling; weak crypto is flat
+at about 19%.
 
 **The March 2026 dataset is the aggregate alone.** Its raw per-package output
 does not exist: it was written to a path matching a line in `.gitignore`, was
@@ -52,10 +64,15 @@ published dataset; they are not backfilled into this one.
 
 Cite the dated dataset, not the repository:
 
-> CryptoServe Census, corpus layer, 2026-03-18. https://github.com/opena2a-org/crypto-census-data
+> CryptoServe Census, corpus layer, 2026-08-03. https://github.com/opena2a-org/crypto-census-data
 
-A Zenodo deposit with a citable DOI is made before publication of results that
-depend on it. When one exists for a dataset it is listed in the table above.
+Each published dataset is deposited to Zenodo from the tag that pins it, so a
+citation resolves to fixed bytes rather than to a moving branch.
+
+| Dataset | DOI |
+|---|---|
+| [`2026-08-03`](datasets/2026-08-03) | _minting; added when Zenodo returns it_ |
+| [`2026-03-18`](datasets/2026-03-18) | none — predates the deposit workflow |
 
 ## Schema
 
