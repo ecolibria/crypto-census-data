@@ -20,7 +20,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -386,6 +386,11 @@ const allowed = [
   ['adds an errata file for another dataset', (r) => r.write('errata/2026-08-03.json', { ...wellFormed(), dataset: '2026-08-03' })],
   ['rewrites the file with other spacing and key order', (r) => r.write(ERRATA_FILE, JSON.stringify(reversedKeys(wellFormed())))],
   ['adds a new dataset', (r) => r.write('datasets/2026-10-05/MANIFEST.json', { dataset: '2026-10-05' })],
+  ['adds a new dataset that holds an executable file', (r) => {
+    r.write('datasets/2026-10-05/MANIFEST.json', { dataset: '2026-10-05' });
+    chmodSync(join(r.dir, 'datasets', '2026-10-05', 'MANIFEST.json'), 0o755);
+    r.git('add', '--', 'datasets/2026-10-05/MANIFEST.json');
+  }],
   ['touches nothing', () => {}],
   ['adds an issue while the base has moved on with another change', (r) => {
     // Compared with the tip of the base, this change would seem to lack what
@@ -429,8 +434,8 @@ test('a change that left the base before the base gained a dataset passes', asyn
   assert.match(result.stdout, /No published dataset was modified \(2 protected\)/);
 });
 
-test('a checkout whose directory name ends in a space is the one that is checked', async () => {
-  // Beside it sits a checkout of the same name without the space, in which nothing was rewritten.
+for (const [what, name] of [['ends in a space', 'repo '], ['holds a line feed', 're\npo']]) test(`a checkout whose directory name ${what} is the one that is checked`, async () => {
+  // Beside it sits a checkout named without that character, in which nothing was rewritten.
   const parent = mkdtempSync(join(tmpdir(), 'census-errata-names-'));
   const build = (dir, rewrite) => {
     mkdirSync(dir);
@@ -450,8 +455,8 @@ test('a checkout whose directory name ends in a space is the one that is checked
   };
   try {
     build(join(parent, 'repo'), false);
-    build(join(parent, 'repo '), true);
-    const result = await run([join(ROOT, 'scripts', 'check-immutable.mjs'), 'published'], { cwd: join(parent, 'repo '), env: GIT_ENV });
+    build(join(parent, name), true);
+    const result = await run([join(ROOT, 'scripts', 'check-immutable.mjs'), 'published'], { cwd: join(parent, name), env: GIT_ENV });
     assert.equal(result.code, 1, result.stdout);
     assert.match(result.stderr, /modified datasets\/2026-03-18\/MANIFEST\.json/);
   } finally {
