@@ -157,6 +157,36 @@
       "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set."
     },
     {
+      "defect": "dependencies-declared-for-some-target-frameworks-counted",
+      "summary": "The NuGet scanner counted a library that a package declares for only some of its target frameworks as a dependency of the package. Re-read from the NuGet registry on 2026-10-05 at the last version it lists for each package, which is the scanner's own rule: 1,905 of the 1,911 published entries could be read, and 87 of them match a catalogued library only in dependency groups for some target frameworks. Of the 200 re-read packages that remain weak-classed under the corrected classes, 57 declare the weak library that way, and 42 of the 57 belong to one family of packages whose names share their first part. Of the 1,702 re-read packages counted as modern-only, 36 match only that way. How far the re-read shows what the scan read depends on the date of that last version. For 721 packages it is dated before the scan, so the version is the one the scan read: among them the two counts are 2 of 63 and 14 of 656. For 1,047 it is dated after the scan, so the re-read is of a later version. The other 137 are unlisted, and the registry gives an unlisted version no date, so their date does not show which version the scan read: among them the counts are 51 of 65 and 1 of 72. A library is taken as declared for every target framework when it is in every dependency group of the package or in a group that names no framework.",
+      "affects": [
+        "byEcosystem.nuget.weakExposed",
+        "byEcosystem.nuget.modernOnly"
+      ],
+      "direction": "overstates",
+      "magnitude": {
+        "value": 87,
+        "of": 1905,
+        "unit": "published NuGet entries re-read on 2026-10-05 that match a catalogued library only in dependency groups for some target frameworks"
+      },
+      "correctedIn": "A correction that records how each match is declared is planned for every scanner and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set."
+    },
+    {
+      "defect": "dependencies-in-non-default-subspecs-counted",
+      "summary": "The CocoaPods scanner counted a library that a pod declares only in a subspec outside its default subspecs, which is not installed unless asked for. Re-read from the CocoaPods CDN on 2026-10-05 at the last version it lists for each pod, which is the scanner's own rule: of the 357 matched pods, 5 match a catalogued library only that way, 3 counted as modern-only and 2 as weak. Both of the weak ones are counted through OpenSSL, which the corrected classes keep as weak. The re-read reproduces the published matches for 355 of the 357 pods.",
+      "affects": [
+        "byEcosystem.cocoapods.weakExposed",
+        "byEcosystem.cocoapods.modernOnly"
+      ],
+      "direction": "overstates",
+      "magnitude": {
+        "value": 5,
+        "of": 357,
+        "unit": "matched pods re-read on 2026-10-05 whose every catalogued match is in a subspec outside the default subspecs"
+      },
+      "correctedIn": "A correction that records how each match is declared is planned for every scanner and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set."
+    },
+    {
       "defect": "unread-packages-counted-as-scanned",
       "summary": "A package whose metadata could not be read was still counted as scanned, and as using no cryptography. Each raw file records the number as fetchErrors: npm 5,374 of 1,000,000; PyPI 4,084 of 150,000; Go 76 of 200,117; Maven 26 of 103,400; Packagist 20,826 of 100,000; NuGet 6,855 of 100,000; CocoaPods 1 of 50,000. packagesScanned (2,170,994) therefore includes at least 37,242 packages that were not read, and withNoCrypto counts them as using no cryptography. The figure is a floor: in the npm and NuGet scanners some failed reads are not added to fetchErrors. Packagist cause, from a seeded sample of 300 packages run on 2026-10-05: 46 had no tagged release, which the scanner treated as a failed fetch. NuGet cause: not verified. crates.io has no fetchErrors field; its scanner counted only crates it read, and its file records 12 parse errors. RubyGems, Hex and pub.dev report 0; whether their scanners count every failure has not been verified.",
       "affects": [
@@ -210,7 +240,7 @@
     },
     {
       "defect": "weak-tier-mixes-two-kinds-of-library",
-      "summary": "The catalogue's weak tier mixes libraries that implement broken algorithms with libraries that are deprecated or unmaintained, and it holds entries that the corrected classes do not class as weak. Re-aggregated on 2026-10-05 under the corrected classes, the 12,465 packages counted as depending on a weak library become 10,749. Counting every package with a weak match, including the 23 that are filed as post-quantum because they also have a post-quantum match (21 crates, 2 npm packages), the pair is 12,488 and 10,770. By ecosystem, on the published rule: npm 3,146 to 2,655; PyPI 201 to 173; Go 3,244 to 3,227; Maven 895 to 152; crates.io 4,460 to 4,266; Packagist 177 to 61; NuGet 204 to 201; RubyGems 83 to 4; CocoaPods 52 to 7; Hex and pub.dev do not change. A package that leaves the weak count and still matches another catalogued library moves to the modern-only count. The corrected classes count a library as weak only where it implements broken algorithms or an end-of-life signal was found. For 11 entries left out of the weak class no such signal was found either way and their status is not verified, so the corrected figures may be low: tlslite (PyPI); bordoni/phpass and ircmaxell/random-lib (Packagist); CryptSharpOfficial (NuGet); crypt, gibberish and ezcrypto (RubyGems); crypto_dart (pub.dev); AESCrypt-ObjC, Arcane and CommonCryptoSwift (CocoaPods). On npm and Packagist the unread packages work in the other direction and are unmeasured, so the net direction of weakExposed on those two rows is not established.",
+      "summary": "The catalogue's weak tier mixes libraries that implement broken algorithms with libraries that are deprecated or unmaintained, and it holds entries that the corrected classes do not class as weak. Re-aggregated on 2026-10-05 under the corrected classes, the 12,465 packages counted as depending on a weak library become between 10,749 and 10,809. Counting every package with a weak match, the published figure is 12,488: it adds the 23 that are filed as post-quantum because they also have a post-quantum match (21 crates, 2 npm packages). On that count the corrected figure is between 10,770 and 10,830. It adds 21 of the 23, the crates: under the corrected classes the two npm packages have no weak match. By ecosystem, on the published rule: npm 3,146 to 2,655; PyPI 201 to 173 or 174; Go 3,244 to 3,227; Maven 895 to 152; crates.io 4,460 to 4,266; Packagist 177 to between 61 and 86; NuGet 204 to 201; RubyGems 83 to between 4 and 37; CocoaPods 52 to 7 or 8; Hex and pub.dev do not change. A package that leaves the weak count and still matches another catalogued library moves to the modern-only count. The corrected classes count a library as weak only where it implements broken algorithms or an end-of-life signal was found. For 11 entries left out of the weak class no such signal was found either way and their status is not verified: tlslite (PyPI); bordoni/phpass and ircmaxell/random-lib (Packagist); CryptSharpOfficial (NuGet); crypt, gibberish and ezcrypto (RubyGems); crypto_dart (pub.dev); AESCrypt-ObjC, Arcane and CommonCryptoSwift (CocoaPods). 60 packages are counted as weak only through those entries: RubyGems 33, Packagist 25, PyPI 1, CocoaPods 1. That is why the corrected figures are ranges: the lower end takes none of the 11 as weak and the upper end takes all of them. On npm, Packagist and NuGet the unread packages work in the other direction and are unmeasured, so the net direction of weakExposed on those three rows is not established.",
       "affects": [
         "withWeakCrypto",
         "weakShareOfCryptoUsing",
@@ -228,7 +258,7 @@
       "magnitude": {
         "value": 10749,
         "of": 12465,
-        "unit": "packages counted as depending on a weak library that remain so under the corrected classes"
+        "unit": "packages counted as depending on a weak library that remain so under the corrected classes; 10,809 if all 11 entries of unverified status are weak"
       },
       "correctedIn": "A correction to the catalogue is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set."
     },
@@ -249,15 +279,15 @@
     },
     {
       "defect": "top-exposed-list-names-packages-not-classed-weak",
-      "summary": "topExposedProjects names 50 packages with posture weak or mixed. Under the corrected weak classes, 35 of them are counted as weak only through catalogue entries those classes do not class as weak or do not count. The other 15 remain, each through a library classed as deprecated.",
+      "summary": "topExposedProjects names 50 packages with posture weak or mixed. Under the corrected weak classes, between 23 and 35 of them leave the list and between 15 and 27 remain. 15 remain, each through a library classed as deprecated. 23 are counted as weak only through catalogue entries those classes do not class as weak. The other 12 are counted as weak only through entries whose status is not verified (gibberish 6, ezcrypto 4, crypt 2; see weak-tier-mixes-two-kinds-of-library), and leave or remain as those are settled.",
       "affects": [
         "topExposedProjects"
       ],
       "direction": "overstates",
       "magnitude": {
-        "value": 35,
+        "value": 23,
         "of": 50,
-        "unit": "packages named in topExposedProjects that are weak only through entries the corrected classes do not class as weak"
+        "unit": "packages named in topExposedProjects that leave the list under the corrected classes, at least; 35 if none of the three entries of unverified status is weak"
       },
       "correctedIn": "A correction to the catalogue is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set."
     },

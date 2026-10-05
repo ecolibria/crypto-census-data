@@ -23,12 +23,6 @@
       "identifier": "https://census.cryptoserve.dev",
       "relation": "isDocumentedBy",
       "scheme": "url"
-    },
-    {
-      "identifier": "https://github.com/opena2a-org/crypto-census",
-      "relation": "isSupplementTo",
-      "resource_type": "software",
-      "scheme": "url"
     }
   ]
 }

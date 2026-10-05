@@ -66,14 +66,17 @@ measured, and how to check it.
 | Go | A go.mod that holds only a module line was counted as using no cryptography. | Understates |
 | crates.io | A dependency was counted however it is declared, including optional, development, build and platform-specific ones. | Overstates |
 | PyPI | Requirements behind an extra or an environment marker were counted. | Overstates |
+| NuGet | A library that a package declares for only some of its target frameworks was counted. | Overstates |
+| CocoaPods | A library that a pod declares only in a subspec outside its default subspecs was counted. | Overstates |
 | npm, PyPI, Go, Maven, Packagist, NuGet, CocoaPods | A package that could not be read was counted as scanned and as using no cryptography. | `packagesScanned` overstates; match counts understate |
 | Every ecosystem but Hex and pub.dev | The weak tier mixes libraries that implement broken algorithms with libraries that are deprecated or unmaintained, and holds entries the corrected classes do not class as weak. | Overstates |
 | Totals and shares | They sum or divide the counts above. | Not established |
 | `topExposedProjects`, `topPqcProjects` | The two lists name packages through entries not classed weak, or through optional declarations. | Overstates |
 
 Not known: the effect of the unread packages on any count, the cause of the NuGet read failures, whether the
-RubyGems, Hex and pub.dev scanners, which report no unread package, count every failure, and why some of the
-published Go entries could not be located when the Go scan was reconstructed.
+RubyGems, Hex and pub.dev scanners, which report no unread package, count every failure, why some of the
+published Go entries could not be located when the Go scan was reconstructed, and whether some libraries left
+out of the corrected weak class are weak. The corrected weak counts in the errata are ranges for that last reason.
 
 One correction has been made to a scanner, for Maven, and no scan has been published with it. The others are
 planned. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.
@@ -146,11 +149,11 @@ before quoting a percentage.
 
 ## How a dataset gets here
 
-The census scan runs daily in
-[`opena2a-org/crypto-census`](https://github.com/opena2a-org/crypto-census) as a
-canary: it scans all eleven ecosystems, aggregates, uploads artifacts, and
-publishes nothing. A broken scanner is therefore found the day it breaks rather
-than the day someone needs the data.
+The scan is a workflow in the source repository that each manifest's `provenance` records. That repository is not
+public, so the addresses in `provenance` do not open for an outside reader. Run without `publish`, the workflow is
+a canary: it scans all eleven ecosystems, aggregates, uploads artifacts, and publishes nothing. It does not run on
+a schedule at present. Its daily schedule has been off since 2026-09-10, and one canary was run by hand on
+2026-10-05.
 
 Publication is deliberate. A maintainer triggers the workflow with
 `publish=true`, which opens a pull request here carrying the aggregate, the raw
@@ -159,8 +162,10 @@ a run in which any ecosystem enumerated implausibly little, or enumerated
 normally and matched nothing at all — both of which have happened, and neither
 of which looks like a failure in the totals.
 
-Scan limits are what they are. They are never tuned to reproduce a previously
-published figure.
+A scan limit is not to be chosen to reproduce a previously published figure. On 2026-10-05 four limits in the
+source repository were raised so that a run would list more packages than the March dataset did. No dataset was
+published from those limits. They are to be replaced by a rule that takes each limit from what the registry lists
+and not from a total, and no dataset is published until that rule is in the scanner.
 
 ## Immutability
 
@@ -169,8 +174,9 @@ deletes a file under an existing `datasets/<date>/`. A correction is published a
 a new dated dataset that supersedes the old one and says so.
 
 A defect measured after publication is recorded in `errata/<date>.json`, outside the dataset directory, so the
-deposited bytes do not change. Entries are added to an errata file and existing entries are not edited; the
-repository history records each addition.
+deposited bytes do not change. An errata file only grows. CI rejects a pull request that edits, reorders or
+removes an issue already published in one, changes anything else in the file, or deletes or renames it. Each
+issue carries the date it was added.
 
 This is the property a DOI depends on: a citation points at bytes that must not
 move underneath it.
@@ -178,14 +184,17 @@ move underneath it.
 ## Validating
 
 ```bash
-node scripts/validate-dataset.mjs             # every dataset
-node scripts/validate-dataset.mjs 2026-03-18  # one dataset
+node scripts/validate-dataset.mjs             # every dataset and every errata file
+node scripts/validate-dataset.mjs 2026-03-18  # one dataset, and its errata file if it has one
 ```
 
 The validator checks that every listed file exists and matches its hash, that no
 unlisted file is present, that the aggregate and the raw files describe the same
 run, that the aggregate's per-ecosystem counts sum to its own total, and that any
 `knownIssue` is complete and states a direction.
+It checks each errata file as well: that it is named for a dataset in this repository, that every issue names
+fields that exist in that dataset's aggregate, states a direction and carries the date it was added, that a size
+is given in whole counts or as null, and that the file is exactly what a JSON serialiser writes.
 
 The two datasets above were published before a manifest carried a
 `schemaVersion`. The validator accepts a manifest without one for those two
