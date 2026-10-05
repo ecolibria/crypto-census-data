@@ -49,6 +49,7 @@ const wellFormed = () => ({
       direction: 'overstates',
       magnitude: { value: 3, of: 10, unit: 'packages' },
       correctedIn: 'the next dataset',
+      issuedAt: '2026-10-05',
     },
     {
       defect: 'example-second',
@@ -57,6 +58,7 @@ const wellFormed = () => ({
       direction: 'unknown',
       magnitude: null,
       correctedIn: 'the next dataset',
+      issuedAt: '2026-10-05',
     },
   ],
 });
@@ -68,6 +70,7 @@ const later = () => ({
   direction: 'understates',
   magnitude: null,
   correctedIn: 'the next dataset',
+  issuedAt: '2026-11-01',
 });
 
 const run = (args, options) => new Promise((done) => {
@@ -90,7 +93,7 @@ async function validateWith(errataFiles, argument) {
     mkdirSync(join(dir, 'errata'));
     for (const [name, content] of Object.entries(errataFiles)) {
       writeFileSync(join(dir, 'errata', name),
-        typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+        typeof content === 'string' ? content : `${JSON.stringify(content, null, 2)}\n`);
     }
     const args = [join(dir, 'scripts', 'validate-dataset.mjs'), ...(argument ? [argument] : [])];
     return await run(args, { env: {} });
@@ -115,11 +118,15 @@ test('an empty errata directory changes nothing about the run', async () => {
   assert.doesNotMatch(result.stdout, /errata/);
 });
 
-/** [what the file has wrong, the change that makes it so, the problem reported]. One problem each. */
+/** [what the file has wrong, the change that makes it so, the problem reported, how many problems if not one]. */
 const refusals = [
   ['no date of issue', (e) => { e.issuedAt = null; }, /issuedAt is null, not a YYYY-MM-DD date/],
   ['a date of issue that is not a day of the calendar', (e) => { e.issuedAt = '2026-02-31'; }, /issuedAt is "2026-02-31", not a YYYY-MM-DD date/],
-  ['a date of issue before the dataset was collected', (e) => { e.issuedAt = '2026-03-17'; }, /issuedAt is 2026-03-17, before the dataset/],
+  ['a date of issue before the dataset was collected', (e) => { e.issuedAt = '2026-03-17'; }, /issuedAt is 2026-03-17, before the dataset/, 2],
+  ['a date of issue that is not its first issue\'s', (e) => { e.issuedAt = '2026-10-06'; }, /issuedAt is 2026-10-06 and its first issue has 2026-10-05/],
+  ['an issue with no date of issue', (e) => { delete e.issues[1].issuedAt; }, /issue 2 \(example-second\) has issuedAt undefined, not a YYYY-MM-DD date/],
+  ['an issue dated before the dataset was collected', (e) => { e.issues[0].issuedAt = '2026-03-01'; e.issuedAt = '2026-03-01'; }, /issue 1 \(example-first\) has issuedAt 2026-03-01, before the dataset/, 2],
+  ['an issue dated before the one above it', (e) => { e.issues[1].issuedAt = '2026-10-04'; }, /issue 2 \(example-second\) has issuedAt 2026-10-04, earlier than the issue before it \(2026-10-05\)/],
   ['another schema version', (e) => { e.schemaVersion = 1; }, /schemaVersion is 1;/],
   ['another kind', (e) => { e.kind = 'aggregate-only'; }, /kind is "aggregate-only", not "censusErrata"/],
   ['a dataset other than the one the file is named for', (e) => { e.dataset = '2026-08-03'; }, /dataset is "2026-08-03", and the file is named for 2026-03-18/],
@@ -143,8 +150,10 @@ const refusals = [
   ['a figure named twice', (e) => { e.issues[0].affects = ['packagesScanned', 'packagesScanned']; }, /names packagesScanned twice in affects/],
   ['a figure that is not a path', (e) => { e.issues[0].affects = [42]; }, /has an entry in affects that is not a field path/],
   ['a magnitude left out', (e) => { delete e.issues[0].magnitude; }, /issue 1 \(example-first\) is missing magnitude/],
-  ['a magnitude whose count is text', (e) => { e.issues[0].magnitude.value = '3'; }, /has magnitude\.value "3", not a count/],
-  ['a magnitude counted in nothing', (e) => { e.issues[0].magnitude = { value: 0, of: 0, unit: 'packages' }; }, /has magnitude\.of 0, not a count above zero/],
+  ['a magnitude whose count is text', (e) => { e.issues[0].magnitude.value = '3'; }, /has magnitude\.value "3", not a whole count/],
+  ['a magnitude that is a fraction', (e) => { e.issues[0].magnitude = { value: 0.5, of: 1, unit: 'packages' }; }, /has magnitude\.value 0\.5, not a whole count/],
+  ['a magnitude counted in a fraction', (e) => { e.issues[0].magnitude.of = 10.5; }, /has magnitude\.of 10\.5, not a whole count above zero/],
+  ['a magnitude counted in nothing', (e) => { e.issues[0].magnitude = { value: 0, of: 0, unit: 'packages' }; }, /has magnitude\.of 0, not a whole count above zero/],
   ['a magnitude larger than its whole', (e) => { e.issues[0].magnitude.value = 11; }, /has a magnitude of 11 of 10: more than the whole/],
   ['a magnitude with no unit', (e) => { e.issues[0].magnitude.unit = ''; }, /has no magnitude\.unit/],
   ['a magnitude with a field of its own', (e) => { e.issues[0].magnitude.note = 'estimate'; }, /has a magnitude that is not \{ value, of, unit \} or null/],
@@ -152,14 +161,31 @@ const refusals = [
   ['a magnitude written as a list', (e) => { e.issues[0].magnitude = [3, 10, 'packages']; }, /has a magnitude that is not \{ value, of, unit \} or null/],
 ];
 
-for (const [what, change, problem] of refusals) {
+for (const [what, change, problem, count = 1] of refusals) {
   test(`an errata file with ${what} is refused`, async () => {
     const errata = wellFormed();
     change(errata);
     const result = await validateWith({ [`${PUBLISHED}.json`]: errata });
     assert.equal(result.code, 1, result.stdout);
-    assert.match(result.stderr, ONE_PROBLEM);
+    assert.match(result.stderr, new RegExp(`\\n${count} problem\\(s\\) across 1 dataset\\(s\\) and 1 errata file\\(s\\):`));
     assert.match(result.stderr, problem);
+  });
+}
+
+/** [how the file is written, its text]. The content is the well-formed file each time. */
+const spellings = [
+  ['with four-space indentation', () => `${JSON.stringify(wellFormed(), null, 4)}\n`],
+  ['on one line', () => `${JSON.stringify(wellFormed())}\n`],
+  ['with no newline at its end', () => JSON.stringify(wellFormed(), null, 2)],
+  ['with a key written twice', () => `${JSON.stringify(wellFormed(), null, 2)}\n`.replace('"kind": "censusErrata",', '"kind": "draft",\n  "kind": "censusErrata",')],
+];
+
+for (const [how, text] of spellings) {
+  test(`an errata file written ${how} is refused`, async () => {
+    const result = await validateWith({ [`${PUBLISHED}.json`]: text() });
+    assert.equal(result.code, 1, result.stdout);
+    assert.match(result.stderr, ONE_PROBLEM);
+    assert.match(result.stderr, /is not in its canonical form/);
   });
 }
 

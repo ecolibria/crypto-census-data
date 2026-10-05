@@ -79,7 +79,7 @@ const DIRECTIONS = ['understates', 'overstates', 'unknown'];
  * one.
  */
 const ERRATA_FIELDS = ['schemaVersion', 'kind', 'dataset', 'doi', 'issuedAt', 'issues'];
-const ISSUE_FIELDS = ['defect', 'summary', 'affects', 'direction', 'magnitude', 'correctedIn'];
+const ISSUE_FIELDS = ['defect', 'summary', 'affects', 'direction', 'magnitude', 'correctedIn', 'issuedAt'];
 const MAGNITUDE_FIELDS = ['value', 'of', 'unit'];
 
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -283,9 +283,11 @@ function validateErrata(file) {
   }
   const date = named[1];
 
+  let text;
   let errata;
   try {
-    errata = JSON.parse(readFileSync(join(ERRATA, file), 'utf-8'));
+    text = readFileSync(join(ERRATA, file), 'utf-8');
+    errata = JSON.parse(text);
   } catch (err) {
     fail(label, `does not parse: ${err.message}`);
     return;
@@ -293,6 +295,15 @@ function validateErrata(file) {
   if (!isObject(errata)) {
     fail(label, 'is not a JSON object');
     return;
+  }
+
+  // One spelling of a file. A JSON parser keeps the last of two keys with the
+  // same name and says nothing, so a file edited by hand can hold a second
+  // `summary` that no check ever reads. A file that is exactly what a
+  // serialiser writes cannot.
+  if (text !== `${JSON.stringify(errata, null, 2)}\n`) {
+    fail(label, 'is not in its canonical form: two-space JSON as JSON.stringify writes it, ending in one ' +
+      'newline. Anything else can hide a repeated key from every check here.');
   }
 
   const extra = unknownFields(errata, ERRATA_FIELDS);
@@ -339,6 +350,12 @@ function validateErrata(file) {
     return;
   }
 
+  // Each issue carries the date it was added. One date for the file would
+  // backdate every issue added later. The file's own date is that of its
+  // first issue, and the dates never run backwards.
+  const fileIssued = isCalendarDate(errata.issuedAt) ? errata.issuedAt : null;
+  let previousIssued = null;
+
   const defects = new Set();
   errata.issues.forEach((issue, index) => {
     const at = `issue ${index + 1}`;
@@ -368,6 +385,24 @@ function validateErrata(file) {
         'which tells a reader nothing about which way to read the figure');
     }
 
+    if (!isCalendarDate(issue.issuedAt)) {
+      fail(label, `${where} has issuedAt ${JSON.stringify(issue.issuedAt)}, not a YYYY-MM-DD date. ` +
+        'An issue with no date of issue is a draft.');
+    } else {
+      if (issue.issuedAt < date) {
+        fail(label, `${where} has issuedAt ${issue.issuedAt}, before the dataset it describes was collected`);
+      }
+      if (previousIssued !== null && issue.issuedAt < previousIssued) {
+        fail(label, `${where} has issuedAt ${issue.issuedAt}, earlier than the issue before it (${previousIssued}). ` +
+          'Issues are listed in the order they were added.');
+      }
+      if (index === 0 && fileIssued !== null && issue.issuedAt !== fileIssued) {
+        fail(label, `issuedAt is ${fileIssued} and its first issue has ${issue.issuedAt}. ` +
+          "The file's date of issue is the date of its first issue.");
+      }
+      previousIssued = issue.issuedAt;
+    }
+
     if (!Array.isArray(issue.affects) || issue.affects.length === 0) {
       fail(label, `${where} names no figure in affects`);
     } else {
@@ -394,10 +429,11 @@ function validateErrata(file) {
           !MAGNITUDE_FIELDS.every((k) => Object.hasOwn(m, k))) {
         fail(label, `${where} has a magnitude that is not { value, of, unit } or null`);
       } else {
-        const valueOk = Number.isFinite(m.value) && m.value >= 0;
-        const ofOk = Number.isFinite(m.of) && m.of > 0;
-        if (!valueOk) fail(label, `${where} has magnitude.value ${JSON.stringify(m.value)}, not a count`);
-        if (!ofOk) fail(label, `${where} has magnitude.of ${JSON.stringify(m.of)}, not a count above zero`);
+        // Whole numbers: a magnitude counts things, and 0.5 of 1 would pass as a share.
+        const valueOk = Number.isInteger(m.value) && m.value >= 0;
+        const ofOk = Number.isInteger(m.of) && m.of > 0;
+        if (!valueOk) fail(label, `${where} has magnitude.value ${JSON.stringify(m.value)}, not a whole count`);
+        if (!ofOk) fail(label, `${where} has magnitude.of ${JSON.stringify(m.of)}, not a whole count above zero`);
         if (valueOk && ofOk && m.value > m.of) {
           fail(label, `${where} has a magnitude of ${m.value} of ${m.of}: more than the whole it is counted in`);
         }
