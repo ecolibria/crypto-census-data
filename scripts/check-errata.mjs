@@ -143,6 +143,9 @@ const refusals = [
   ['an issue with no summary', (e) => { e.issues[0].summary = '  '; }, /issue 1 \(example-first\) is missing summary/],
   ['a summary made of characters nobody can see', (e) => { e.issues[0].summary = '\u200B\u200B'; }, /issue 1 \(example-first\) is missing summary/],
   ['a summary that carries a direction override', (e) => { e.issues[0].summary = 'A count \u202Edaer ton saw'; }, /issue 1 \(example-first\) has a control or format character in summary/],
+  ['a summary with a control character in it', (e) => { e.issues[0].summary = 'A count includes\u0007 packages that were not read.'; }, /issue 1 \(example-first\) has a control or format character in summary/],
+  ['a summary broken over two lines', (e) => { e.issues[0].summary = 'A count includes packages\nthat were not read.'; }, /issue 1 \(example-first\) has a control or format character in summary/],
+  ['a unit that carries a character nobody can see', (e) => { e.issues[0].magnitude.unit = 'pack\u200Bages'; }, /has no magnitude\.unit/],
   ['a unit made of characters nobody can see', (e) => { e.issues[0].magnitude.unit = '\u0000'; }, /has no magnitude\.unit/],
   ['a defect id with a space after it', (e) => { e.issues[1].defect = 'example-first '; }, /issue 2 \(example-first \) has a defect id that is not lower-case words joined by hyphens/],
   ['an issue that does not say where it is corrected', (e) => { delete e.issues[0].correctedIn; }, /issue 1 \(example-first\) is missing correctedIn/],
@@ -154,6 +157,8 @@ const refusals = [
   ['a registry the aggregate does not have', (e) => { e.issues[0].affects = ['byEcosystem.conda.scanned']; }, /affects byEcosystem\.conda\.scanned, which is not a field/],
   ['a figure every object has', (e) => { e.issues[0].affects = ['byEcosystem.constructor']; }, /affects byEcosystem\.constructor, which is not a field/],
   ['a path below a number', (e) => { e.issues[0].affects = ['packagesScanned.toFixed']; }, /affects packagesScanned\.toFixed, which is not a field/],
+  ['a path below a text value', (e) => { e.issues[0].affects = ['collectedAt.length']; }, /affects collectedAt\.length, which is not a field/],
+  ['a figure named with a character nobody can see', (e) => { e.issues[0].affects = ['packagesScanned\u200B']; }, /has an entry in affects that is not a field path/],
   ['a figure named twice', (e) => { e.issues[0].affects = ['packagesScanned', 'packagesScanned']; }, /names packagesScanned twice in affects/],
   ['a figure that is not a path', (e) => { e.issues[0].affects = [42]; }, /has an entry in affects that is not a field path/],
   ['a magnitude left out', (e) => { delete e.issues[0].magnitude; }, /issue 1 \(example-first\) is missing magnitude/],
@@ -238,6 +243,27 @@ test('an errata file that is a link to a file elsewhere is refused', async () =>
   assert.match(result.stderr, /errata\/2026-03-18\.json: is not a regular file/);
 });
 
+test('errata/ that is a link to a directory elsewhere is refused', async () => {
+  // Every file in it is a regular file, kept where the append-only check does not look.
+  const result = await validateWith({}, undefined, (dir) => {
+    rmSync(join(dir, 'errata'), { recursive: true });
+    mkdirSync(join(dir, 'attic'));
+    writeFileSync(join(dir, 'attic', `${PUBLISHED}.json`), `${JSON.stringify(wellFormed(), null, 2)}\n`);
+    symlinkSync('attic', join(dir, 'errata'));
+  });
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(result.stderr, /\n1 problem\(s\) across 1 dataset\(s\):/);
+  assert.match(result.stderr, /errata: is not a directory/);
+});
+
+test('an errata file that starts with a byte order mark is refused', async () => {
+  // A decoder that drops the mark reads the rest as the canonical file, which these bytes are not.
+  const result = await validateWith({ [`${PUBLISHED}.json`]: `\uFEFF${JSON.stringify(wellFormed(), null, 2)}\n` });
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(result.stderr, ONE_PROBLEM);
+  assert.match(result.stderr, /errata\/2026-03-18\.json: does not parse/);
+});
+
 test('an errata file with a byte that is not UTF-8 is refused', async () => {
   const good = Buffer.from(`${JSON.stringify(wellFormed(), null, 2)}\n`, 'utf-8');
   const at = good.indexOf('A count');
@@ -275,8 +301,10 @@ const GIT_ENV = {
 /**
  * Publish a dataset and its errata file in one commit, apply `change` in a
  * second, and run the immutability check with the first commit as its base.
+ * `published: null` publishes the dataset with no errata file, and
+ * `dataset: false` publishes nothing at all.
  */
-async function afterPublication(change, { published = wellFormed(), startIn = '.' } = {}) {
+async function afterPublication(change, { published = wellFormed(), startIn = '.', dataset = true } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'census-errata-history-'));
   const git = (...args) => execFileSync('git', args, { cwd: dir, env: GIT_ENV, stdio: ['ignore', 'pipe', 'pipe'] });
   const write = (path, content) => {
@@ -286,9 +314,9 @@ async function afterPublication(change, { published = wellFormed(), startIn = '.
   };
   try {
     git('init', '--quiet', '--initial-branch=work');
-    write(`datasets/${PUBLISHED}/MANIFEST.json`, { dataset: PUBLISHED });
-    write(ERRATA_FILE, published);
-    git('commit', '--quiet', '--message', 'published');
+    if (dataset) write(`datasets/${PUBLISHED}/MANIFEST.json`, { dataset: PUBLISHED });
+    if (dataset && published) write(ERRATA_FILE, published);
+    git('commit', '--quiet', '--allow-empty', '--message', 'published');
     git('branch', 'published');
     change({ write, git, dir });
     git('commit', '--quiet', '--allow-empty', '--message', 'change');
@@ -313,6 +341,8 @@ test('a base that cannot be read fails the check', async () => {
     const missing = await run([script, 'origin/no-such-branch'], { cwd: dir, env: GIT_ENV });
     assert.equal(missing.code, 1, missing.stdout);
     assert.match(missing.stderr, /Cannot read the base "origin\/no-such-branch"/);
+    // It stops there: nothing further is asked of a base that cannot be read.
+    assert.doesNotMatch(missing.stderr, /share no history/);
     // The same tree against a base it can read passes, so the failure above is the base and nothing else.
     const readable = await run([script, 'work'], { cwd: dir, env: GIT_ENV });
     assert.equal(readable.code, 0, readable.stderr);
@@ -386,6 +416,49 @@ test('started in a subdirectory, the check still sees a rewritten dataset and a 
   assert.match(result.stderr, /issue 1 \(example-first\) of errata\/2026-03-18\.json is no longer what was published/);
 });
 
+test('a change that left the base before the base gained a dataset passes', async () => {
+  // Compared with the tip of the base, this change would seem to have deleted a dataset it never had.
+  const result = await afterPublication((r) => {
+    r.git('checkout', '--quiet', 'published');
+    r.write('datasets/2026-10-05/MANIFEST.json', { dataset: '2026-10-05' });
+    r.git('commit', '--quiet', '--message', 'the base gains a dataset');
+    r.git('checkout', '--quiet', 'work');
+    r.write(ERRATA_FILE, changed((e) => { e.issues.push(later()); }));
+  });
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, /No published dataset was modified \(2 protected\)/);
+});
+
+test('a checkout whose directory name ends in a space is the one that is checked', async () => {
+  // Beside it sits a checkout of the same name without the space, in which nothing was rewritten.
+  const parent = mkdtempSync(join(tmpdir(), 'census-errata-names-'));
+  const build = (dir, rewrite) => {
+    mkdirSync(dir);
+    const git = (...args) => execFileSync('git', args, { cwd: dir, env: GIT_ENV, stdio: ['ignore', 'pipe', 'pipe'] });
+    const write = (content) => {
+      mkdirSync(join(dir, 'datasets', PUBLISHED), { recursive: true });
+      writeFileSync(join(dir, 'datasets', PUBLISHED, 'MANIFEST.json'), `${JSON.stringify(content, null, 2)}\n`);
+      git('add', '--', 'datasets');
+    };
+    git('init', '--quiet', '--initial-branch=work');
+    write({ dataset: PUBLISHED });
+    git('commit', '--quiet', '--message', 'published');
+    git('branch', 'published');
+    if (!rewrite) return;
+    write({ dataset: PUBLISHED, note: 'restated' });
+    git('commit', '--quiet', '--message', 'change');
+  };
+  try {
+    build(join(parent, 'repo'), false);
+    build(join(parent, 'repo '), true);
+    const result = await run([join(ROOT, 'scripts', 'check-immutable.mjs'), 'published'], { cwd: join(parent, 'repo '), env: GIT_ENV });
+    assert.equal(result.code, 1, result.stdout);
+    assert.match(result.stderr, /modified datasets\/2026-03-18\/MANIFEST\.json/);
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
+
 for (const [what, change] of allowed) {
   test(`a change that ${what} passes`, async () => {
     const result = await afterPublication(change);
@@ -428,6 +501,43 @@ const forbidden = [
     symlinkSync(join('..', 'attic', 'other.json'), join(r.dir, 'errata', '2026-08-03.json'));
     r.git('add', '--', 'errata/2026-08-03.json');
   }, /errata\/2026-08-03\.json is not a regular file/],
+  ['makes errata a link to a directory, where no errata file was published', (r) => {
+    r.write(`attic/${PUBLISHED}.json`, wellFormed());
+    symlinkSync('attic', join(r.dir, 'errata'));
+    r.git('add', '--', 'errata');
+  }, /\n  errata is not a directory/, { published: null }],
+  ['makes errata a link to a directory, where nothing at all was published', (r) => {
+    r.write(`attic/${PUBLISHED}.json`, wellFormed());
+    symlinkSync('attic', join(r.dir, 'errata'));
+    r.git('add', '--', 'errata');
+  }, /\n  errata is not a directory/, { dataset: false }],
+  ['replaces datasets with a link to a copy of it', (r) => {
+    r.git('mv', 'datasets', 'attic');
+    symlinkSync('attic', join(r.dir, 'datasets'));
+    r.git('add', '--', 'datasets');
+  }, /\n  datasets is not a directory/],
+  ['adds a dataset that is a link to a directory elsewhere', (r) => {
+    r.write('attic/2026-10-05/MANIFEST.json', { dataset: '2026-10-05' });
+    symlinkSync(join('..', 'attic', '2026-10-05'), join(r.dir, 'datasets', '2026-10-05'));
+    r.git('add', '--', 'datasets/2026-10-05');
+  }, /\n  datasets\/2026-10-05 is not a regular file/],
+  ['adds a dataset that holds a link to a file elsewhere', (r) => {
+    r.write('attic/aggregate.json', {});
+    r.write('datasets/2026-10-05/MANIFEST.json', { dataset: '2026-10-05' });
+    symlinkSync(join('..', '..', 'attic', 'aggregate.json'), join(r.dir, 'datasets', '2026-10-05', 'aggregate.json'));
+    r.git('add', '--', 'datasets/2026-10-05/aggregate.json');
+  }, /\n  datasets\/2026-10-05\/aggregate\.json is not a regular file/],
+  ['adds a dataset that holds a submodule', (r) => {
+    r.write('datasets/2026-10-05/MANIFEST.json', { dataset: '2026-10-05' });
+    const commit = r.git('rev-parse', 'HEAD').toString().trim();
+    r.git('update-index', '--add', '--cacheinfo', `160000,${commit},datasets/2026-10-05/source`);
+  }, /\n  datasets\/2026-10-05\/source is not a regular file/],
+  ['replaces a file of a published dataset with a link to a copy of it', (r) => {
+    r.write('attic/MANIFEST.json', { dataset: PUBLISHED });
+    rmSync(join(r.dir, 'datasets', PUBLISHED, 'MANIFEST.json'));
+    symlinkSync(join('..', '..', 'attic', 'MANIFEST.json'), join(r.dir, 'datasets', PUBLISHED, 'MANIFEST.json'));
+    r.git('add', '--', `datasets/${PUBLISHED}/MANIFEST.json`);
+  }, /changed the type of datasets\/2026-03-18\/MANIFEST\.json/],
   ['puts a directory inside errata', (r) => r.write('errata/drafts/2026-08-03.json', wellFormed()),
     /errata\/drafts is not a regular file/],
   ['leaves a file that is not UTF-8', (r) => {
@@ -436,6 +546,8 @@ const forbidden = [
     writeFileSync(join(r.dir, ERRATA_FILE), Buffer.concat([good.subarray(0, at), Buffer.from([0xff]), good.subarray(at + 1)]));
     r.git('add', '--', ERRATA_FILE);
   }, /errata\/2026-03-18\.json cannot be compared with what was published: one of the two does not parse/],
+  ['puts a byte order mark at the start of the errata file', (r) => r.write(ERRATA_FILE, `\uFEFF${JSON.stringify(wellFormed(), null, 2)}\n`),
+    /errata\/2026-03-18\.json cannot be compared with what was published: one of the two does not parse/],
   ['leaves a file that does not parse', (r) => r.write(ERRATA_FILE, '{'),
     /errata\/2026-03-18\.json cannot be compared with what was published: one of the two does not parse/],
   ['deletes the errata file', (r) => r.git('rm', '--quiet', '--', ERRATA_FILE),
@@ -450,9 +562,9 @@ const forbidden = [
     /renamed datasets\/2026-03-18\/MANIFEST\.json/],
 ];
 
-for (const [what, change, report] of forbidden) {
+for (const [what, change, report, options] of forbidden) {
   test(`a change that ${what} fails`, async () => {
-    const result = await afterPublication(change);
+    const result = await afterPublication(change, options);
     assert.equal(result.code, 1, result.stdout);
     assert.match(result.stderr, report);
   });

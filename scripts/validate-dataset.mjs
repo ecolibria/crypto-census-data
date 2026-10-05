@@ -499,9 +499,13 @@ if (requested && !all.includes(requested)) {
 // called: a file passed over for its name is a file nothing has checked. With
 // one dataset named, only that dataset's errata file is read.
 let allErrata = [];
-if (existsSync(ERRATA)) {
-  if (statSync(ERRATA).isDirectory()) allErrata = readdirSync(ERRATA).sort();
-  else fail('errata', 'is not a directory');
+// errata/ is asked about itself and not about what it may point at: a link to
+// a directory reads like one, while the files live where the append-only
+// check does not look.
+const errataEntry = lstatSync(ERRATA, { throwIfNoEntry: false });
+if (errataEntry) {
+  if (errataEntry.isDirectory()) allErrata = readdirSync(ERRATA).sort();
+  else fail('errata', 'is not a directory. A link would keep the errata files somewhere the checks do not look.');
 }
 const errataFiles = requested ? allErrata.filter((f) => f === `${requested}.json`) : allErrata;
 

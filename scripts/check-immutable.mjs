@@ -31,7 +31,8 @@ if (!base) {
 // path that does not exist there, and nothing would be compared.
 let top;
 try {
-  top = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  // Only the line ending is removed: a directory name can end in a space.
+  top = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).replace(/\n$/, '');
 } catch {
   process.stderr.write('\nThis is not a git checkout, so there is nothing to compare.\n\n');
   process.exit(1);
@@ -76,6 +77,38 @@ try {
   process.exit(1);
 }
 
+// Everything these checks read is a regular file in a real directory. A link
+// is compared as a link, so the text it points at could be rewritten
+// elsewhere with no change here to see. That holds for a link to a directory
+// as much as for a link to a file, and for datasets/ or errata/ itself as
+// much as for an entry inside one. So at this change's head: datasets/ and
+// errata/ are directories, nothing at any depth under datasets/ is a link or
+// a submodule, and errata/ holds regular files and nothing else.
+const REGULAR = ['100644', '100755'];
+const entries = (...args) =>
+  ask('ls-tree', ...args).split('\n').filter(Boolean).map((line) => {
+    const [meta, path] = line.split('\t');
+    const [mode, type] = meta.split(' ');
+    return { mode, type, path };
+  });
+const isRegular = (entry) => entry.type === 'blob' && REGULAR.includes(entry.mode);
+const irregular = [
+  ...['datasets', 'errata'].flatMap((directory) => entries('HEAD', directory))
+    .filter((entry) => entry.type !== 'tree').map((entry) => `  ${entry.path} is not a directory`),
+  ...[...entries('-r', 'HEAD', 'datasets/'), ...entries('HEAD', 'errata/')]
+    .filter((entry) => !isRegular(entry)).map((entry) => `  ${entry.path} is not a regular file`),
+];
+const reportIrregular = () => {
+  if (irregular.length === 0) return;
+  process.stderr.write(
+    '\nNot everything under datasets/ and errata/ is a regular file in a real directory:\n\n' +
+    irregular.join('\n') +
+    '\n\nA link or a submodule keeps its content somewhere these checks do not look,\n' +
+    'where it could be rewritten with no change here to see. Commit the files\n' +
+    'themselves.\n\n'
+  );
+};
+
 // Dataset directories that already existed at the base commit. A directory
 // introduced by this change is new and may contain anything; one that was
 // already published may not change at all.
@@ -90,6 +123,8 @@ try {
 } catch {
   // No datasets/ at the base commit: nothing has been published, so nothing
   // can have been rewritten.
+  reportIrregular();
+  if (irregular.length > 0) process.exit(1);
   process.stdout.write('No datasets existed at the base commit. Nothing to protect.\n');
   process.exit(0);
 }
@@ -107,7 +142,7 @@ const changesUnder = (directory) =>
       return { status: status[0], path: paths[paths.length - 1], from: paths[0] };
     });
 
-const VERBS = { M: 'modified', D: 'deleted', R: 'renamed', A: 'added a file to' };
+const VERBS = { M: 'modified', D: 'deleted', R: 'renamed', A: 'added a file to', T: 'changed the type of' };
 const published = (path) => existing.has(path.split('/')[1]);
 
 const violations = [];
@@ -184,15 +219,6 @@ for (const change of changesUnder('errata')) {
   });
 }
 
-// Everything in errata/ at this change's head is a regular file. A link is
-// compared as a link, so the text it points at could be rewritten elsewhere
-// with no change here to see.
-for (const line of ask('ls-tree', 'HEAD', 'errata/').split('\n').filter(Boolean)) {
-  const [meta, path] = line.split('\t');
-  const [mode, type] = meta.split(' ');
-  if (type !== 'blob' || !['100644', '100755'].includes(mode)) edits.push(`  ${path} is not a regular file`);
-}
-
 if (violations.length > 0) {
   process.stderr.write(
     '\nThis change rewrites a dataset that has already been published:\n\n' +
@@ -215,7 +241,9 @@ if (edits.length > 0) {
   );
 }
 
-if (violations.length > 0 || edits.length > 0) process.exit(1);
+reportIrregular();
+
+if (violations.length > 0 || edits.length > 0 || irregular.length > 0) process.exit(1);
 
 let protectedErrata = 0;
 try {
