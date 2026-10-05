@@ -200,7 +200,7 @@
     },
     {
       "defect": "unread-packages-counted-as-scanned",
-      "summary": "A package whose metadata could not be read was still counted as scanned, and as using no cryptography. Each raw file records the number as fetchErrors: npm 5,374 of 1,000,000; PyPI 4,084 of 150,000; Go 76 of 200,117; Maven 26 of 103,400; Packagist 20,826 of 100,000; NuGet 6,855 of 100,000; CocoaPods 1 of 50,000. packagesScanned (2,170,994) therefore includes at least 37,242 packages that were not read, and withNoCrypto counts them as using no cryptography. The figure is a floor: in the npm and NuGet scanners some failed reads are not added to fetchErrors. Packagist cause, from a seeded sample of 300 packages run on 2026-10-05: 46 had no tagged release, which the scanner treated as a failed fetch. NuGet cause: not verified. crates.io has no fetchErrors field; its scanner counted only crates it read, and its file records 12 parse errors. RubyGems, Hex and pub.dev report 0; whether their scanners count every failure has not been verified.",
+      "summary": "A package whose metadata could not be read was still counted as scanned, and as using no cryptography. Each raw file records the number as fetchErrors: npm 5,374 of 1,000,000; PyPI 4,084 of 150,000; Go 76 of 200,117; Maven 26 of 103,400; Packagist 20,826 of 100,000; NuGet 6,855 of 100,000; CocoaPods 1 of 50,000. packagesScanned (2,170,994) therefore includes at least 37,242 packages that were not read, and withNoCrypto counts them as using no cryptography. The figure is a floor: in the npm and NuGet scanners some failed reads are not added to fetchErrors. Packagist cause, from a seeded sample of 300 packages run on 2026-10-05: 46 had no tagged release, which the scanner treated as a failed fetch. NuGet cause: not verified. crates.io has no fetchErrors field; its scanner counted only crates it read, and its file records 12 parse errors. RubyGems, Hex and pub.dev report 0. The Hex scanner counted a package only once it had read it, and the RubyGems and pub.dev scanners added every failed request to fetchErrors. Whether any pub.dev answer came without a pubspec, which that scanner counted as scanned and not as a failure, has not been verified.",
       "affects": [
         "packagesScanned",
         "withNoCrypto",
@@ -337,7 +337,7 @@
     },
     {
       "defect": "limited-rows-are-the-first-part-of-a-list-not-a-sample",
-      "summary": "In seven ecosystems the packages listed are the first part of the registry's list, not a sample of the registry. npm: the first 1.2 million names in key order, where scoped names precede names that begin with a letter; 10,102 of the 10,249 published npm entries are scoped. pub.dev and RubyGems: alphabetical. Hex: most downloaded first. NuGet and Maven Central: newest first. Go: oldest first. The totals and the two shares pool these rows.",
+      "summary": "In seven ecosystems the packages listed are the first part of the registry's list, not a sample of the registry. npm: the first 1.2 million names in key order, where scoped names precede names that begin with a letter; 10,102 of the 10,249 published npm entries are scoped. pub.dev: alphabetical. RubyGems: search results letter by letter from a. Hex: most downloaded first. NuGet and Maven Central: newest first. Go: oldest first. The totals and the two shares pool these rows.",
       "affects": [
         "byEcosystem.npm.weakExposed",
         "byEcosystem.npm.modernOnly",

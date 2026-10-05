@@ -76,10 +76,11 @@ measured, and how to check it.
 | Totals and shares | They sum or divide the counts above. | Not established |
 | `topExposedProjects`, `topPqcProjects` | The two lists name packages through entries not classed weak, or through optional declarations. | Overstates |
 
-Not known: the effect of the unread packages on any count, the cause of the NuGet read failures, whether the
-RubyGems, Hex and pub.dev scanners, which report no unread package, count every failure, why some of the
-published Go entries could not be located when the Go scan was reconstructed, and whether some libraries left
-out of the corrected weak class are weak. The corrected weak counts in the errata are ranges for that last reason.
+Not known: the effect of the unread packages on any count, the cause of the NuGet read failures, whether any
+pub.dev answer came without a pubspec (its scanner did not count one as a failure), the effect of the 38 NuGet
+packages read at an unlisted version, why some of the published Go entries could not be located when the Go scan
+was reconstructed, and whether some libraries left out of the corrected weak class are weak. The corrected weak
+counts in the errata are ranges for that last reason.
 
 One correction has been made to a scanner, for Maven, and no scan has been published with it. The others are
 planned. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.
