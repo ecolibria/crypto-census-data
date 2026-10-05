@@ -20,7 +20,7 @@
  *   node scripts/validate-dataset.mjs 2026-07-29 # one dataset, and its errata file if it has one
  */
 
-import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, statSync, lstatSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -83,7 +83,20 @@ const ISSUE_FIELDS = ['defect', 'summary', 'affects', 'direction', 'magnitude', 
 const MAGNITUDE_FIELDS = ['value', 'of', 'unit'];
 
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
-const isText = (v) => typeof v === 'string' && v.trim().length > 0;
+/**
+ * Text a reader can see: at least one letter or digit, and no control or
+ * format character. A zero-width space is not a summary, and a direction
+ * override can make a sentence display as a different one.
+ */
+const hasWords = (v) => typeof v === 'string' && /[\p{L}\p{N}]/u.test(v);
+const hasHiddenCharacters = (v) => /[\p{Cc}\p{Cf}]/u.test(v);
+const isText = (v) => hasWords(v) && !hasHiddenCharacters(v);
+
+/** Read a file as UTF-8 and refuse bytes that are not: a decoder that substitutes a character hides the difference. */
+const readStrict = (path) => new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(readFileSync(path));
+
+/** The day this run happens on, in UTC. A date of issue cannot be later. */
+const TODAY = new Date().toISOString().slice(0, 10);
 const unknownFields = (object, fields) => Object.keys(object).filter((k) => !fields.includes(k));
 
 /** A date that exists: 2026-02-31 has the right shape and is not one. */
@@ -283,10 +296,18 @@ function validateErrata(file) {
   }
   const date = named[1];
 
+  // A regular file, and nothing else. A link would keep the text these checks
+  // read somewhere the append-only check does not look, where it could be
+  // rewritten without that check seeing a change.
+  if (!lstatSync(join(ERRATA, file)).isFile()) {
+    fail(label, 'is not a regular file. A link or a directory would keep the text somewhere the checks do not look.');
+    return;
+  }
+
   let text;
   let errata;
   try {
-    text = readFileSync(join(ERRATA, file), 'utf-8');
+    text = readStrict(join(ERRATA, file));
     errata = JSON.parse(text);
   } catch (err) {
     fail(label, `does not parse: ${err.message}`);
@@ -328,6 +349,8 @@ function validateErrata(file) {
       'An errata file with no date of issue is a draft.');
   } else if (errata.issuedAt < date) {
     fail(label, `issuedAt is ${errata.issuedAt}, before the dataset it describes was collected`);
+  } else if (errata.issuedAt > TODAY) {
+    fail(label, `issuedAt is ${errata.issuedAt}, after today (${TODAY})`);
   }
 
   // The figures an issue names are looked up in the dataset's own aggregate.
@@ -371,9 +394,15 @@ function validateErrata(file) {
     }
 
     for (const field of ['defect', 'summary', 'correctedIn']) {
-      if (!isText(issue[field])) fail(label, `${where} is missing ${field}`);
+      if (!hasWords(issue[field])) fail(label, `${where} is missing ${field}`);
+      else if (hasHiddenCharacters(issue[field])) fail(label, `${where} has a control or format character in ${field}`);
     }
     if (isText(issue.defect)) {
+      // An id is cited, so it has one spelling: "a-defect" and "a-defect " are
+      // two strings and would be one id to every reader.
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(issue.defect)) {
+        fail(label, `${where} has a defect id that is not lower-case words joined by hyphens`);
+      }
       if (defects.has(issue.defect)) {
         fail(label, `${where} repeats a defect already listed. A reader citing it could mean either.`);
       }
@@ -391,6 +420,12 @@ function validateErrata(file) {
     } else {
       if (issue.issuedAt < date) {
         fail(label, `${where} has issuedAt ${issue.issuedAt}, before the dataset it describes was collected`);
+      }
+      // A date in the future would be accepted today and then refuse every
+      // issue added before that day came, since dates do not run backwards
+      // and a published issue cannot be corrected.
+      if (issue.issuedAt > TODAY) {
+        fail(label, `${where} has issuedAt ${issue.issuedAt}, after today (${TODAY})`);
       }
       if (previousIssued !== null && issue.issuedAt < previousIssued) {
         fail(label, `${where} has issuedAt ${issue.issuedAt}, earlier than the issue before it (${previousIssued}). ` +
@@ -429,9 +464,10 @@ function validateErrata(file) {
           !MAGNITUDE_FIELDS.every((k) => Object.hasOwn(m, k))) {
         fail(label, `${where} has a magnitude that is not { value, of, unit } or null`);
       } else {
-        // Whole numbers: a magnitude counts things, and 0.5 of 1 would pass as a share.
-        const valueOk = Number.isInteger(m.value) && m.value >= 0;
-        const ofOk = Number.isInteger(m.of) && m.of > 0;
+        // Whole numbers a float holds exactly: a magnitude counts things. 0.5 of
+        // 1 would pass as a share, and past 2^53 two different counts are one number.
+        const valueOk = Number.isSafeInteger(m.value) && m.value >= 0;
+        const ofOk = Number.isSafeInteger(m.of) && m.of > 0;
         if (!valueOk) fail(label, `${where} has magnitude.value ${JSON.stringify(m.value)}, not a whole count`);
         if (!ofOk) fail(label, `${where} has magnitude.of ${JSON.stringify(m.of)}, not a whole count above zero`);
         if (valueOk && ofOk && m.value > m.of) {

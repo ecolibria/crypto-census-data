@@ -26,11 +26,31 @@ if (!base) {
   process.exit(2);
 }
 
-const git = (...args) => execFileSync('git', args, { encoding: 'utf-8' }).trim();
+// Every git command runs at the top of the repository, whatever directory the
+// script was started in. Started in a subdirectory, "datasets" would name a
+// path that does not exist there, and nothing would be compared.
+let top;
+try {
+  top = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+} catch {
+  process.stderr.write('\nThis is not a git checkout, so there is nothing to compare.\n\n');
+  process.exit(1);
+}
+
+/** Room for any file this repository could hold: a published file has to stay comparable as it grows. */
+const MAX_OUTPUT = 1024 * 1024 * 1024;
+
+const git = (...args) => execFileSync('git', args, { cwd: top, encoding: 'utf-8', maxBuffer: MAX_OUTPUT }).trim();
 
 /** The same, for a question whose answer may be "there is no such thing": git's own complaint is not printed. */
 const ask = (...args) =>
-  execFileSync('git', args, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  execFileSync('git', args, { cwd: top, encoding: 'utf-8', maxBuffer: MAX_OUTPUT, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+
+/** A file as it is at a commit, decoded strictly: bytes that are not UTF-8 are an error, not a substituted character. */
+const fileAt = (commit, path) =>
+  new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(
+    execFileSync('git', ['show', `${commit}:${path}`], { cwd: top, maxBuffer: MAX_OUTPUT, stdio: ['ignore', 'pipe', 'ignore'] })
+  );
 
 // The base has to be a commit this checkout can read. If it is not, nothing
 // below can tell a rewritten tree from an untouched one, and a check that
@@ -135,8 +155,8 @@ for (const change of changesUnder('errata')) {
   let was;
   let is;
   try {
-    was = JSON.parse(ask('show', `${mergeBase}:${change.path}`));
-    is = JSON.parse(ask('show', `HEAD:${change.path}`));
+    was = JSON.parse(fileAt(mergeBase, change.path));
+    is = JSON.parse(fileAt('HEAD', change.path));
   } catch {
     edits.push(`  ${change.path} cannot be compared with what was published: one of the two does not parse`);
     continue;
@@ -146,9 +166,13 @@ for (const change of changesUnder('errata')) {
     continue;
   }
 
+  // Own properties only: read plainly, a key such as "__proto__" that one side
+  // lacks comes back as the object every object inherits from, and an added
+  // key would compare equal to its absence.
+  const own = (object, key) => (Object.hasOwn(object, key) ? object[key] : undefined);
   for (const field of new Set([...Object.keys(was), ...Object.keys(is)])) {
     if (field === 'issues') continue;
-    if (canonical(was[field]) !== canonical(is[field])) edits.push(`  changed ${field} in ${change.path}`);
+    if (canonical(own(was, field)) !== canonical(own(is, field))) edits.push(`  changed ${field} in ${change.path}`);
   }
   if (is.issues.length < was.issues.length) {
     edits.push(`  removed ${was.issues.length - is.issues.length} issue(s) from ${change.path}`);
@@ -158,6 +182,15 @@ for (const change of changesUnder('errata')) {
     const name = isObject(issue) && typeof issue.defect === 'string' ? ` (${issue.defect})` : '';
     edits.push(`  issue ${index + 1}${name} of ${change.path} is no longer what was published`);
   });
+}
+
+// Everything in errata/ at this change's head is a regular file. A link is
+// compared as a link, so the text it points at could be rewritten elsewhere
+// with no change here to see.
+for (const line of ask('ls-tree', 'HEAD', 'errata/').split('\n').filter(Boolean)) {
+  const [meta, path] = line.split('\t');
+  const [mode, type] = meta.split(' ');
+  if (type !== 'blob' || !['100644', '100755'].includes(mode)) edits.push(`  ${path} is not a regular file`);
 }
 
 if (violations.length > 0) {

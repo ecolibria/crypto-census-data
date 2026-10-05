@@ -20,7 +20,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -84,7 +84,7 @@ const run = (args, options) => new Promise((done) => {
  * Run a copy of the validator over a copy of the published dataset and the
  * given errata files. A file's content is an object, or text to write as is.
  */
-async function validateWith(errataFiles, argument) {
+async function validateWith(errataFiles, argument, prepare) {
   const dir = mkdtempSync(join(tmpdir(), 'census-errata-'));
   try {
     mkdirSync(join(dir, 'scripts'));
@@ -95,6 +95,7 @@ async function validateWith(errataFiles, argument) {
       writeFileSync(join(dir, 'errata', name),
         typeof content === 'string' ? content : `${JSON.stringify(content, null, 2)}\n`);
     }
+    if (prepare) prepare(dir);
     const args = [join(dir, 'scripts', 'validate-dataset.mjs'), ...(argument ? [argument] : [])];
     return await run(args, { env: {} });
   } finally {
@@ -123,7 +124,9 @@ const refusals = [
   ['no date of issue', (e) => { e.issuedAt = null; }, /issuedAt is null, not a YYYY-MM-DD date/],
   ['a date of issue that is not a day of the calendar', (e) => { e.issuedAt = '2026-02-31'; }, /issuedAt is "2026-02-31", not a YYYY-MM-DD date/],
   ['a date of issue before the dataset was collected', (e) => { e.issuedAt = '2026-03-17'; }, /issuedAt is 2026-03-17, before the dataset/, 2],
-  ['a date of issue that is not its first issue\'s', (e) => { e.issuedAt = '2026-10-06'; }, /issuedAt is 2026-10-06 and its first issue has 2026-10-05/],
+  ['a date of issue that is not its first issue\'s', (e) => { e.issuedAt = '2026-10-04'; }, /issuedAt is 2026-10-04 and its first issue has 2026-10-05/],
+  ['an issue dated in the future', (e) => { e.issues[1].issuedAt = '2999-01-01'; }, /issue 2 \(example-second\) has issuedAt 2999-01-01, after today/],
+  ['a file dated in the future', (e) => { e.issuedAt = '2999-01-01'; e.issues.forEach((issue) => { issue.issuedAt = '2999-01-01'; }); }, /: issuedAt is 2999-01-01, after today/, 3],
   ['an issue with no date of issue', (e) => { delete e.issues[1].issuedAt; }, /issue 2 \(example-second\) has issuedAt undefined, not a YYYY-MM-DD date/],
   ['an issue dated before the dataset was collected', (e) => { e.issues[0].issuedAt = '2026-03-01'; e.issuedAt = '2026-03-01'; }, /issue 1 \(example-first\) has issuedAt 2026-03-01, before the dataset/, 2],
   ['an issue dated before the one above it', (e) => { e.issues[1].issuedAt = '2026-10-04'; }, /issue 2 \(example-second\) has issuedAt 2026-10-04, earlier than the issue before it \(2026-10-05\)/],
@@ -138,6 +141,10 @@ const refusals = [
   ['a field an issue does not define', (e) => { e.issues[0].severity = 'high'; }, /issue 1 \(example-first\) carries severity, which an issue does not define/],
   ['an issue with no defect', (e) => { delete e.issues[0].defect; }, /issue 1 is missing defect/],
   ['an issue with no summary', (e) => { e.issues[0].summary = '  '; }, /issue 1 \(example-first\) is missing summary/],
+  ['a summary made of characters nobody can see', (e) => { e.issues[0].summary = '\u200B\u200B'; }, /issue 1 \(example-first\) is missing summary/],
+  ['a summary that carries a direction override', (e) => { e.issues[0].summary = 'A count \u202Edaer ton saw'; }, /issue 1 \(example-first\) has a control or format character in summary/],
+  ['a unit made of characters nobody can see', (e) => { e.issues[0].magnitude.unit = '\u0000'; }, /has no magnitude\.unit/],
+  ['a defect id with a space after it', (e) => { e.issues[1].defect = 'example-first '; }, /issue 2 \(example-first \) has a defect id that is not lower-case words joined by hyphens/],
   ['an issue that does not say where it is corrected', (e) => { delete e.issues[0].correctedIn; }, /issue 1 \(example-first\) is missing correctedIn/],
   ['the same defect listed twice', (e) => { e.issues[1].defect = 'example-first'; }, /issue 2 \(example-first\) repeats a defect already listed/],
   ['a direction outside the three', (e) => { e.issues[0].direction = 'wrong'; }, /issue 1 \(example-first\) has direction "wrong"/],
@@ -151,6 +158,8 @@ const refusals = [
   ['a figure that is not a path', (e) => { e.issues[0].affects = [42]; }, /has an entry in affects that is not a field path/],
   ['a magnitude left out', (e) => { delete e.issues[0].magnitude; }, /issue 1 \(example-first\) is missing magnitude/],
   ['a magnitude whose count is text', (e) => { e.issues[0].magnitude.value = '3'; }, /has magnitude\.value "3", not a whole count/],
+  ['a negative magnitude', (e) => { e.issues[0].magnitude.value = -1; }, /has magnitude\.value -1, not a whole count/],
+  ['a magnitude past what a number holds exactly', (e) => { e.issues[0].magnitude = { value: 2 ** 53, of: 2 ** 53 + 2, unit: 'packages' }; }, /has magnitude\.value 9007199254740992, not a whole count/, 2],
   ['a magnitude that is a fraction', (e) => { e.issues[0].magnitude = { value: 0.5, of: 1, unit: 'packages' }; }, /has magnitude\.value 0\.5, not a whole count/],
   ['a magnitude counted in a fraction', (e) => { e.issues[0].magnitude.of = 10.5; }, /has magnitude\.of 10\.5, not a whole count above zero/],
   ['a magnitude counted in nothing', (e) => { e.issues[0].magnitude = { value: 0, of: 0, unit: 'packages' }; }, /has magnitude\.of 0, not a whole count above zero/],
@@ -217,6 +226,29 @@ test('an errata file for a dataset that is not here is refused', async () => {
   assert.match(result.stderr, /describes datasets\/2026-01-01, which is not a dataset in this repository/);
 });
 
+test('an errata file that is a link to a file elsewhere is refused', async () => {
+  // The text of a link lives outside errata/, where the append-only check does not look.
+  const result = await validateWith({}, undefined, (dir) => {
+    mkdirSync(join(dir, 'attic'));
+    writeFileSync(join(dir, 'attic', 'kept.json'), `${JSON.stringify(wellFormed(), null, 2)}\n`);
+    symlinkSync(join('..', 'attic', 'kept.json'), join(dir, 'errata', `${PUBLISHED}.json`));
+  });
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(result.stderr, ONE_PROBLEM);
+  assert.match(result.stderr, /errata\/2026-03-18\.json: is not a regular file/);
+});
+
+test('an errata file with a byte that is not UTF-8 is refused', async () => {
+  const good = Buffer.from(`${JSON.stringify(wellFormed(), null, 2)}\n`, 'utf-8');
+  const at = good.indexOf('A count');
+  assert.ok(at > 0);
+  const bad = Buffer.concat([good.subarray(0, at), Buffer.from([0xff]), good.subarray(at + 1)]);
+  const result = await validateWith({}, undefined, (dir) => writeFileSync(join(dir, 'errata', `${PUBLISHED}.json`), bad));
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(result.stderr, ONE_PROBLEM);
+  assert.match(result.stderr, /errata\/2026-03-18\.json: does not parse/);
+});
+
 test('validating one dataset reads its errata file and no other', async () => {
   const files = { [`${PUBLISHED}.json`]: wellFormed(), '2026-01-01.json': '{' };
   const one = await validateWith(files, PUBLISHED);
@@ -244,7 +276,7 @@ const GIT_ENV = {
  * Publish a dataset and its errata file in one commit, apply `change` in a
  * second, and run the immutability check with the first commit as its base.
  */
-async function afterPublication(change) {
+async function afterPublication(change, { published = wellFormed(), startIn = '.' } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'census-errata-history-'));
   const git = (...args) => execFileSync('git', args, { cwd: dir, env: GIT_ENV, stdio: ['ignore', 'pipe', 'pipe'] });
   const write = (path, content) => {
@@ -255,12 +287,12 @@ async function afterPublication(change) {
   try {
     git('init', '--quiet', '--initial-branch=work');
     write(`datasets/${PUBLISHED}/MANIFEST.json`, { dataset: PUBLISHED });
-    write(ERRATA_FILE, wellFormed());
+    write(ERRATA_FILE, published);
     git('commit', '--quiet', '--message', 'published');
     git('branch', 'published');
-    change({ write, git });
+    change({ write, git, dir });
     git('commit', '--quiet', '--allow-empty', '--message', 'change');
-    return await run([join(ROOT, 'scripts', 'check-immutable.mjs'), 'published'], { cwd: dir, env: GIT_ENV });
+    return await run([join(ROOT, 'scripts', 'check-immutable.mjs'), 'published'], { cwd: join(dir, startIn), env: GIT_ENV });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -325,7 +357,34 @@ const allowed = [
   ['rewrites the file with other spacing and key order', (r) => r.write(ERRATA_FILE, JSON.stringify(reversedKeys(wellFormed())))],
   ['adds a new dataset', (r) => r.write('datasets/2026-10-05/MANIFEST.json', { dataset: '2026-10-05' })],
   ['touches nothing', () => {}],
+  ['adds an issue while the base has moved on with another change', (r) => {
+    // Compared with the tip of the base, this change would seem to lack what
+    // the base gained since. It is compared with the point where it left the base.
+    r.git('checkout', '--quiet', 'published');
+    r.write(ERRATA_FILE, changed((e) => { e.issues.push({ ...later(), defect: 'example-on-the-base' }); }));
+    r.git('commit', '--quiet', '--message', 'the base moves on');
+    r.git('checkout', '--quiet', 'work');
+    r.write(ERRATA_FILE, changed((e) => { e.issues.push(later()); }));
+  }],
 ];
+
+test('a published errata file larger than a megabyte can still be added to', async () => {
+  const large = wellFormed();
+  for (let i = 0; large.issues.length < 6000; i += 1) large.issues.push({ ...later(), defect: `example-filler-${i}`, issuedAt: '2026-10-05' });
+  assert.ok(JSON.stringify(large).length > 1024 * 1024);
+  const result = await afterPublication((r) => r.write(ERRATA_FILE, { ...large, issues: [...large.issues, later()] }), { published: large });
+  assert.equal(result.code, 0, result.stderr);
+});
+
+test('started in a subdirectory, the check still sees a rewritten dataset and a reworded issue', async () => {
+  const result = await afterPublication((r) => {
+    r.write(`datasets/${PUBLISHED}/MANIFEST.json`, { dataset: PUBLISHED, note: 'restated' });
+    r.write(ERRATA_FILE, changed((e) => { e.issues[0].summary = 'A count may be slightly high.'; }));
+  }, { startIn: 'datasets' });
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(result.stderr, /modified datasets\/2026-03-18\/MANIFEST\.json/);
+  assert.match(result.stderr, /issue 1 \(example-first\) of errata\/2026-03-18\.json is no longer what was published/);
+});
 
 for (const [what, change] of allowed) {
   test(`a change that ${what} passes`, async () => {
@@ -356,6 +415,27 @@ const forbidden = [
     /removed 2 issue\(s\) from errata\/2026-03-18\.json/],
   ['replaces the list of issues with text', (r) => r.write(ERRATA_FILE, changed((e) => { e.issues = 'none'; })),
     /errata\/2026-03-18\.json cannot be compared with what was published: one of the two is not an errata file/],
+  ['adds a key named __proto__ beside the issues', (r) => r.write(ERRATA_FILE, `${JSON.stringify(wellFormed(), null, 2)}\n`.replace('  "issues": [', '  "__proto__": {},\n  "issues": [')),
+    /changed __proto__ in errata\/2026-03-18\.json/],
+  ['replaces the errata file with a link to a copy of it', (r) => {
+    r.write('attic/kept.json', wellFormed());
+    rmSync(join(r.dir, ERRATA_FILE));
+    symlinkSync(join('..', 'attic', 'kept.json'), join(r.dir, ERRATA_FILE));
+    r.git('add', '--', ERRATA_FILE);
+  }, /errata\/2026-03-18\.json is not a regular file/],
+  ['adds an errata file that is a link', (r) => {
+    r.write('attic/other.json', { ...wellFormed(), dataset: '2026-08-03' });
+    symlinkSync(join('..', 'attic', 'other.json'), join(r.dir, 'errata', '2026-08-03.json'));
+    r.git('add', '--', 'errata/2026-08-03.json');
+  }, /errata\/2026-08-03\.json is not a regular file/],
+  ['puts a directory inside errata', (r) => r.write('errata/drafts/2026-08-03.json', wellFormed()),
+    /errata\/drafts is not a regular file/],
+  ['leaves a file that is not UTF-8', (r) => {
+    const good = Buffer.from(`${JSON.stringify(wellFormed(), null, 2)}\n`, 'utf-8');
+    const at = good.indexOf('A count');
+    writeFileSync(join(r.dir, ERRATA_FILE), Buffer.concat([good.subarray(0, at), Buffer.from([0xff]), good.subarray(at + 1)]));
+    r.git('add', '--', ERRATA_FILE);
+  }, /errata\/2026-03-18\.json cannot be compared with what was published: one of the two does not parse/],
   ['leaves a file that does not parse', (r) => r.write(ERRATA_FILE, '{'),
     /errata\/2026-03-18\.json cannot be compared with what was published: one of the two does not parse/],
   ['deletes the errata file', (r) => r.git('rm', '--quiet', '--', ERRATA_FILE),
