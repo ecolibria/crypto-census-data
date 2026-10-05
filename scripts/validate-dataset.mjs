@@ -459,8 +459,9 @@ if (requested && !all.includes(requested)) {
   process.exit(2);
 }
 
-// Every entry in errata/ is read, whatever it is called. A file passed over
-// for its name is a file nothing has checked.
+// With no dataset named, every entry of errata/ is read, whatever it is
+// called: a file passed over for its name is a file nothing has checked. With
+// one dataset named, only that dataset's errata file is read.
 let allErrata = [];
 if (existsSync(ERRATA)) {
   if (statSync(ERRATA).isDirectory()) allErrata = readdirSync(ERRATA).sort();

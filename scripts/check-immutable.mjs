@@ -34,8 +34,8 @@ const ask = (...args) =>
 
 // The base has to be a commit this checkout can read. If it is not, nothing
 // below can tell a rewritten tree from an untouched one, and a check that
-// cannot look must not pass. A shallow checkout, a misspelt ref and a deleted
-// branch all arrive here.
+// cannot look must not pass. A misspelt ref and a deleted branch arrive here,
+// and so does a shallow checkout that never fetched the base.
 try {
   ask('rev-parse', '--verify', '--quiet', `${base}^{commit}`);
 } catch {
