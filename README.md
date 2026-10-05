@@ -143,6 +143,11 @@ unlisted file is present, that the aggregate and the raw files describe the same
 run, that the aggregate's per-ecosystem counts sum to its own total, and that any
 `knownIssue` is complete and states a direction.
 
+The two datasets above were published before a manifest carried a
+`schemaVersion`. The validator accepts a manifest without one for those two
+directories only. A dataset under a new date has to declare its version, and the
+validator refuses a declared version until it has rules for it.
+
 ## Licence
 
 [CC-BY-4.0](LICENSE). Attribution as above.

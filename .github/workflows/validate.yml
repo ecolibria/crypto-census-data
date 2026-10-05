@@ -31,6 +31,10 @@ jobs:
       - name: Validate every dataset
         run: node scripts/validate-dataset.mjs
 
+      # The validator's own rules, run against copies in a temporary directory.
+      - name: Check the validator
+        run: node --test scripts/check-validator.mjs
+
   immutable:
     name: No published dataset is rewritten
     runs-on: ubuntu-latest

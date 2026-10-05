@@ -49,6 +49,18 @@ const KINDS = {
   },
 };
 
+/**
+ * Datasets published in the first file shape, whose manifest carries no
+ * `schemaVersion`.
+ *
+ * That shape is accepted for these directories and for no others. A dataset
+ * added under a new date has to declare its version, so files in the first
+ * shape cannot be published as a new measurement. This script has no rules for
+ * a declared version yet, so a dataset that declares one is refused rather than
+ * passed unchecked.
+ */
+const FIRST_SHAPE_DATASETS = ['2026-03-18', '2026-08-03'];
+
 const problems = [];
 const fail = (dataset, message) => problems.push(`${dataset}: ${message}`);
 
@@ -66,6 +78,19 @@ function validate(name) {
     manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
   } catch (err) {
     fail(name, `MANIFEST.json does not parse: ${err.message}`);
+    return;
+  }
+
+  // Checked before anything else: every rule below is written for the first
+  // file shape and says nothing about a dataset in another one.
+  if (manifest.schemaVersion !== undefined) {
+    fail(name, `schemaVersion is ${JSON.stringify(manifest.schemaVersion)}. This script has no rules for a ` +
+      'declared version yet, and a dataset it cannot check is not one it can pass.');
+    return;
+  }
+  if (!FIRST_SHAPE_DATASETS.includes(name)) {
+    fail(name, 'MANIFEST.json declares no schemaVersion. The first file shape is accepted only for ' +
+      `${FIRST_SHAPE_DATASETS.join(' and ')}; a new dataset has to declare its version.`);
     return;
   }
 
