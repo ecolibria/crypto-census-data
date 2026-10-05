@@ -108,8 +108,27 @@ const irregular = [
 // out of the archive a deposit is made from. None is needed here, so none is
 // allowed, at any depth. Names are read NUL-separated, so that a path git
 // would print in quotes is still recognised.
+/**
+ * True for a file name that git, on some file system, reads as the attribute
+ * file. Wider than git's own tests on purpose, since no such name is needed
+ * here:
+ * - a file system that folds case reads `.GITATTRIBUTES` as it;
+ * - HFS+ ignores some format characters, so a name with one inside is it;
+ * - NTFS drops trailing spaces and periods, reads `name:stream` as `name`,
+ *   and gives it the short names `GITATT~1` to `~4` and, as a fall-back, a
+ *   name built on `gi7d29` (git's is_ntfs_dotgitattributes). A backslash is a
+ *   path separator there, so the last part after one is tested as well.
+ */
+const isAttributeFileName = (name) => {
+  const folded = name.normalize('NFC').replace(/\p{Cf}/gu, '').toLowerCase();
+  const base = folded.split(':')[0].replace(/[ .]+$/, '');
+  if (base === '.gitattributes') return true;
+  if (/^gitatt~[1-4]$/.test(base)) return true;
+  const tilde = base.indexOf('~');
+  return tilde >= 0 && tilde <= 6 && 'gi7d29'.startsWith(base.slice(0, tilde)) && /^~[1-9]\d*$/.test(base.slice(tilde));
+};
 const attributeFiles = ask('ls-tree', '-r', '-z', '--name-only', 'HEAD').split('\0')
-  .filter((path) => path.split('/').pop() === '.gitattributes');
+  .filter((path) => isAttributeFileName(path.split('/').pop()) || isAttributeFileName(path.split(/[\\/]/).pop()));
 const reportIrregular = () => {
   if (attributeFiles.length > 0) {
     process.stderr.write(

@@ -560,6 +560,21 @@ const forbidden = [
   }, /\n  datasets\/2026-10-05\/\.gitattributes\n/],
   ['adds an attribute file under a directory whose name git prints in quotes', (r) => r.write('notes/na\u00efve/.gitattributes', '* text\n'),
     /This tree holds an attribute file:/],
+  ['adds an attribute file named in capitals', (r) => r.write('.GITATTRIBUTES', 'datasets/** export-ignore\n'),
+    /This tree holds an attribute file:\n\n  \.GITATTRIBUTES\n/],
+  ['adds an attribute file named in mixed case inside a dataset', (r) => {
+    r.write('datasets/2026-10-05/MANIFEST.json', { dataset: '2026-10-05' });
+    r.write('datasets/2026-10-05/.GitAttributes', '*.json export-ignore\n');
+  }, /\n  datasets\/2026-10-05\/\.GitAttributes\n/],
+  // Names that are not the attribute file byte for byte, and that git reads as it on HFS+ or NTFS.
+  ['adds an attribute file with a format character in its name', (r) => r.write('.git\u200cattributes', 'datasets/** export-ignore\n'),
+    /This tree holds an attribute file:/],
+  ['adds an attribute file under its first NTFS short name', (r) => r.write('GITATT~1', 'datasets/** export-ignore\n'),
+    /This tree holds an attribute file:\n\n  GITATT~1\n/],
+  ['adds an attribute file under its fall-back NTFS short name', (r) => r.write('notes/gi7d29~1', 'datasets/** export-ignore\n'),
+    /This tree holds an attribute file:\n\n  notes\/gi7d29~1\n/],
+  ['adds an attribute file after a backslash in a name', (r) => r.write('notes\\.gitattributes', 'datasets/** export-ignore\n'),
+    /This tree holds an attribute file:/],
   ['puts a directory inside errata', (r) => r.write('errata/drafts/2026-08-03.json', wellFormed()),
     /errata\/drafts is not a regular file/],
   ['leaves a file that is not UTF-8', (r) => {
