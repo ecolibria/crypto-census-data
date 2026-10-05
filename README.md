@@ -68,8 +68,10 @@ measured, and how to check it.
 | crates.io | A dependency was counted however it is declared, including optional, development, build and platform-specific ones. | Overstates |
 | PyPI | Requirements behind an extra or an environment marker were counted. | Overstates |
 | NuGet | A library that a package declares for only some of its target frameworks was counted. | Overstates |
+| NuGet | Packages with no listed version were counted. | Overstates |
 | CocoaPods | A library that a pod declares only in a subspec outside its default subspecs was counted. | Overstates |
 | npm, PyPI, Go, Maven, Packagist, NuGet, CocoaPods | A package that could not be read was counted as scanned and as using no cryptography. | `packagesScanned` overstates; match counts understate |
+| npm, Go, Maven, NuGet, RubyGems, Hex, pub.dev | The packages listed are the first part of the registry's list. | Not a sample |
 | Every ecosystem but Hex and pub.dev | The weak tier mixes libraries that implement broken algorithms with libraries that are deprecated or unmaintained, and holds entries the corrected classes do not class as weak. | Overstates |
 | Totals and shares | They sum or divide the counts above. | Not established |
 | `topExposedProjects`, `topPqcProjects` | The two lists name packages through entries not classed weak, or through optional declarations. | Overstates |

@@ -334,6 +334,59 @@
       "magnitude": null,
       "correctedIn": "The comparison is removed from the repository README and from the description used for later deposits. The copy archived with this deposit cannot change.",
       "issuedAt": "2026-10-05"
+    },
+    {
+      "defect": "limited-rows-are-the-first-part-of-a-list-not-a-sample",
+      "summary": "In seven ecosystems the packages listed are the first part of the registry's list, not a sample of the registry. npm: the first 1.2 million names in key order, where scoped names precede names that begin with a letter; 10,102 of the 10,249 published npm entries are scoped. pub.dev and RubyGems: alphabetical. Hex: most downloaded first. NuGet and Maven Central: newest first. Go: oldest first. The totals and the two shares pool these rows.",
+      "affects": [
+        "byEcosystem.npm.weakExposed",
+        "byEcosystem.npm.modernOnly",
+        "byEcosystem.npm.pqcReady",
+        "byEcosystem.go.weakExposed",
+        "byEcosystem.go.modernOnly",
+        "byEcosystem.go.pqcReady",
+        "byEcosystem.maven.weakExposed",
+        "byEcosystem.maven.modernOnly",
+        "byEcosystem.maven.pqcReady",
+        "byEcosystem.nuget.weakExposed",
+        "byEcosystem.nuget.modernOnly",
+        "byEcosystem.nuget.pqcReady",
+        "byEcosystem.rubygems.weakExposed",
+        "byEcosystem.rubygems.modernOnly",
+        "byEcosystem.rubygems.pqcReady",
+        "byEcosystem.hex.weakExposed",
+        "byEcosystem.hex.modernOnly",
+        "byEcosystem.hex.pqcReady",
+        "byEcosystem.pub.weakExposed",
+        "byEcosystem.pub.modernOnly",
+        "byEcosystem.pub.pqcReady",
+        "packagesWithCrypto",
+        "withWeakCrypto",
+        "withModernOnly",
+        "withPqcReady",
+        "weakShareOfCryptoUsing",
+        "pqcShareOfCryptoUsing"
+      ],
+      "direction": "unknown",
+      "magnitude": null,
+      "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-05"
+    },
+    {
+      "defect": "packages-with-no-listed-version-counted",
+      "summary": "The NuGet scanner counted packages with no listed version. Of the 1,905 published entries re-read on 2026-10-05, 99 have none. 81 of them had none when the scan ran, their record last written before it; 49 of the 81 are among the 203 re-read entries counted as weak. Against packages with a listed version the match counts are too high by 81 to 99. Another 38 were read at an unlisted version though one is listed; the effect, also on shares, is not established.",
+      "affects": [
+        "byEcosystem.nuget.weakExposed",
+        "byEcosystem.nuget.modernOnly"
+      ],
+      "direction": "overstates",
+      "magnitude": {
+        "value": 81,
+        "of": 1905,
+        "unit": "re-read NuGet entries with no listed version at the scan (at least)"
+      },
+      "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-05"
     }
   ]
 }
