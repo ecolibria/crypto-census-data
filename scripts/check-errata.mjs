@@ -264,6 +264,13 @@ test('an errata file that starts with a byte order mark is refused', async () =>
   assert.match(result.stderr, /errata\/2026-03-18\.json: does not parse/);
 });
 
+test('a file directly under datasets/ is refused', async () => {
+  const result = await validateWith({}, undefined, (dir) => writeFileSync(join(dir, 'datasets', 'corpus-latest.json'), '{}\n'));
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(result.stderr, /\n1 problem\(s\) across 1 dataset\(s\):/);
+  assert.match(result.stderr, /datasets: corpus-latest\.json is not a dataset directory/);
+});
+
 test('an errata file with a byte that is not UTF-8 is refused', async () => {
   const good = Buffer.from(`${JSON.stringify(wellFormed(), null, 2)}\n`, 'utf-8');
   const at = good.indexOf('A count');
@@ -543,6 +550,16 @@ const forbidden = [
     symlinkSync(join('..', '..', 'attic', 'MANIFEST.json'), join(r.dir, 'datasets', PUBLISHED, 'MANIFEST.json'));
     r.git('add', '--', `datasets/${PUBLISHED}/MANIFEST.json`);
   }, /changed the type of datasets\/2026-03-18\/MANIFEST\.json/],
+  ['adds a file directly under datasets', (r) => r.write('datasets/corpus-latest.json', { dataset: 'latest' }),
+    /\n  datasets\/corpus-latest\.json is not a dataset directory/],
+  ['adds an attribute file at the top of the tree', (r) => r.write('.gitattributes', 'datasets/** export-ignore\n'),
+    /This tree holds an attribute file:\n\n  \.gitattributes\n/],
+  ['adds an attribute file inside a new dataset', (r) => {
+    r.write('datasets/2026-10-05/MANIFEST.json', { dataset: '2026-10-05' });
+    r.write('datasets/2026-10-05/.gitattributes', '*.json export-ignore\n');
+  }, /\n  datasets\/2026-10-05\/\.gitattributes\n/],
+  ['adds an attribute file under a directory whose name git prints in quotes', (r) => r.write('notes/na\u00efve/.gitattributes', '* text\n'),
+    /This tree holds an attribute file:/],
   ['puts a directory inside errata', (r) => r.write('errata/drafts/2026-08-03.json', wellFormed()),
     /errata\/drafts is not a regular file/],
   ['leaves a file that is not UTF-8', (r) => {

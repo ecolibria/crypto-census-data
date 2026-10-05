@@ -97,8 +97,29 @@ const irregular = [
     .filter((entry) => entry.type !== 'tree').map((entry) => `  ${entry.path} is not a directory`),
   ...[...entries('-r', 'HEAD', 'datasets/'), ...entries('HEAD', 'errata/')]
     .filter((entry) => !isRegular(entry)).map((entry) => `  ${entry.path} is not a regular file`),
+  // A file directly under datasets/ belongs to no dataset: the validator reads
+  // dataset directories, and nothing else reads it.
+  ...entries('HEAD', 'datasets/')
+    .filter((entry) => isRegular(entry)).map((entry) => `  ${entry.path} is not a dataset directory`),
 ];
+
+// An attribute file can change what an archive of this repository holds without
+// changing one file these checks read: `export-ignore` leaves a published file
+// out of the archive a deposit is made from. None is needed here, so none is
+// allowed, at any depth. Names are read NUL-separated, so that a path git
+// would print in quotes is still recognised.
+const attributeFiles = ask('ls-tree', '-r', '-z', '--name-only', 'HEAD').split('\0')
+  .filter((path) => path.split('/').pop() === '.gitattributes');
 const reportIrregular = () => {
+  if (attributeFiles.length > 0) {
+    process.stderr.write(
+      '\nThis tree holds an attribute file:\n\n' +
+      attributeFiles.map((path) => `  ${path}`).join('\n') +
+      '\n\nAn attribute file can leave a published file out of an archive of this\n' +
+      'repository, or change its bytes on checkout, with no change to the file\n' +
+      'itself. Remove it.\n\n'
+    );
+  }
   if (irregular.length === 0) return;
   process.stderr.write(
     '\nNot everything under datasets/ and errata/ is a regular file in a real directory:\n\n' +
@@ -124,7 +145,7 @@ try {
   // No datasets/ at the base commit: nothing has been published, so nothing
   // can have been rewritten.
   reportIrregular();
-  if (irregular.length > 0) process.exit(1);
+  if (irregular.length > 0 || attributeFiles.length > 0) process.exit(1);
   process.stdout.write('No datasets existed at the base commit. Nothing to protect.\n');
   process.exit(0);
 }
@@ -243,7 +264,7 @@ if (edits.length > 0) {
 
 reportIrregular();
 
-if (violations.length > 0 || edits.length > 0 || irregular.length > 0) process.exit(1);
+if (violations.length > 0 || edits.length > 0 || irregular.length > 0 || attributeFiles.length > 0) process.exit(1);
 
 let protectedErrata = 0;
 try {

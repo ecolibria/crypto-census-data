@@ -23,8 +23,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
 
@@ -46,14 +48,15 @@ jobs:
     timeout-minutes: 10
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          persist-credentials: false
           # check-immutable.mjs diffs against the merge base, so the history
           # between base and head has to be present. A shallow clone reports
           # every file as added and the check passes without checking anything.
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
 
@@ -61,4 +64,4 @@ jobs:
       # targets. Compared with its own target, a change aimed at a branch that
       # already holds a rewrite would have nothing left to show.
       - name: Check immutability against the default branch
-        run: node scripts/check-immutable.mjs "origin/${{ github.event.repository.default_branch }}"
+        run: node scripts/check-immutable.mjs "refs/remotes/origin/${{ github.event.repository.default_branch }}"
