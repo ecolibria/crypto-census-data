@@ -11,6 +11,7 @@ published.
 $ git clone https://github.com/ecolibria/crypto-census-data
 $ node scripts/validate-dataset.mjs
 2 dataset(s) validated: 2026-03-18, 2026-08-03
+1 errata file(s) validated: 2026-08-03.json
 ```
 
 Every file is verified against the SHA-256 recorded in its `MANIFEST.json`, so a
