@@ -32,6 +32,30 @@ const git = (...args) => execFileSync('git', args, { encoding: 'utf-8' }).trim()
 const ask = (...args) =>
   execFileSync('git', args, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 
+// The base has to be a commit this checkout can read. If it is not, nothing
+// below can tell a rewritten tree from an untouched one, and a check that
+// cannot look must not pass. A shallow checkout, a misspelt ref and a deleted
+// branch all arrive here.
+try {
+  ask('rev-parse', '--verify', '--quiet', `${base}^{commit}`);
+} catch {
+  process.stderr.write(
+    `\nCannot read the base "${base}" in this checkout, so nothing can be compared against it.\n` +
+    'The check needs the full history of the base branch (fetch-depth: 0 in CI).\n\n'
+  );
+  process.exit(1);
+}
+
+// What was published is read at the point this change left the base. Without
+// a common ancestor there is no such point, and the comparison has no meaning.
+let mergeBase;
+try {
+  mergeBase = ask('merge-base', base, 'HEAD');
+} catch {
+  process.stderr.write(`\nThis change and the base "${base}" share no history, so nothing can be compared.\n\n`);
+  process.exit(1);
+}
+
 // Dataset directories that already existed at the base commit. A directory
 // introduced by this change is new and may contain anything; one that was
 // already published may not change at all.
@@ -98,8 +122,6 @@ const canonical = (value) => {
   }
   return JSON.stringify(value);
 };
-
-const mergeBase = git('merge-base', base, 'HEAD');
 
 const edits = [];
 for (const change of changesUnder('errata')) {

@@ -266,6 +266,51 @@ async function afterPublication(change) {
   }
 }
 
+test('a base that cannot be read fails the check', async () => {
+  // A check that cannot look at what was published must not report that
+  // nothing was rewritten.
+  const dir = mkdtempSync(join(tmpdir(), 'census-errata-history-'));
+  try {
+    const git = (...args) => execFileSync('git', args, { cwd: dir, env: GIT_ENV, stdio: ['ignore', 'pipe', 'pipe'] });
+    git('init', '--quiet', '--initial-branch=work');
+    mkdirSync(join(dir, 'datasets', PUBLISHED), { recursive: true });
+    writeFileSync(join(dir, 'datasets', PUBLISHED, 'MANIFEST.json'), '{}\n');
+    git('add', '--', `datasets/${PUBLISHED}/MANIFEST.json`);
+    git('commit', '--quiet', '--message', 'published');
+    const script = join(ROOT, 'scripts', 'check-immutable.mjs');
+    const missing = await run([script, 'origin/no-such-branch'], { cwd: dir, env: GIT_ENV });
+    assert.equal(missing.code, 1, missing.stdout);
+    assert.match(missing.stderr, /Cannot read the base "origin\/no-such-branch"/);
+    // The same tree against a base it can read passes, so the failure above is the base and nothing else.
+    const readable = await run([script, 'work'], { cwd: dir, env: GIT_ENV });
+    assert.equal(readable.code, 0, readable.stderr);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a change with no history in common with the base fails the check', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'census-errata-history-'));
+  try {
+    const git = (...args) => execFileSync('git', args, { cwd: dir, env: GIT_ENV, stdio: ['ignore', 'pipe', 'pipe'] });
+    const commit = (message) => {
+      mkdirSync(join(dir, 'datasets', PUBLISHED), { recursive: true });
+      writeFileSync(join(dir, 'datasets', PUBLISHED, 'MANIFEST.json'), `${JSON.stringify({ message })}\n`);
+      git('add', '--', `datasets/${PUBLISHED}/MANIFEST.json`);
+      git('commit', '--quiet', '--message', message);
+    };
+    git('init', '--quiet', '--initial-branch=published');
+    commit('published');
+    git('checkout', '--quiet', '--orphan', 'rewritten');
+    commit('a second history');
+    const result = await run([join(ROOT, 'scripts', 'check-immutable.mjs'), 'published'], { cwd: dir, env: GIT_ENV });
+    assert.equal(result.code, 1, result.stdout);
+    assert.match(result.stderr, /share no history/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 const changed = (edit) => { const errata = wellFormed(); edit(errata); return errata; };
 const reversedKeys = (value) => {
   if (Array.isArray(value)) return value.map(reversedKeys);
