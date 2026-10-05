@@ -13,10 +13,11 @@
  *   - every file present is listed, so nothing arrives unaccounted for
  *   - the aggregate and the raw files describe the same run
  *   - a dataset says which kind it is, and meets that kind's requirements
+ *   - an errata file names a dataset that is here, and figures that are in it
  *
  * Usage:
- *   node scripts/validate-dataset.mjs            # every dataset
- *   node scripts/validate-dataset.mjs 2026-07-29 # one dataset
+ *   node scripts/validate-dataset.mjs            # every dataset and every errata file
+ *   node scripts/validate-dataset.mjs 2026-07-29 # one dataset, and its errata file if it has one
  */
 
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
@@ -26,6 +27,7 @@ import { createHash } from 'node:crypto';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DATASETS = join(ROOT, 'datasets');
+const ERRATA = join(ROOT, 'errata');
 
 const sha256 = (path) => createHash('sha256').update(readFileSync(path)).digest('hex');
 
@@ -60,6 +62,49 @@ const KINDS = {
  * passed unchecked.
  */
 const FIRST_SHAPE_DATASETS = ['2026-03-18', '2026-08-03'];
+
+/** The three ways a figure can be off: for a row's knownIssue and for an errata issue alike. */
+const DIRECTIONS = ['understates', 'overstates', 'unknown'];
+
+/**
+ * An errata file: what has been learnt about a dataset since it was published.
+ *
+ * A published dataset is never rewritten (scripts/check-immutable.mjs), so a
+ * figure found to be wrong cannot be corrected, or even labelled, where it
+ * sits. The finding is published beside the datasets instead, in
+ * errata/<date>.json, named for the dataset it describes.
+ *
+ * The lists are closed. A field this script has no rule for is one no reader
+ * has a definition of, and a misspelt field would otherwise read as an absent
+ * one.
+ */
+const ERRATA_FIELDS = ['schemaVersion', 'kind', 'dataset', 'doi', 'issuedAt', 'issues'];
+const ISSUE_FIELDS = ['defect', 'summary', 'affects', 'direction', 'magnitude', 'correctedIn'];
+const MAGNITUDE_FIELDS = ['value', 'of', 'unit'];
+
+const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const isText = (v) => typeof v === 'string' && v.trim().length > 0;
+const unknownFields = (object, fields) => Object.keys(object).filter((k) => !fields.includes(k));
+
+/** A date that exists: 2026-02-31 has the right shape and is not one. */
+function isCalendarDate(v) {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const time = Date.parse(`${v}T00:00:00Z`);
+  return !Number.isNaN(time) && new Date(time).toISOString().slice(0, 10) === v;
+}
+
+/**
+ * Follow a dotted path through own properties only, so that `constructor` and
+ * its kind resolve to nothing instead of to something every object has.
+ */
+function resolvePath(root, path) {
+  let at = root;
+  for (const key of path.split('.')) {
+    if (!isObject(at) || !Object.hasOwn(at, key)) return undefined;
+    at = at[key];
+  }
+  return at;
+}
 
 const problems = [];
 const fail = (dataset, message) => problems.push(`${dataset}: ${message}`);
@@ -213,11 +258,153 @@ function validate(name) {
     for (const field of ['defect', 'summary', 'affects', 'direction', 'correctedIn']) {
       if (!row.knownIssue[field]) fail(name, `${eco}.knownIssue is missing ${field}`);
     }
-    if (!['understates', 'overstates', 'unknown'].includes(row.knownIssue.direction)) {
+    if (!DIRECTIONS.includes(row.knownIssue.direction)) {
       fail(name, `${eco}.knownIssue.direction is ${JSON.stringify(row.knownIssue.direction)}, ` +
         'which tells a reader nothing about which way to read the figure');
     }
   }
+}
+
+/**
+ * Validate one file of errata/.
+ *
+ * An errata file is only useful if a reader can act on it. So each issue has
+ * to say which figures it bears on, which way they are off, by how much where
+ * that was measured, and where the correction will appear. An issue that names
+ * a figure the dataset does not contain describes nothing, and fails.
+ */
+function validateErrata(file) {
+  const label = `errata/${file}`;
+
+  const named = /^(\d{4}-\d{2}-\d{2})\.json$/.exec(file);
+  if (!named) {
+    fail(label, 'is not named <dataset date>.json. Everything in errata/ is the errata file of one dataset.');
+    return;
+  }
+  const date = named[1];
+
+  let errata;
+  try {
+    errata = JSON.parse(readFileSync(join(ERRATA, file), 'utf-8'));
+  } catch (err) {
+    fail(label, `does not parse: ${err.message}`);
+    return;
+  }
+  if (!isObject(errata)) {
+    fail(label, 'is not a JSON object');
+    return;
+  }
+
+  const extra = unknownFields(errata, ERRATA_FIELDS);
+  if (extra.length > 0) {
+    fail(label, `carries ${extra.join(', ')}, which an errata file does not define`);
+  }
+  if (errata.schemaVersion !== 2) {
+    fail(label, `schemaVersion is ${JSON.stringify(errata.schemaVersion)}; the rules here are for version 2`);
+  }
+  if (errata.kind !== 'censusErrata') {
+    fail(label, `kind is ${JSON.stringify(errata.kind)}, not "censusErrata"`);
+  }
+  if (errata.dataset !== date) {
+    fail(label, `dataset is ${JSON.stringify(errata.dataset)}, and the file is named for ${date}`);
+  }
+  if (typeof errata.doi !== 'string' || !/^10\.\d{4,9}\/\S+$/.test(errata.doi)) {
+    fail(label, `doi is ${JSON.stringify(errata.doi)}. An errata file gives the DOI of the dataset it ` +
+      'describes, so a reader holding the citation can tell the two belong together.');
+  }
+  if (!isCalendarDate(errata.issuedAt)) {
+    fail(label, `issuedAt is ${JSON.stringify(errata.issuedAt)}, not a YYYY-MM-DD date. ` +
+      'An errata file with no date of issue is a draft.');
+  } else if (errata.issuedAt < date) {
+    fail(label, `issuedAt is ${errata.issuedAt}, before the dataset it describes was collected`);
+  }
+
+  // The figures an issue names are looked up in the dataset's own aggregate.
+  let corpus;
+  const manifestPath = join(DATASETS, date, 'MANIFEST.json');
+  if (!existsSync(manifestPath)) {
+    fail(label, `describes datasets/${date}, which is not a dataset in this repository`);
+  } else {
+    try {
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+      corpus = JSON.parse(readFileSync(join(DATASETS, date, manifest.corpus.file), 'utf-8'));
+    } catch {
+      // What is wrong with the dataset is reported by its own validation.
+      fail(label, `cannot be checked against datasets/${date}: its aggregate could not be read`);
+    }
+  }
+
+  if (!Array.isArray(errata.issues) || errata.issues.length === 0) {
+    fail(label, 'lists no issues. An errata file with nothing in it reads as a dataset checked and cleared.');
+    return;
+  }
+
+  const defects = new Set();
+  errata.issues.forEach((issue, index) => {
+    const at = `issue ${index + 1}`;
+    if (!isObject(issue)) {
+      fail(label, `${at} is not an object`);
+      return;
+    }
+    const where = isText(issue.defect) ? `${at} (${issue.defect})` : at;
+
+    const undefinedHere = unknownFields(issue, ISSUE_FIELDS);
+    if (undefinedHere.length > 0) {
+      fail(label, `${where} carries ${undefinedHere.join(', ')}, which an issue does not define`);
+    }
+
+    for (const field of ['defect', 'summary', 'correctedIn']) {
+      if (!isText(issue[field])) fail(label, `${where} is missing ${field}`);
+    }
+    if (isText(issue.defect)) {
+      if (defects.has(issue.defect)) {
+        fail(label, `${where} repeats a defect already listed. A reader citing it could mean either.`);
+      }
+      defects.add(issue.defect);
+    }
+
+    if (!DIRECTIONS.includes(issue.direction)) {
+      fail(label, `${where} has direction ${JSON.stringify(issue.direction)}, ` +
+        'which tells a reader nothing about which way to read the figure');
+    }
+
+    if (!Array.isArray(issue.affects) || issue.affects.length === 0) {
+      fail(label, `${where} names no figure in affects`);
+    } else {
+      const figures = new Set();
+      for (const path of issue.affects) {
+        if (!isText(path)) {
+          fail(label, `${where} has an entry in affects that is not a field path`);
+          continue;
+        }
+        if (figures.has(path)) fail(label, `${where} names ${path} twice in affects`);
+        figures.add(path);
+        if (corpus !== undefined && resolvePath(corpus, path) === undefined) {
+          fail(label, `${where} affects ${path}, which is not a field of the ${date} aggregate`);
+        }
+      }
+    }
+
+    if (!Object.hasOwn(issue, 'magnitude')) {
+      fail(label, `${where} is missing magnitude. Where the size was not measured it is null, ` +
+        'stated rather than left out.');
+    } else if (issue.magnitude !== null) {
+      const m = issue.magnitude;
+      if (!isObject(m) || unknownFields(m, MAGNITUDE_FIELDS).length > 0 ||
+          !MAGNITUDE_FIELDS.every((k) => Object.hasOwn(m, k))) {
+        fail(label, `${where} has a magnitude that is not { value, of, unit } or null`);
+      } else {
+        const valueOk = Number.isFinite(m.value) && m.value >= 0;
+        const ofOk = Number.isFinite(m.of) && m.of > 0;
+        if (!valueOk) fail(label, `${where} has magnitude.value ${JSON.stringify(m.value)}, not a count`);
+        if (!ofOk) fail(label, `${where} has magnitude.of ${JSON.stringify(m.of)}, not a count above zero`);
+        if (valueOk && ofOk && m.value > m.of) {
+          fail(label, `${where} has a magnitude of ${m.value} of ${m.of}: more than the whole it is counted in`);
+        }
+        if (!isText(m.unit)) fail(label, `${where} has no magnitude.unit, so its numbers count nothing a reader can name`);
+      }
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -236,9 +423,18 @@ if (requested && !all.includes(requested)) {
   process.exit(2);
 }
 
+// Every entry in errata/ is read, whatever it is called. A file passed over
+// for its name is a file nothing has checked.
+let allErrata = [];
+if (existsSync(ERRATA)) {
+  if (statSync(ERRATA).isDirectory()) allErrata = readdirSync(ERRATA).sort();
+  else fail('errata', 'is not a directory');
+}
+const errataFiles = requested ? allErrata.filter((f) => f === `${requested}.json`) : allErrata;
+
 // An empty repository is a valid state (nothing published yet), but a run that
 // validated nothing must say so rather than print a checkmark.
-if (names.length === 0) {
+if (names.length === 0 && errataFiles.length === 0 && problems.length === 0) {
   process.stdout.write('No datasets published yet. Nothing to validate.\n');
   process.exit(0);
 }
@@ -251,11 +447,19 @@ for (const name of names) {
   validate(name);
 }
 
+for (const file of errataFiles) validateErrata(file);
+
+const checked = `${names.length} dataset(s)` +
+  (errataFiles.length > 0 ? ` and ${errataFiles.length} errata file(s)` : '');
+
 if (problems.length > 0) {
-  process.stderr.write(`\n${problems.length} problem(s) across ${names.length} dataset(s):\n\n`);
+  process.stderr.write(`\n${problems.length} problem(s) across ${checked}:\n\n`);
   for (const p of problems) process.stderr.write(`  ${p}\n`);
   process.stderr.write('\n');
   process.exit(1);
 }
 
 process.stdout.write(`${names.length} dataset(s) validated: ${names.join(', ')}\n`);
+if (errataFiles.length > 0) {
+  process.stdout.write(`${errataFiles.length} errata file(s) validated: ${errataFiles.join(', ')}\n`);
+}

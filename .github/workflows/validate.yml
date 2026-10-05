@@ -35,6 +35,11 @@ jobs:
       - name: Check the validator
         run: node --test scripts/check-validator.mjs
 
+      # The rules an errata file lives under, in the validator and in the
+      # immutability check, run against copies and scratch repositories.
+      - name: Check the errata rules
+        run: node --test scripts/check-errata.mjs
+
   immutable:
     name: No published dataset is rewritten
     runs-on: ubuntu-latest
