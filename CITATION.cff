@@ -8,7 +8,7 @@ authors:
   - name: CryptoServe
     website: https://census.cryptoserve.dev
 license: CC-BY-4.0
-repository-code: https://github.com/opena2a-org/crypto-census-data
+repository-code: https://github.com/ecolibria/crypto-census-data
 url: https://census.cryptoserve.dev
 identifiers:
   - type: doi
@@ -24,8 +24,10 @@ abstract: >-
   Cryptographic dependency adoption across eleven public package registries.
   Each dataset records, per ecosystem, how many packages were examined and how
   many depend on a catalogued cryptographic library, split across weak, modern
-  and post-quantum tiers. Counts are of packages examined, not of packages using
-  cryptography; every published share is over the crypto-using subset.
+  and post-quantum tiers.
+  Counts are of packages listed for scanning, which can include packages that
+  could not be read, not of packages using cryptography; every published share
+  is over the subset that matched a catalogued library.
 keywords:
   - cryptography
   - post-quantum cryptography
