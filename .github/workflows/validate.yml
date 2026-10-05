@@ -35,6 +35,11 @@ jobs:
       - name: Check the validator
         run: node --test scripts/check-validator.mjs
 
+      # The rules an errata file lives under, in the validator and in the
+      # immutability check, run against copies and scratch repositories.
+      - name: Check the errata rules
+        run: node --test scripts/check-errata.mjs
+
   immutable:
     name: No published dataset is rewritten
     runs-on: ubuntu-latest
@@ -52,5 +57,8 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Check immutability against the base branch
-        run: node scripts/check-immutable.mjs "origin/${{ github.base_ref }}"
+      # Always against the default branch, whatever branch the pull request
+      # targets. Compared with its own target, a change aimed at a branch that
+      # already holds a rewrite would have nothing left to show.
+      - name: Check immutability against the default branch
+        run: node scripts/check-immutable.mjs "origin/${{ github.event.repository.default_branch }}"
