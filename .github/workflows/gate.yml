@@ -1,7 +1,6 @@
 name: Gate
 
-# The checks a pull request has to pass, run by the default branch's copy of
-# the scripts.
+# Checks on a pull request, run by the default branch's copy of the scripts.
 #
 # On a `pull_request` event the workflow file and the scripts are the pull
 # request's own. A change could then edit a published file together with the
@@ -12,9 +11,10 @@ name: Gate
 # branch's two scripts, and those read JSON.
 #
 # validate.yml still runs on pull requests, on the pull request's own scripts
-# and their tests, which is what a change to the scripts needs. Its checks are
-# required as well as these: a change that breaks the scripts' own tests does
-# not merge either.
+# and their tests, which is what a change to the scripts needs.
+#
+# A pull request from another repository is not checked here and does not pass
+# here: see the first step.
 
 on:
   pull_request_target:
@@ -47,7 +47,22 @@ jobs:
         shell: bash
     env:
       HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+      THIS_REPOSITORY: ${{ github.repository }}
     steps:
+      # This workflow runs with this repository's own permissions, so it checks
+      # branches of this repository and nothing else. The step fails; it is not
+      # a condition on the job, because a job that is skipped is reported as a
+      # success. A head whose repository has since been deleted has no name,
+      # and stops here too.
+      - name: Stop at a pull request from another repository
+        run: |
+          if [ -z "$THIS_REPOSITORY" ] || [ "$HEAD_REPOSITORY" != "$THIS_REPOSITORY" ]; then
+            echo "This pull request is not from a branch of this repository, so these checks do not run on it and it is not merged as it is."
+            echo "A maintainer who takes the change cherry-picks it onto a branch of this repository, unless it touches scripts/ or .github/."
+            exit 1
+          fi
+
       - name: Check out the default branch's scripts
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -75,18 +90,6 @@ jobs:
         working-directory: data
         run: |
           test "$(git rev-parse HEAD)" = "$HEAD_SHA" || { echo "The checkout is not the head of the pull request."; exit 1; }
-
-      # The scripts and the workflows of this repository change only from
-      # inside it, where a change to them is reviewed before it is pushed.
-      - name: Refuse a change to the scripts or the workflows from another repository
-        if: github.event.pull_request.head.repo.full_name != github.repository
-        working-directory: data
-        run: |
-          count=$(git diff --name-only -z refs/remotes/origin/main...HEAD -- scripts .github | tr -cd '\0' | wc -c | tr -d ' ')
-          if [ "$count" -ne 0 ]; then
-            echo "This pull request comes from another repository and changes $count path(s) under scripts/ or .github/. Those change only from inside this repository."
-            exit 1
-          fi
 
       # The checks read the tree the merge would produce, not the head alone. A
       # head whose history joins the default branch's in more than one place can
