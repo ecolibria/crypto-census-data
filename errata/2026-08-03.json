@@ -3,7 +3,7 @@
   "kind": "censusErrata",
   "dataset": "2026-08-03",
   "doi": "10.5281/zenodo.21791658",
-  "issuedAt": "2026-10-05",
+  "issuedAt": "2026-10-06",
   "issues": [
     {
       "defect": "first-dependencies-element-read-wherever-it-sat",
@@ -19,7 +19,7 @@
         "unit": "POMs in the second set whose dependency list the scanner read differently from an XML parser"
       },
       "correctedIn": "scripts/scan-maven.mjs was corrected on 2026-10-05 to read project-level dependencies only; no scan has been published with it. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
-      "issuedAt": "2026-10-05"
+      "issuedAt": "2026-10-06"
     },
     {
       "defect": "entries-matched-only-by-libraries-being-removed",
@@ -37,7 +37,7 @@
         "unit": "packages counted as matching a catalogued library"
       },
       "correctedIn": "A correction to the catalogue is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
-      "issuedAt": "2026-10-05"
+      "issuedAt": "2026-10-06"
     },
     {
       "defect": "catalogue-names-matched-by-path-prefix",
@@ -52,7 +52,7 @@
         "unit": "Go modules counted as using cryptography"
       },
       "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
-      "issuedAt": "2026-10-05"
+      "issuedAt": "2026-10-06"
     },
     {
       "defect": "packages-counted-only-through-removed-entries-or-a-prefix-match",
@@ -67,7 +67,7 @@
         "unit": "packages counted as matching a catalogued library"
       },
       "correctedIn": "Corrections are planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
-      "issuedAt": "2026-10-05"
+      "issuedAt": "2026-10-06"
     },
     {
       "defect": "catalogue-entry-absent-from-the-registry",
@@ -79,7 +79,7 @@
       "direction": "unknown",
       "magnitude": null,
       "correctedIn": "A correction to the catalogue is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
-      "issuedAt": "2026-10-05"
+      "issuedAt": "2026-10-06"
     },
     {
       "defect": "indirect-requirements-counted-as-direct",
@@ -96,7 +96,7 @@
         "unit": "published Go entries re-read in the reconstruction that required the matched library only as // indirect"
       },
       "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
-      "issuedAt": "2026-10-05"
+      "issuedAt": "2026-10-06"
     },
     {
       "defect": "module-read-at-its-first-indexed-version",
@@ -113,7 +113,7 @@
         "unit": "published Go entries located in the reconstruction, each first indexed between 2019-04-10 and 2020-07-30"
       },
       "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
-      "issuedAt": "2026-10-05"
+      "issuedAt": "2026-10-06"
     },
     {
       "defect": "module-line-only-manifests-counted-as-no-cryptography",
@@ -130,7 +130,7 @@
         "unit": "go.mod files read in the reconstruction that hold only a module line"
       },
       "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
-      "issuedAt": "2026-10-05"
+      "issuedAt": "2026-10-06"
     },
     {
       "defect": "dependencies-counted-however-declared",
@@ -147,7 +147,7 @@
         "unit": "crates counted as post-quantum that require the library unconditionally at the scanned version"
       },
       "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
-      "issuedAt": "2026-10-05"
+      "issuedAt": "2026-10-06"
     },
     {
       "defect": "requirements-behind-an-extra-or-marker-counted",
@@ -164,7 +164,7 @@
         "unit": "published PyPI entries unchanged since the scan that match a catalogued library only behind an extra or a marker"
       },
       "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
-      "issuedAt": "2026-10-05"
+      "issuedAt": "2026-10-06"
     },
     {
       "defect": "dependencies-declared-for-some-target-frameworks-counted",
@@ -180,7 +180,7 @@
         "unit": "published NuGet entries re-read on 2026-10-05 that match a catalogued library only in dependency groups for some target frameworks"
       },
       "correctedIn": "A correction that records how each match is declared is planned for every scanner and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
-      "issuedAt": "2026-10-05"
+      "issuedAt": "2026-10-06"
     },
     {
       "defect": "dependencies-in-non-default-subspecs-counted",
@@ -196,7 +196,7 @@
         "unit": "matched pods re-read on 2026-10-05 whose every catalogued match is in a subspec outside the default subspecs"
       },
       "correctedIn": "A correction that records how each match is declared is planned for every scanner and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
-      "issuedAt": "2026-10-05"
+      "issuedAt": "2026-10-06"
     },
     {
       "defect": "unread-packages-counted-as-scanned",
@@ -219,7 +219,7 @@
         "unit": "packages counted as scanned that were not read (at least)"
       },
       "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
-      "issuedAt": "2026-10-05"
+      "issuedAt": "2026-10-06"
     },
     {
       "defect": "unread-packages-missing-from-match-counts",
@@ -250,7 +250,7 @@
       "direction": "understates",
       "magnitude": null,
       "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
-      "issuedAt": "2026-10-05"
+      "issuedAt": "2026-10-06"
     },
     {
       "defect": "weak-tier-mixes-two-kinds-of-library",
@@ -275,7 +275,7 @@
         "unit": "packages counted as depending on a weak library that remain so under the corrected classes; 10,809 if all 11 entries of unverified status are weak"
       },
       "correctedIn": "A correction to the catalogue is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
-      "issuedAt": "2026-10-05"
+      "issuedAt": "2026-10-06"
     },
     {
       "defect": "totals-derived-from-affected-rows",
@@ -291,7 +291,7 @@
       "direction": "unknown",
       "magnitude": null,
       "correctedIn": "Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
-      "issuedAt": "2026-10-05"
+      "issuedAt": "2026-10-06"
     },
     {
       "defect": "top-exposed-list-names-packages-not-classed-weak",
@@ -306,7 +306,7 @@
         "unit": "packages named in topExposedProjects that leave the list under the corrected classes, at least; 35 if none of the three entries of unverified status is weak"
       },
       "correctedIn": "A correction to the catalogue is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
-      "issuedAt": "2026-10-05"
+      "issuedAt": "2026-10-06"
     },
     {
       "defect": "top-post-quantum-list-counts-optional-declarations-and-is-unranked",
@@ -321,7 +321,7 @@
         "unit": "crates named in topPqcProjects that do not require the post-quantum library unconditionally"
       },
       "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
-      "issuedAt": "2026-10-05"
+      "issuedAt": "2026-10-06"
     },
     {
       "defect": "march-and-august-figures-compared-as-a-trend",
@@ -333,7 +333,7 @@
       "direction": "unknown",
       "magnitude": null,
       "correctedIn": "The comparison is removed from the repository README and from the description used for later deposits. The copy archived with this deposit cannot change.",
-      "issuedAt": "2026-10-05"
+      "issuedAt": "2026-10-06"
     },
     {
       "defect": "limited-rows-are-the-first-part-of-a-list-not-a-sample",
@@ -370,7 +370,7 @@
       "direction": "unknown",
       "magnitude": null,
       "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
-      "issuedAt": "2026-10-05"
+      "issuedAt": "2026-10-06"
     },
     {
       "defect": "packages-with-no-listed-version-counted",
@@ -386,7 +386,7 @@
         "unit": "re-read NuGet entries with no listed version at the scan (at least)"
       },
       "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
-      "issuedAt": "2026-10-05"
+      "issuedAt": "2026-10-06"
     }
   ]
 }
