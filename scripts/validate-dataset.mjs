@@ -1819,6 +1819,200 @@ function compareLedger(eco, ledger, scan, bad) {
   }
 }
 
+// --- The consolidation map ------------------------------------------------------
+
+/** The id every figure is read with. A definition that changes takes the next integer, so an id these rules do not know fails. */
+const DEFINITIONS = {
+  coverage: 'census.coverage/1',
+  anyManifestMatch: 'census.match.anyManifest/1',
+  directUnconditional: 'census.match.directUnconditional/1',
+  raw: 'census.unit.package/1',
+  consolidated: 'census.unit.consolidated/1',
+  multiPurposeLibrary: 'census.table.multiPurposeLibrary/1',
+};
+
+/**
+ * The namespace that makes packages one unit under census.unit.consolidated/1:
+ * an npm scope, a Maven groupId, a Packagist vendor, the first three elements
+ * of a Go path. Names only, any size, and nothing is removed. A registry not
+ * named here has no namespace, so each of its packages is its own unit.
+ */
+const NAMESPACE = {
+  npm: (name) => (name.startsWith('@') && name.includes('/') ? name.slice(0, name.indexOf('/')) : null),
+  maven: (name) => (name.includes(':') ? name.slice(0, name.indexOf(':')) : null),
+  packagist: (name) => (name.includes('/') ? name.slice(0, name.indexOf('/')) : null),
+  go: (name) => name.split('/').slice(0, 3).join('/'),
+};
+
+const canonical = (value) => {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (isObject(value)) return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}`;
+  return JSON.stringify(value);
+};
+
+Object.assign(KEYS, {
+  consolidation: ['schemaVersion', 'kind', 'collectedAt', 'definitionId', 'rules', 'byEcosystem'],
+  rule: ['id', 'statement'],
+  consolidationEcosystem: ['units', 'removed'],
+  unit: ['unit', 'members'],
+  removal: ['name', 'rule'],
+});
+
+function checkConsolidation(name, record, scans, bad) {
+  const file = record.file;
+  const c = record.value;
+  if (!closed(c, KEYS.consolidation, file, bad)) return null;
+  let sound = true;
+  if (c.kind !== 'censusConsolidation') bad(`${file}: kind is ${describe(c.kind)}, not "censusConsolidation"`);
+  if (c.collectedAt !== name) bad(`${file}: collectedAt is ${describe(c.collectedAt)}, not the dataset's date ${name}`);
+  if (c.definitionId !== DEFINITIONS.consolidated) {
+    bad(`${file}: definitionId is ${describe(c.definitionId)}, not ${DEFINITIONS.consolidated}, the one rule set these rules know`);
+    sound = false;
+  }
+  const ruleIds = new Set();
+  if (!Array.isArray(c.rules)) {
+    bad(`${file}: rules is ${describe(c.rules)}, not a list`);
+    sound = false;
+  } else {
+    c.rules.forEach((rule, index) => {
+      if (!closed(rule, KEYS.rule, `${file}: rules[${index}]`, bad)) return;
+      if (!isText(rule.id) || ruleIds.has(rule.id)) bad(`${file}: rules[${index}].id is ${describe(rule.id)}, not a rule id of its own`);
+      if (!isText(rule.statement)) bad(`${file}: rules[${index}].statement is ${describe(rule.statement)}, not a statement of the rule`);
+      ruleIds.add(rule.id);
+    });
+  }
+  const byEco = {};
+  if (!isObject(c.byEcosystem)) {
+    bad(`${file}: byEcosystem is ${describe(c.byEcosystem)}, not an object by registry`);
+    return null;
+  }
+  for (const key of Object.keys(c.byEcosystem)) {
+    if (!ECOSYSTEMS.includes(key)) bad(`${file}: byEcosystem carries ${key}, which is not one of the eleven registries`);
+  }
+  for (const eco of ECOSYSTEMS) {
+    const unitOf = new Map();
+    const removedBy = new Map();
+    const units = [];
+    byEco[eco] = { unitOf, removedBy, units };
+    if (!Object.hasOwn(c.byEcosystem, eco)) continue;
+    const where = `${file}: byEcosystem.${eco}`;
+    const section = c.byEcosystem[eco];
+    if (!closed(section, KEYS.consolidationEcosystem, where, bad)) {
+      sound = false;
+      continue;
+    }
+    const known = scans[eco] && Array.isArray(scans[eco].value.packages)
+      ? new Set(scans[eco].value.packages.filter(isObject).map((p) => p.name)) : null;
+    const place = (member, at) => {
+      if (!isText(member)) {
+        bad(`${at} names ${describe(member)}, not a package`);
+        return false;
+      }
+      if (known && !known.has(member)) {
+        bad(`${at} names ${member}, which is not a package with a match in the scan file of ${eco}`);
+        return false;
+      }
+      if (unitOf.has(member) || removedBy.has(member)) {
+        bad(`${at} places ${member} a second time. Each package with a match is kept, merged into one unit, or removed.`);
+        return false;
+      }
+      return true;
+    };
+    if (!Array.isArray(section.units)) {
+      bad(`${where}.units is ${describe(section.units)}, not a list`);
+      sound = false;
+    } else {
+      const seen = new Set();
+      section.units.forEach((unit, index) => {
+        const at = `${where}.units[${index}]`;
+        if (!closed(unit, KEYS.unit, at, bad)) {
+          sound = false;
+          return;
+        }
+        if (!isText(unit.unit) || seen.has(unit.unit)) {
+          bad(`${at}.unit is ${describe(unit.unit)}, not a name of its own`);
+          sound = false;
+          return;
+        }
+        seen.add(unit.unit);
+        if (!Array.isArray(unit.members) || unit.members.length < 2) {
+          bad(`${at}.members is ${describe(unit.members)}. The map lists merged units only, so a unit has two members or more.`);
+          sound = false;
+          return;
+        }
+        for (const member of unit.members) {
+          if (place(member, at)) unitOf.set(member, unit.unit);
+          else sound = false;
+        }
+        units.push({ unit: unit.unit, members: unit.members });
+      });
+    }
+    if (!Array.isArray(section.removed)) {
+      bad(`${where}.removed is ${describe(section.removed)}, not a list`);
+      sound = false;
+    } else {
+      section.removed.forEach((removal, index) => {
+        const at = `${where}.removed[${index}]`;
+        if (!closed(removal, KEYS.removal, at, bad)) {
+          sound = false;
+          return;
+        }
+        if (!ruleIds.has(removal.rule)) {
+          bad(`${at}.rule is ${describe(removal.rule)}, which is not a rule of this map`);
+          sound = false;
+        }
+        if (place(removal.name, at)) removedBy.set(removal.name, removal.rule);
+        else sound = false;
+      });
+    }
+  }
+  if (sound) checkConsolidationRule(byEco, scans, file, bad);
+  return sound ? { byEco, ruleIds } : null;
+}
+
+/**
+ * census.unit.consolidated/1, recomputed from the names: packages that share
+ * a namespace are one unit, whatever its size, and no package is removed. A
+ * map that merges anything else, or leaves a namespace apart, fails, whatever
+ * figures it produces.
+ */
+function checkConsolidationRule(byEco, scans, file, bad) {
+  for (const eco of ECOSYSTEMS) {
+    const section = byEco[eco];
+    for (const [member, rule] of section.removedBy) {
+      bad(`${file}: byEcosystem.${eco} removes ${member} by ${rule}. Under ${DEFINITIONS.consolidated} consolidation only ` +
+        'merges; no rule removes a package.');
+    }
+    if (!scans[eco] || !Array.isArray(scans[eco].value.packages)) continue;
+    const namespace = NAMESPACE[eco];
+    const groups = new Map();
+    if (namespace) {
+      for (const p of scans[eco].value.packages) {
+        if (!isObject(p) || typeof p.name !== 'string') continue;
+        const key = namespace(p.name);
+        if (key === null) continue;
+        groups.set(key, [...(groups.get(key) ?? []), p.name]);
+      }
+    }
+    const expected = new Map([...groups].filter(([, members]) => members.length > 1)
+      .map(([key, members]) => [canonical([...members].sort()), { key, members }]));
+    const actual = new Map(section.units.map((unit) => [canonical([...unit.members].sort()), unit]));
+    for (const [members, group] of expected) {
+      if (!actual.has(members)) {
+        bad(`${file}: byEcosystem.${eco} does not merge ${group.members.join(', ')}, which share ${group.key}. Under ` +
+          `${DEFINITIONS.consolidated}, packages that share an npm scope, a Maven groupId, a Packagist vendor or the first ` +
+          'three elements of a Go path are one unit, whatever its size.');
+      }
+    }
+    for (const [members, unit] of actual) {
+      if (!expected.has(members)) {
+        bad(`${file}: byEcosystem.${eco} unit ${unit.unit} merges ${unit.members.join(', ')}, which are not the packages of ` +
+          `one namespace. Under ${DEFINITIONS.consolidated} a unit is a namespace and nothing else.`);
+      }
+    }
+  }
+}
+
 /** Every rule of a version 2 dataset, in the order its files depend on each other. */
 function validateVersion2(name, dir) {
   const bad = (message) => fail(name, message);
@@ -1840,6 +2034,7 @@ function validateVersion2(name, dir) {
     if (ledger.sound) compareLedger(eco, ledger, scans[eco], bad);
     ledgers[eco] = ledger;
   }
+  if (found.consolidation) checkConsolidation(name, found.consolidation, scans, bad);
 }
 
 // ---------------------------------------------------------------------------

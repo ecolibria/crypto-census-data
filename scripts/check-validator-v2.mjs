@@ -1148,6 +1148,46 @@ test('a ledger that decompresses past the bound is refused, and the run ends', a
   assert.match(result.stderr, /listing-hex\.tsv\.gz decompresses to more than 1,073,741,824 bytes, the most a ledger may hold/);
 });
 
+// --- Consolidation map ---------------------------------------------------------
+
+const mapOf = (fn) => ({ consolidation: fn });
+
+// Each object is closed: a field the contract does not define fails, at every level.
+const closedInTheMap = [
+  ['the consolidation map', mapOf((m) => { m.note = 'x'; }), /consolidation-2026-09-30\.json carries note/],
+  ['a consolidation rule', mapOf((m) => { m.rules[0].note = 'x'; }), /rules\[0\] carries note/],
+  ['a registry of the map', mapOf((m) => { m.byEcosystem.npm.note = 'x'; }), /byEcosystem\.npm carries note/],
+  ['a merged unit', mapOf((m) => { m.byEcosystem.npm.units[0].note = 'x'; }), /byEcosystem\.npm\.units\[0\] carries note/],
+  ['a removal', mapOf((m) => { m.byEcosystem.pub.removed = [{ name: 'acme_dart', rule: 'sharedNamespace', note: 'x' }]; }), /byEcosystem\.pub\.removed\[0\] carries note/],
+];
+for (const [level, change, problem] of closedInTheMap) plant(`a field the contract does not define, in ${level}`, change, problem);
+
+// The consolidation map, and the rule it is held to.
+plant('a map of another kind', mapOf((m) => { m.kind = 'censusMap'; }), /consolidation-2026-09-30\.json: kind is "censusMap", not "censusConsolidation"/);
+plant('a map of another date', mapOf((m) => { m.collectedAt = '2026-09-01'; }), /consolidation-2026-09-30\.json: collectedAt is "2026-09-01", not the dataset's date/);
+plant('a map under a definition these rules do not know', mapOf((m) => { m.definitionId = 'census.unit.consolidated/2'; }), /definitionId is "census\.unit\.consolidated\/2", not census\.unit\.consolidated\/1/);
+plant('rules that are not a list', mapOf((m) => { m.rules = {}; }), /consolidation-2026-09-30\.json: rules is \{\}, not a list/);
+plant('a rule with no id of its own', mapOf((m) => { m.rules.push({ ...m.rules[0] }); }), /rules\[1\]\.id is "sharedNamespace", not a rule id of its own/);
+plant('a rule with no statement', mapOf((m) => { m.rules[0].statement = ''; }), /rules\[0\]\.statement is "", not a statement of the rule/);
+plant('a map that is not by registry', mapOf((m) => { m.byEcosystem = []; }), /consolidation-2026-09-30\.json: byEcosystem is \[\], not an object by registry/);
+plant('a map naming a registry that is not one', mapOf((m) => { m.byEcosystem.conda = { units: [], removed: [] }; }), /byEcosystem carries conda, which is not one of the eleven registries/);
+plant('units that are not a list', mapOf((m) => { m.byEcosystem.npm.units = {}; }), /byEcosystem\.npm\.units is \{\}, not a list/);
+plant('two units of one name', mapOf((m) => { m.byEcosystem.go.units.push({ unit: 'example.com/app/one', members: ['example.com/lib', 'example.com/app/one/v2'] }); }), /byEcosystem\.go\.units\[1\]\.unit is "example\.com\/app\/one", not a name of its own/);
+plant('a unit of one member', mapOf((m) => { m.byEcosystem.npm.units.push({ unit: '@other', members: ['@other/delta'] }); }), /units\[1\]\.members is \["@other\/delta"\]\. The map lists merged units only/);
+plant('a unit with a member that is not a package with a match', mapOf((m) => { m.byEcosystem.npm.units[0].members.push('@acme/zeta'); }), /names @acme\/zeta, which is not a package with a match in the scan file of npm/);
+plant('a package placed twice', mapOf((m) => { m.byEcosystem.npm.removed = [{ name: '@acme/alpha', rule: 'sharedNamespace' }]; }), /places @acme\/alpha a second time/);
+plant('removals that are not a list', mapOf((m) => { m.byEcosystem.npm.removed = {}; }), /byEcosystem\.npm\.removed is \{\}, not a list/);
+plant('a removal by a rule the map does not have', mapOf((m) => { m.byEcosystem.pub.removed = [{ name: 'acme_dart', rule: 'nameTooShort' }]; }), /removed\[0\]\.rule is "nameTooShort", which is not a rule of this map/);
+plant('a map that removes a package', mapOf((m) => { m.byEcosystem.pub.removed = [{ name: 'acme_dart', rule: 'sharedNamespace' }]; }), /byEcosystem\.pub removes acme_dart by sharedNamespace\. Under census\.unit\.consolidated\/1 consolidation only merges/);
+plant('a namespace left unmerged', mapOf((m) => { m.byEcosystem.maven.units = []; }), /byEcosystem\.maven does not merge com\.example:app, com\.example:lib, com\.example:tool, which share com\.example/);
+plant('a merge across namespaces', mapOf((m) => { m.byEcosystem.pypi.units = [{ unit: 'apps', members: ['alpha-app', 'beta-lib'] }]; }), /byEcosystem\.pypi unit apps merges alpha-app, beta-lib, which are not the packages of one namespace/);
+
+// Fields left out of nested objects, and the remaining types.
+plant('a registry of the map missing a field', mapOf((m) => { delete m.byEcosystem.npm.removed; }), /byEcosystem\.npm is missing removed/);
+plant('a unit member that is not a name', mapOf((m) => { m.byEcosystem.npm.units[0].members.push(42); }), /byEcosystem\.npm\.units\[0\] names 42, not a package/);
+plant('a unit missing its members', mapOf((m) => { delete m.byEcosystem.npm.units[0].members; }), /byEcosystem\.npm\.units\[0\] is missing members/);
+plant('a removal missing its rule', mapOf((m) => { m.byEcosystem.pub.removed = [{ name: 'acme_dart' }]; }), /byEcosystem\.pub\.removed\[0\] is missing rule/);
+
 // --- Running the planted defects -------------------------------------------------
 
 for (const [what, change, problem, prepare] of defects) {
