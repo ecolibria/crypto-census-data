@@ -958,13 +958,700 @@ function readListedFiles(name, dir, manifest, bad) {
   return found;
 }
 
+// --- The catalogue snapshot -----------------------------------------------------
+
+const isCamel = (v) => typeof v === 'string' && /^[a-z][A-Za-z0-9]*$/.test(v);
+const isUrl = (v) => {
+  if (typeof v !== 'string' || hasHiddenCharacters(v)) return false;
+  try {
+    return ['https:', 'http:'].includes(new URL(v).protocol);
+  } catch {
+    return false;
+  }
+};
+const isHttpsUrl = (v) => isUrl(v) && v.startsWith('https://');
+const isDistinct = (list) => new Set(list).size === list.length;
+const sameSet = (a, b) => Array.isArray(a) && Array.isArray(b) && isDistinct(a) && a.length === new Set(b).size && a.every((x) => b.includes(x));
+const sum = (values) => values.reduce((total, value) => total + value, 0);
+const byteOrder = (a, b) => Buffer.compare(Buffer.from(a, 'utf-8'), Buffer.from(b, 'utf-8'));
+
+const hasExactly = (object, keys) => Object.keys(object).length === keys.length && keys.every((key) => Object.hasOwn(object, key));
+const isTextList = (value) => Array.isArray(value) && value.every(isText);
+
+const CLASSES = ['matched', 'weak', 'brokenAlgorithm', 'deprecatedLibrary', 'pqc'];
+
+/** The algorithms whose presence alone makes a library weak (class brokenAlgorithm). */
+const BROKEN_ALGORITHMS = ['MD2', 'MD4', 'MD5', 'SHA-1', 'DES', 'RC4', '3DES', 'RC2', 'Blowfish', 'CAST5', 'IDEA', 'TEA', 'GOST 28147-89'];
+
+Object.assign(KEYS, {
+  catalog: ['schemaVersion', 'kind', 'collectedAt', 'sourceCommit', 'matchSetSha256', 'classificationSha256', 'matchRules', 'entries'],
+  entry: ['ecosystem', 'name', 'tier', 'weakClass', 'classEvidence', 'classified', 'unclassifiedReason', 'endOfLifeReview',
+    'multiPurpose', 'unmatchable', 'registryAbsent', 'aliases', 'lastRelease', 'algorithms', 'category'],
+  classEvidence: ['basis', 'limb', 'url', 'checkedAt', 'additionalUrls'],
+  unclassifiedReason: ['code', 'url', 'checkedAt'],
+  endOfLifeReview: ['status', 'url', 'checkedAt'],
+  multiPurpose: ['version', 'url', 'checkedAt'],
+  unmatchable: ['reason', 'url', 'checkedAt'],
+  registryAbsent: ['checkedAt', 'note'],
+  alias: ['name', 'url', 'checkedAt'],
+  lastRelease: ['version', 'date', 'checkedAt'],
+});
+
+const TIERS = ['weak', 'other', 'pqc'];
+const WEAK_CLASSES = ['brokenAlgorithm', 'deprecatedLibrary'];
+const EVIDENCE_BASES = ['entryAlgorithms', 'endOfLifeSignal'];
+const LIMBS = ['D1', 'D2', 'D3', 'D4'];
+const UNCLASSIFIED_CODES = ['primaryFunctionNotCryptography', 'builtinPolyfill', 'noCryptographicCode'];
+const REVIEW_STATUSES = ['notReviewed', 'signalFound', 'noSignalFound', 'statusNotVerified'];
+const UNMATCHABLE_REASONS = ['standardLibraryPath', 'packagePathInModule'];
+
+/** Which entries each class holds. A multi-purpose library is never a post-quantum one. */
+const IN_CLASS = {
+  matched: (e) => e.classified === true,
+  weak: (e) => e.classified === true && e.tier === 'weak',
+  brokenAlgorithm: (e) => e.classified === true && e.weakClass === 'brokenAlgorithm',
+  deprecatedLibrary: (e) => e.classified === true && e.weakClass === 'deprecatedLibrary',
+  pqc: (e) => e.classified === true && e.tier === 'pqc' && e.multiPurpose === null,
+};
+/** An entry a scan can observe: classified, present on the registry, and a name a manifest can declare. */
+const isCountable = (e) => e.classified === true && e.registryAbsent === null && e.unmatchable === null;
+const exclusionOf = (e) => (e.classified !== true ? 'unclassified' : e.registryAbsent !== null ? 'registryAbsent' : 'unmatchable');
+
+/** One entry of the snapshot: its fields, their types, and the states the contract makes impossible. */
+function checkEntry(e, where, bad) {
+  if (!closed(e, KEYS.entry, where, bad)) return false;
+  let sound = true;
+  const wrong = (message) => {
+    bad(`${where}: ${message}`);
+    sound = false;
+  };
+  const nested = (value, keys, field, check) => {
+    if (value === null) return;
+    if (closed(value, keys, `${where}: ${field}`, bad)) check(value);
+    else sound = false;
+  };
+  if (!ECOSYSTEMS.includes(e.ecosystem)) wrong(`ecosystem is ${describe(e.ecosystem)}, not one of the eleven registries`);
+  if (!isText(e.name)) wrong(`name is ${describe(e.name)}`);
+  if (e.tier !== null && !TIERS.includes(e.tier)) wrong(`tier is ${describe(e.tier)}, not weak, other, pqc or null`);
+  if (e.weakClass !== null && !WEAK_CLASSES.includes(e.weakClass)) wrong(`weakClass is ${describe(e.weakClass)}, not brokenAlgorithm, deprecatedLibrary or null`);
+  if (typeof e.classified !== 'boolean') wrong(`classified is ${describe(e.classified)}, not true or false`);
+  nested(e.classEvidence, KEYS.classEvidence, 'classEvidence', (c) => {
+    if (!EVIDENCE_BASES.includes(c.basis)) wrong(`classEvidence.basis is ${describe(c.basis)}, not entryAlgorithms or endOfLifeSignal`);
+    if (c.limb !== null && !LIMBS.includes(c.limb)) wrong(`classEvidence.limb is ${describe(c.limb)}, not D1 to D4 or null`);
+    if (c.url !== null && !isHttpsUrl(c.url)) wrong(`classEvidence.url is ${describe(c.url)}, not an https URL or null`);
+    if (c.checkedAt !== null && !isTime(c.checkedAt)) wrong(`classEvidence.checkedAt is ${describe(c.checkedAt)}, not a time or null`);
+    if (!Array.isArray(c.additionalUrls) || !c.additionalUrls.every(isHttpsUrl)) wrong(`classEvidence.additionalUrls is ${describe(c.additionalUrls)}, not a list of https URLs`);
+    const cited = [c.limb, c.url, c.checkedAt].filter((v) => v !== null).length;
+    if (c.basis === 'entryAlgorithms' && cited !== 0) {
+      wrong('classEvidence cites a limb, a page or a check time with basis entryAlgorithms. An entry classed from its own ' +
+        'algorithms cites none, and null in those fields means exactly that.');
+    }
+    if (c.basis === 'endOfLifeSignal' && cited !== 3) {
+      wrong('classEvidence has basis endOfLifeSignal without a limb, a page and a check time. A class read from an end-of-life ' +
+        'signal says which signal, where it was read and when.');
+    }
+  });
+  nested(e.unclassifiedReason, KEYS.unclassifiedReason, 'unclassifiedReason', (u) => {
+    if (!UNCLASSIFIED_CODES.includes(u.code)) wrong(`unclassifiedReason.code is ${describe(u.code)}, not one of: ${UNCLASSIFIED_CODES.join(', ')}`);
+    if (!isHttpsUrl(u.url)) wrong(`unclassifiedReason.url is ${describe(u.url)}, not an https URL`);
+    if (!isTime(u.checkedAt)) wrong(`unclassifiedReason.checkedAt is ${describe(u.checkedAt)}, not a time`);
+  });
+  if (closed(e.endOfLifeReview, KEYS.endOfLifeReview, `${where}: endOfLifeReview`, bad)) {
+    const r = e.endOfLifeReview;
+    if (!REVIEW_STATUSES.includes(r.status)) wrong(`endOfLifeReview.status is ${describe(r.status)}, not one of: ${REVIEW_STATUSES.join(', ')}`);
+    if (r.url !== null && !isHttpsUrl(r.url)) wrong(`endOfLifeReview.url is ${describe(r.url)}, not an https URL or null`);
+    if (r.checkedAt !== null && !isTime(r.checkedAt)) wrong(`endOfLifeReview.checkedAt is ${describe(r.checkedAt)}, not a time or null`);
+  } else {
+    sound = false;
+  }
+  nested(e.multiPurpose, KEYS.multiPurpose, 'multiPurpose', (m) => {
+    if (!isText(m.version)) wrong(`multiPurpose.version is ${describe(m.version)}, not the version inspected`);
+    if (!isHttpsUrl(m.url)) wrong(`multiPurpose.url is ${describe(m.url)}, not an https URL`);
+    if (!isTime(m.checkedAt)) wrong(`multiPurpose.checkedAt is ${describe(m.checkedAt)}, not a time`);
+  });
+  nested(e.unmatchable, KEYS.unmatchable, 'unmatchable', (u) => {
+    if (!UNMATCHABLE_REASONS.includes(u.reason)) wrong(`unmatchable.reason is ${describe(u.reason)}, not standardLibraryPath or packagePathInModule`);
+    if (!isHttpsUrl(u.url)) wrong(`unmatchable.url is ${describe(u.url)}, not an https URL`);
+    if (!isTime(u.checkedAt)) wrong(`unmatchable.checkedAt is ${describe(u.checkedAt)}, not a time`);
+  });
+  nested(e.registryAbsent, KEYS.registryAbsent, 'registryAbsent', (a) => {
+    if (!isTime(a.checkedAt)) wrong(`registryAbsent.checkedAt is ${describe(a.checkedAt)}, not a time`);
+    if (a.note !== null && !isText(a.note)) wrong(`registryAbsent.note is ${describe(a.note)}, not text or null`);
+  });
+  if (!Array.isArray(e.aliases)) {
+    wrong(`aliases is ${describe(e.aliases)}, not a list`);
+  } else {
+    e.aliases.forEach((alias, index) => {
+      if (!closed(alias, KEYS.alias, `${where}: aliases[${index}]`, bad)) {
+        sound = false;
+        return;
+      }
+      if (!isText(alias.name)) wrong(`aliases[${index}].name is ${describe(alias.name)}`);
+      if (!isHttpsUrl(alias.url)) wrong(`aliases[${index}].url is ${describe(alias.url)}, not an https URL`);
+      if (!isTime(alias.checkedAt)) wrong(`aliases[${index}].checkedAt is ${describe(alias.checkedAt)}, not a time`);
+    });
+  }
+  nested(e.lastRelease, KEYS.lastRelease, 'lastRelease', (l) => {
+    if (!isText(l.version)) wrong(`lastRelease.version is ${describe(l.version)}, not a version`);
+    if (!isCalendarDate(l.date)) wrong(`lastRelease.date is ${describe(l.date)}, not a YYYY-MM-DD date`);
+    if (!isTime(l.checkedAt)) wrong(`lastRelease.checkedAt is ${describe(l.checkedAt)}, not a time`);
+  });
+  if (!isTextList(e.algorithms)) wrong(`algorithms is ${describe(e.algorithms)}, not a list of names`);
+  // not checked yet: category against the catalogue's closed list of
+  // categories, which the schema version 2 contract names but does not give.
+  if (!isText(e.category)) wrong(`category is ${describe(e.category)}, not a category`);
+  if (!sound) return false;
+
+  // The states the contract makes impossible to write.
+  if ((e.tier === null) !== (e.classified === false) || (e.unclassifiedReason !== null) !== (e.classified === false)) {
+    wrong(`tier is ${describe(e.tier)}, classified ${e.classified} and unclassifiedReason ${e.unclassifiedReason === null ? 'null' : 'set'}. ` +
+      'An entry has no tier exactly when it is unclassified, and then it says why.');
+  }
+  if ((e.weakClass !== null) !== (e.tier === 'weak')) {
+    wrong(`weakClass is ${describe(e.weakClass)} on tier ${describe(e.tier)}. A weak entry is in exactly one weak class, and no other entry is in one.`);
+  }
+  if ((e.classEvidence !== null) !== (e.weakClass !== null)) {
+    wrong(`classEvidence is ${e.classEvidence === null ? 'null' : 'set'} with weakClass ${describe(e.weakClass)}. The evidence for a weak class is given exactly when there is one.`);
+  }
+  if (e.weakClass === 'deprecatedLibrary' && e.classEvidence !== null && e.classEvidence.basis !== 'endOfLifeSignal') {
+    wrong('is a deprecatedLibrary with classEvidence.basis entryAlgorithms. A library is deprecated on an end-of-life signal, cited.');
+  }
+  if (e.weakClass === 'brokenAlgorithm') {
+    const off = e.algorithms.filter((algorithm) => !BROKEN_ALGORITHMS.includes(algorithm));
+    if (off.length > 0) {
+      wrong(`is a brokenAlgorithm entry whose algorithms include ${off.join(', ')}, which is not on the closed list of broken ` +
+        `algorithms (${BROKEN_ALGORITHMS.join(', ')})`);
+    }
+  }
+  if (e.multiPurpose !== null && e.tier !== 'other') {
+    wrong(`multiPurpose is set on tier ${describe(e.tier)}. A library that ships post-quantum algorithms among others is tier other, never counted as post-quantum.`);
+  }
+  if ((e.endOfLifeReview.status === 'signalFound') !== (e.weakClass === 'deprecatedLibrary')) {
+    wrong(`endOfLifeReview.status is ${e.endOfLifeReview.status} with weakClass ${describe(e.weakClass)}. A signal found is what makes a library deprecatedLibrary, and nothing else does.`);
+  }
+  return sound;
+}
+
+/** K, the countable entries and the excluded ones, for each class of one registry. */
+function measure(registry) {
+  registry.measure = {};
+  for (const cls of CLASSES) {
+    const counted = registry.entries.filter((e) => IN_CLASS[cls](e) && isCountable(e)).map((e) => e.name);
+    const members = cls === 'matched' ? registry.entries : registry.entries.filter(IN_CLASS[cls]);
+    const excluded = members.filter((e) => !isCountable(e)).map((e) => ({ entry: e.name, why: exclusionOf(e) }));
+    registry.measure[cls] = { k: counted.length, entries: counted, excluded };
+  }
+  registry.unclassified = registry.entries.filter((e) => e.classified !== true).map((e) => e.name);
+  registry.multiPurpose = registry.entries.filter((e) => e.multiPurpose !== null).map((e) => e.name);
+}
+
+function checkCatalog(name, record, bad) {
+  const file = record.file;
+  const c = record.value;
+  if (!closed(c, KEYS.catalog, file, bad)) return null;
+  if (c.kind !== 'censusCatalog') bad(`${file}: kind is ${describe(c.kind)}, not "censusCatalog"`);
+  if (c.collectedAt !== name) bad(`${file}: collectedAt is ${describe(c.collectedAt)}, not the dataset's date ${name}`);
+  if (!isText(c.sourceCommit)) bad(`${file}: sourceCommit is ${describe(c.sourceCommit)}, not the commit the catalogue was taken from`);
+  // not checked yet: matchSetSha256 and classificationSha256 recomputed from
+  // the entries; the schema version 2 contract names what each covers but not
+  // the exact value that is hashed. They are checked for form here, and for
+  // agreement with every file that repeats them.
+  for (const digest of ['matchSetSha256', 'classificationSha256']) {
+    if (!isSha256(c[digest])) bad(`${file}: ${digest} is ${describe(c[digest])}, not a SHA-256 digest in lower-case hex`);
+  }
+  if (closed(c.matchRules, ECOSYSTEMS, `${file}: matchRules`, bad)) {
+    for (const eco of ECOSYSTEMS) {
+      if (!isText(c.matchRules[eco])) bad(`${file}: matchRules.${eco} is ${describe(c.matchRules[eco])}, not a rule id`);
+    }
+  }
+  if (!Array.isArray(c.entries)) {
+    bad(`${file}: entries is ${describe(c.entries)}, not a list`);
+    return null;
+  }
+  const byEco = Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, { entries: [], byName: new Map(), aliasOf: new Map() }]));
+  let sound = true;
+  let previous = null;
+  c.entries.forEach((entry, index) => {
+    const label = isObject(entry) && isText(entry.name) ? ` (${entry.ecosystem}:${entry.name})` : '';
+    const where = `${file}: entries[${index}]${label}`;
+    if (!checkEntry(entry, where, bad)) {
+      sound = false;
+      return;
+    }
+    if (previous !== null && (byteOrder(previous.ecosystem, entry.ecosystem) || byteOrder(previous.name, entry.name)) >= 0) {
+      bad(`${where} does not follow ${previous.ecosystem}:${previous.name}. Entries are sorted by registry and then by name, ` +
+        'in byte order, and each appears once.');
+    }
+    previous = entry;
+    byEco[entry.ecosystem].entries.push(entry);
+    byEco[entry.ecosystem].byName.set(entry.name, entry);
+  });
+  for (const eco of ECOSYSTEMS) {
+    const registry = byEco[eco];
+    for (const entry of registry.entries) {
+      for (const alias of entry.aliases) {
+        if (registry.byName.has(alias.name)) {
+          bad(`${file}: ${eco}:${entry.name} has the alias ${alias.name}, which is also the name of an entry. A declared name ` +
+            'counts as one entry.');
+        } else if (registry.aliasOf.has(alias.name)) {
+          bad(`${file}: the alias ${alias.name} belongs to both ${registry.aliasOf.get(alias.name)} and ${entry.name} in ${eco}. ` +
+            'A declared name counts as one entry.');
+        } else {
+          registry.aliasOf.set(alias.name, entry.name);
+        }
+      }
+    }
+    measure(registry);
+  }
+  return { value: c, byEco, sound };
+}
+
+// --- The raw scan files ---------------------------------------------------------
+
+/**
+ * The base URLs a scan may read from, by registry and role. A source off the
+ * list means the scanner was pointed somewhere else, at a stub or a mirror,
+ * and the file is not a scan of the registry.
+ *
+ * not checked yet: the allowed sources of npm, PyPI, Maven, crates, Packagist,
+ * NuGet, RubyGems, Hex, pub and CocoaPods, which the schema version 2 contract
+ * does not list. Their sources are checked for shape only.
+ */
+const ALLOWED_SOURCES = {
+  go: { enumeration: 'https://index.golang.org/index', manifests: 'https://proxy.golang.org/cached-only' },
+};
+
+/**
+ * What a manifest can declare, by registry: the closed list of declaration
+ * kinds a scan records, and the members a declaration carries beside `kind`.
+ */
+const DECLARATIONS = {
+  npm: { kinds: ['dependencies', 'optionalDependencies', 'peerDependencies', 'devDependencies'], members: { peerOptional: 'booleanOrNull' } },
+  pypi: { kinds: ['requiresDist'], members: { marker: 'marker', markerText: 'textOrNull' } },
+  go: { kinds: ['require'], members: { indirect: 'boolean', replace: 'replace' } },
+  maven: { kinds: ['project', 'managed', 'profile', 'plugin'], members: { scope: 'textOrNull', optional: 'boolean' } },
+  crates: { kinds: ['normal', 'dev', 'build'], members: { optional: 'boolean', target: 'textOrNull', package: 'textOrNull', inDefaultFeature: 'booleanOrNull' } },
+  packagist: { kinds: ['require', 'requireDev', 'suggest'], members: {} },
+  nuget: { kinds: ['dependencyGroup'], members: { targetFramework: 'textOrNull' } },
+  rubygems: { kinds: ['runtime', 'development'], members: {} },
+  hex: { kinds: ['requirement'], members: { optional: 'boolean' } },
+  pub: { kinds: ['dependencies', 'devDependencies'], members: {} },
+  cocoapods: { kinds: ['topLevel', 'platform', 'subspec', 'testspec', 'appspec'], members: { platform: 'textOrNull', subspec: 'textOrNull' } },
+};
+
+const MEMBER_TYPES = {
+  boolean: { test: (v) => typeof v === 'boolean', says: 'true or false' },
+  booleanOrNull: { test: (v) => v === null || typeof v === 'boolean', says: 'true, false or null' },
+  textOrNull: { test: (v) => v === null || isText(v), says: 'text or null' },
+  marker: { test: (v) => ['none', 'extra', 'environmentOnly'].includes(v), says: 'none, extra or environmentOnly' },
+  replace: {
+    test: (v) => v === null || (isObject(v) && hasExactly(v, ['path', 'version']) && isText(v.path) && (v.version === null || isText(v.version))),
+    says: 'null or { path, version }',
+  },
+};
+
+/** The package-level facts the "direct and unconditional" rule needs, for the three registries that have them; null for the others. */
+const PACKAGE_MANIFESTS = {
+  nuget: {
+    keys: ['dependencyGroups'],
+    test: (m) => Array.isArray(m.dependencyGroups) && m.dependencyGroups.every((g) => g === null || isText(g)),
+    says: '{ dependencyGroups: [target framework or null] }',
+  },
+  cocoapods: {
+    keys: ['subspecs', 'defaultSubspecs'],
+    test: (m) => isTextList(m.subspecs) && (m.defaultSubspecs === null || isTextList(m.defaultSubspecs)),
+    says: '{ subspecs: [names], defaultSubspecs: [names] or null }',
+  },
+  maven: {
+    keys: ['hasParent', 'propertyCoordinates'],
+    test: (m) => typeof m.hasParent === 'boolean' && Number.isSafeInteger(m.propertyCoordinates) && m.propertyCoordinates >= 0,
+    says: '{ hasParent: true or false, propertyCoordinates: a count }',
+  },
+};
+
+const COVERAGE_COUNTS = ['listed', 'scanned', 'absent', 'unresolved', 'unversioned', 'dependenciesNotObservable'];
+
+Object.assign(KEYS, {
+  scan: ['schemaVersion', 'kind', 'ecosystem', 'startedAt', 'finishedAt', 'scanner', 'sources', 'catalog', 'method', 'enumeration',
+    'versionYears', 'coverage', 'listing', 'catalogCheck', 'packagesWithMatch', 'packages'],
+  scanner: ['script', 'commit'],
+  scanCatalog: ['entries', 'matchSetSha256', 'matchRule'],
+  method: ['versionSelection', 'readFrom', 'declarationKinds', 'notObservableWhen', 'limits'],
+  enumeration: ['requested', 'listed', 'truncated', 'reason', 'unit', 'budgetMinutes', 'elapsedMinutes', 'frameSize', 'sampling', 'indexWindow'],
+  sampling: ['method', 'seed'],
+  indexWindow: ['since', 'until'],
+  scanCoverage: [...COVERAGE_COUNTS, 'scannedByReadFrom'],
+  listing: ['file', 'sha256', 'rows'],
+  catalogCheck: ['entry', 'alias', 'status', 'httpStatus', 'url', 'checkedAt', 'latestVersion', 'latestReleaseAt'],
+  package: ['name', 'version', 'readFrom', 'manifest', 'matches'],
+  match: ['declaredName', 'entry', 'matchedBy', 'declarations'],
+});
+
+const MATCHED_BY = ['exact', 'normalized', 'majorVersionSuffix', 'alias', 'packageRename', 'podSubspec'];
+const SAMPLING_METHODS = ['all', 'registryOrder', 'rankedOrder', 'seededShuffle', 'rankedThenSeededShuffle'];
+const SHUFFLED = ['seededShuffle', 'rankedThenSeededShuffle'];
+const CHECK_STATUSES = ['present', 'absent', 'unresolved', 'notApplicable'];
+
+function checkSources(eco, sources, file, bad) {
+  const where = `${file}: sources`;
+  if (!isObject(sources)) {
+    bad(`${where} is ${describe(sources)}, not an object of base URLs by role`);
+    return;
+  }
+  for (const role of ['enumeration', 'manifests']) {
+    if (!Object.hasOwn(sources, role)) {
+      bad(`${where} has no ${role}. A scan names every base URL it read from, so that a scan of the registry can be told ` +
+        'from a scan of something else.');
+    }
+  }
+  const allowed = ALLOWED_SOURCES[eco];
+  for (const [role, url] of Object.entries(sources)) {
+    if (!isCamel(role)) bad(`${where} has the role ${describe(role)}, not a camelCase name`);
+    if (!isUrl(url)) {
+      bad(`${where}.${role} is ${describe(url)}, not a URL`);
+      continue;
+    }
+    if (allowed && !(Object.hasOwn(allowed, role) && allowed[role] === url)) {
+      bad(`${where}.${role} is ${url}, which is off the allowlist for ${eco}` +
+        `${Object.hasOwn(allowed, role) ? ` (${allowed[role]})` : ''}. A source off the list means the scanner was pointed at ` +
+        'a stub or a mirror, and the file is not a scan of the registry.');
+    }
+  }
+}
+
+function checkMethod(eco, method, file, bad) {
+  const where = `${file}: method`;
+  if (!closed(method, KEYS.method, where, bad)) return null;
+  let sound = true;
+  const codes = (field, nonEmpty) => {
+    const list = method[field];
+    if (!Array.isArray(list) || !list.every(isCamel) || !isDistinct(list) || (nonEmpty && list.length === 0)) {
+      bad(`${where}.${field} is ${describe(list)}, not a list of distinct camelCase codes${nonEmpty ? ' with at least one' : ''}`);
+      sound = false;
+    }
+  };
+  if (!isCamel(method.versionSelection)) bad(`${where}.versionSelection is ${describe(method.versionSelection)}, not a camelCase code`);
+  codes('readFrom', true);
+  codes('notObservableWhen', false);
+  codes('limits', false);
+  if (!sameSet(method.declarationKinds, DECLARATIONS[eco].kinds)) {
+    bad(`${where}.declarationKinds is ${describe(method.declarationKinds)}. A scan of ${eco} records every kind of the closed ` +
+      `list (${DECLARATIONS[eco].kinds.join(', ')}), so that a later definition needs no new scan.`);
+  }
+  return sound ? method : null;
+}
+
+function checkEnumeration(eco, e, file, bad) {
+  const where = `${file}: enumeration`;
+  if (!closed(e, KEYS.enumeration, where, bad)) return;
+  for (const field of ['requested', 'listed']) {
+    if (!isCount(e[field])) bad(`${where}.${field} is ${describe(e[field])}, not a whole count`);
+  }
+  if (typeof e.truncated !== 'boolean') bad(`${where}.truncated is ${describe(e.truncated)}, not true or false`);
+  if (e.truncated === false && e.reason !== null) bad(`${where}.reason is ${describe(e.reason)} for a run that was not truncated; it is null then`);
+  if (e.truncated === true && !isText(e.reason)) bad(`${where}.reason is ${describe(e.reason)}; a truncated run says why it stopped`);
+  if (!isText(e.unit)) bad(`${where}.unit is ${describe(e.unit)}, not the unit enumerated`);
+  if (e.budgetMinutes !== null && !(Number.isFinite(e.budgetMinutes) && e.budgetMinutes >= 0)) {
+    bad(`${where}.budgetMinutes is ${describe(e.budgetMinutes)}, not a number of minutes or null`);
+  }
+  if (!(Number.isFinite(e.elapsedMinutes) && e.elapsedMinutes >= 0)) bad(`${where}.elapsedMinutes is ${describe(e.elapsedMinutes)}, not a number of minutes`);
+  if (e.frameSize !== null && !isCount(e.frameSize)) bad(`${where}.frameSize is ${describe(e.frameSize)}, not a whole count or null`);
+  if (closed(e.sampling, KEYS.sampling, `${where}.sampling`, bad)) {
+    const s = e.sampling;
+    if (!SAMPLING_METHODS.includes(s.method)) bad(`${where}.sampling.method is ${describe(s.method)}, not one of: ${SAMPLING_METHODS.join(', ')}`);
+    else if (SHUFFLED.includes(s.method) && !isText(s.seed)) bad(`${where}.sampling.seed is ${describe(s.seed)}. A shuffled sample names its seed, so that it can be drawn again.`);
+    else if (!SHUFFLED.includes(s.method) && s.seed !== null) bad(`${where}.sampling.seed is ${describe(s.seed)} for ${s.method}, which shuffles nothing; it is null then`);
+  }
+  if (eco === 'go') {
+    if (closed(e.indexWindow, KEYS.indexWindow, `${where}.indexWindow`, bad)) {
+      for (const field of KEYS.indexWindow) {
+        if (!isTime(e.indexWindow[field])) bad(`${where}.indexWindow.${field} is ${describe(e.indexWindow[field])}, not a time`);
+      }
+    }
+  } else if (e.indexWindow !== null) {
+    bad(`${where}.indexWindow is ${describe(e.indexWindow)}; it is kept for Go's index alone and is null for ${eco}`);
+  }
+}
+
+function checkScanCoverage(c, method, file, bad) {
+  const where = `${file}: coverage`;
+  if (!closed(c, KEYS.scanCoverage, where, bad)) return null;
+  let sound = true;
+  for (const field of COVERAGE_COUNTS) {
+    if (!isCount(c[field])) {
+      bad(`${where}.${field} is ${describe(c[field])}, not a whole count. null has no meaning in a version 2 count.`);
+      sound = false;
+    }
+  }
+  if (!isObject(c.scannedByReadFrom) || !Object.values(c.scannedByReadFrom).every(isCount)) {
+    bad(`${where}.scannedByReadFrom is ${describe(c.scannedByReadFrom)}, not an object of counts by read source`);
+    sound = false;
+  }
+  if (!sound) return null;
+  const parts = c.scanned + c.absent + c.unresolved + c.unversioned;
+  if (c.listed !== parts) {
+    bad(`${where}.listed is ${c.listed}, and scanned + absent + unresolved + unversioned is ${parts}. Every listed package has ` +
+      'one disposition, so an unread package cannot pass as a read one.');
+  }
+  if (c.dependenciesNotObservable > c.scanned) {
+    bad(`${where}.dependenciesNotObservable is ${c.dependenciesNotObservable}, more than the ${c.scanned} manifests read it is a part of`);
+  }
+  if (method !== null && method.notObservableWhen.length === 0 && c.dependenciesNotObservable !== 0) {
+    bad(`${where}.dependenciesNotObservable is ${c.dependenciesNotObservable} while method.notObservableWhen is empty. This ` +
+      'registry always tells "no dependencies" from "no data", so the count is 0.');
+  }
+  if (method !== null && !sameSet(Object.keys(c.scannedByReadFrom), method.readFrom)) {
+    bad(`${where}.scannedByReadFrom has ${describe(Object.keys(c.scannedByReadFrom))}; it has one count for each of method.readFrom ` +
+      `(${method.readFrom.join(', ')})`);
+  }
+  if (sum(Object.values(c.scannedByReadFrom)) !== c.scanned) {
+    bad(`${where}.scannedByReadFrom sums to ${sum(Object.values(c.scannedByReadFrom))}, and scanned is ${c.scanned}. Each manifest read came from one source.`);
+  }
+  return c;
+}
+
+function checkCatalogCheck(eco, rows, catalog, file, bad) {
+  if (!Array.isArray(rows)) {
+    bad(`${file}: catalogCheck is ${describe(rows)}, not a list`);
+    return;
+  }
+  const registry = catalog ? catalog.byEco[eco] : null;
+  const seen = new Set();
+  rows.forEach((row, index) => {
+    const where = `${file}: catalogCheck[${index}]`;
+    if (!closed(row, KEYS.catalogCheck, where, bad)) return;
+    if (!isText(row.entry)) bad(`${where}.entry is ${describe(row.entry)}`);
+    if (row.alias !== null && !isText(row.alias)) bad(`${where}.alias is ${describe(row.alias)}, not a name or null`);
+    if (!CHECK_STATUSES.includes(row.status)) bad(`${where}.status is ${describe(row.status)}, not one of: ${CHECK_STATUSES.join(', ')}`);
+    if (row.httpStatus !== null && !isCount(row.httpStatus)) bad(`${where}.httpStatus is ${describe(row.httpStatus)}, not a status code or null`);
+    if (row.url !== null && !isUrl(row.url)) bad(`${where}.url is ${describe(row.url)}, not a URL or null`);
+    if (!isTime(row.checkedAt)) bad(`${where}.checkedAt is ${describe(row.checkedAt)}, not a time`);
+    if (row.latestVersion !== null && !isText(row.latestVersion)) bad(`${where}.latestVersion is ${describe(row.latestVersion)}, not a version or null`);
+    if (row.latestReleaseAt !== null && !isTime(row.latestReleaseAt)) bad(`${where}.latestReleaseAt is ${describe(row.latestReleaseAt)}, not a time or null`);
+    const label = row.alias === null ? describe(row.entry) : `${describe(row.entry)} by its alias ${describe(row.alias)}`;
+    const key = `${row.entry}\0${row.alias ?? ''}`;
+    if (seen.has(key)) bad(`${where} checks ${label} a second time`);
+    seen.add(key);
+    if (!registry) return;
+    const entry = registry.byName.get(row.entry);
+    if (!entry) {
+      bad(`${where} checks ${describe(row.entry)}, which is not a ${eco} entry of the catalogue snapshot`);
+      return;
+    }
+    if (row.alias !== null && !entry.aliases.some((alias) => alias.name === row.alias)) {
+      bad(`${where} checks the alias ${describe(row.alias)}, which ${entry.name} does not have in the catalogue snapshot`);
+      return;
+    }
+    if (row.alias === null && (row.status === 'absent') !== (entry.registryAbsent !== null)) {
+      bad(`${where}: the scan's own registry check finds ${entry.name} ${row.status}, and the catalogue snapshot ` +
+        `${entry.registryAbsent === null ? 'does not tag it registryAbsent' : 'tags it registryAbsent'}. The two have to agree, ` +
+        'since the tag decides whether the entry counts toward K.');
+    }
+    if (row.alias === null && entry.unmatchable !== null && row.status === 'present') {
+      bad(`${where}: ${entry.name} is tagged unmatchable, and the registry has a package under that name, so the tag is wrong`);
+    }
+    if (row.status === 'unresolved' && entry.classified === true) {
+      bad(`${where}: the registry check of ${label} is unresolved. For a classified entry that leaves K unestablished, and ` +
+        'publication waits for a check that resolves.');
+    }
+  });
+  if (!registry) return;
+  for (const entry of registry.entries) {
+    for (const alias of [null, ...entry.aliases.map((a) => a.name)]) {
+      if (!seen.has(`${entry.name}\0${alias ?? ''}`)) {
+        bad(`${file}: catalogCheck has no row for ${entry.name}${alias === null ? '' : ` by its alias ${alias}`}. The scan's ` +
+          'own check covers every catalogue entry of the registry and every alias.');
+      }
+    }
+  }
+}
+
+/** The declarations of one match: closed objects of the registry's kinds. */
+function checkDeclarations(eco, declarations, where, bad) {
+  if (!Array.isArray(declarations) || declarations.length === 0) {
+    bad(`${where}.declarations is ${describe(declarations)}. A match has at least one declaration: it says how the manifest declares the name.`);
+    return false;
+  }
+  const spec = DECLARATIONS[eco];
+  const keys = ['kind', ...Object.keys(spec.members)];
+  let sound = true;
+  declarations.forEach((d, index) => {
+    const at = `${where}.declarations[${index}]`;
+    if (!closed(d, keys, at, bad)) {
+      sound = false;
+      return;
+    }
+    if (!spec.kinds.includes(d.kind)) {
+      bad(`${at}.kind is ${describe(d.kind)}, not one of the ${eco} kinds: ${spec.kinds.join(', ')}`);
+      sound = false;
+    }
+    for (const [member, type] of Object.entries(spec.members)) {
+      if (!MEMBER_TYPES[type].test(d[member])) {
+        bad(`${at}.${member} is ${describe(d[member])}, not ${MEMBER_TYPES[type].says}`);
+        sound = false;
+      }
+    }
+  });
+  return sound;
+}
+
+function checkPackages(eco, packages, method, catalog, file, bad) {
+  if (!Array.isArray(packages)) {
+    bad(`${file}: packages is ${describe(packages)}, not a list`);
+    return null;
+  }
+  const registry = catalog ? catalog.byEco[eco] : null;
+  const names = new Set();
+  let sound = true;
+  packages.forEach((p, index) => {
+    const label = isObject(p) && isText(p.name) ? ` (${p.name})` : '';
+    const where = `${file}: packages[${index}]${label}`;
+    const wrong = (message) => {
+      bad(message);
+      sound = false;
+    };
+    if (!closed(p, KEYS.package, where, bad)) {
+      sound = false;
+      return;
+    }
+    if (!isText(p.name)) wrong(`${where}.name is ${describe(p.name)}`);
+    else if (names.has(p.name)) wrong(`${where} is listed a second time`);
+    names.add(p.name);
+    if (!isText(p.version)) wrong(`${where}.version is ${describe(p.version)}, not the version read`);
+    if (method !== null && !method.readFrom.includes(p.readFrom)) {
+      wrong(`${where}.readFrom is ${describe(p.readFrom)}, not one of method.readFrom (${method.readFrom.join(', ')})`);
+    }
+    const shape = PACKAGE_MANIFESTS[eco];
+    if (shape) {
+      if (!isObject(p.manifest) || !hasExactly(p.manifest, shape.keys) || !shape.test(p.manifest)) {
+        wrong(`${where}.manifest is ${describe(p.manifest)}; for ${eco} it is ${shape.says}`);
+      }
+    } else if (p.manifest !== null) {
+      wrong(`${where}.manifest is ${describe(p.manifest)}; ${eco} has no package-level facts, so it is null`);
+    }
+    if (!Array.isArray(p.matches) || p.matches.length === 0) {
+      wrong(`${where}.matches is ${describe(p.matches)}. Only packages with a match are listed, so each has at least one.`);
+      return;
+    }
+    p.matches.forEach((m, at) => {
+      const there = `${where}.matches[${at}]`;
+      if (!closed(m, KEYS.match, there, bad)) {
+        sound = false;
+        return;
+      }
+      if (!isText(m.declaredName)) wrong(`${there}.declaredName is ${describe(m.declaredName)}`);
+      if (!MATCHED_BY.includes(m.matchedBy)) wrong(`${there}.matchedBy is ${describe(m.matchedBy)}, not one of: ${MATCHED_BY.join(', ')}`);
+      const entry = registry && typeof m.entry === 'string' ? registry.byName.get(m.entry) : undefined;
+      if (!isText(m.entry)) {
+        wrong(`${there}.entry is ${describe(m.entry)}. It is always written, also when it equals the declared name.`);
+      } else if (registry && !entry) {
+        wrong(`${there}.entry is ${describe(m.entry)}, which is not a ${eco} entry of the catalogue snapshot`);
+      } else if (entry && m.matchedBy === 'exact' && m.declaredName !== m.entry) {
+        wrong(`${there} is matched exactly, but the declared name ${describe(m.declaredName)} is not the entry's name ${describe(m.entry)}`);
+      } else if (entry && m.matchedBy === 'alias' && !entry.aliases.some((alias) => alias.name === m.declaredName)) {
+        wrong(`${there} is matched by alias, but ${describe(m.declaredName)} is not an alias of ${m.entry} in the catalogue snapshot`);
+      }
+      if (!checkDeclarations(eco, m.declarations, there, bad)) sound = false;
+    });
+  });
+  return sound ? packages : null;
+}
+
+function checkScan(name, eco, record, catalog, found, bad) {
+  const file = record.file;
+  const s = record.value;
+  if (!closed(s, KEYS.scan, file, bad)) return null;
+  const at = `${file}:`;
+  if (s.kind !== 'censusScan') bad(`${at} kind is ${describe(s.kind)}, not "censusScan"`);
+  if (s.ecosystem !== eco) bad(`${at} ecosystem is ${describe(s.ecosystem)}, and the file is the scan of ${eco}`);
+  for (const field of ['startedAt', 'finishedAt']) {
+    if (!isTime(s[field])) bad(`${at} ${field} is ${describe(s[field])}, not an ISO 8601 UTC time`);
+  }
+  if (closed(s.scanner, KEYS.scanner, `${at} scanner`, bad)) {
+    if (!isText(s.scanner.script)) bad(`${at} scanner.script is ${describe(s.scanner.script)}`);
+    if (!isText(s.scanner.commit)) {
+      bad(`${at} scanner.commit is ${describe(s.scanner.commit)}. A published scan names the instrument commit it ran; null ` +
+        'belongs to a local run.');
+    }
+  }
+  checkSources(eco, s.sources, file, bad);
+  const registry = catalog ? catalog.byEco[eco] : null;
+  if (closed(s.catalog, KEYS.scanCatalog, `${at} catalog`, bad)) {
+    if (!isCount(s.catalog.entries)) {
+      bad(`${at} catalog.entries is ${describe(s.catalog.entries)}, not a count`);
+    } else if (registry && s.catalog.entries !== registry.entries.length) {
+      bad(`${at} catalog.entries is ${s.catalog.entries}, and the catalogue snapshot has ${registry.entries.length} ${eco} ` +
+        'entries. A scan is matched against the catalogue the aggregate is classified with.');
+    }
+    if (!isSha256(s.catalog.matchSetSha256)) {
+      bad(`${at} catalog.matchSetSha256 is ${describe(s.catalog.matchSetSha256)}, not a SHA-256 digest`);
+    } else if (catalog && s.catalog.matchSetSha256 !== catalog.value.matchSetSha256) {
+      bad(`${at} catalog.matchSetSha256 differs from the catalogue snapshot's. A scan matched against another set of names ` +
+        'needs a new scan, not a new aggregation.');
+    }
+    if (!isText(s.catalog.matchRule)) {
+      bad(`${at} catalog.matchRule is ${describe(s.catalog.matchRule)}, not a rule id`);
+    } else if (catalog && isObject(catalog.value.matchRules) && s.catalog.matchRule !== catalog.value.matchRules[eco]) {
+      bad(`${at} catalog.matchRule is ${describe(s.catalog.matchRule)}, and the catalogue snapshot's rule for ${eco} is ` +
+        `${describe(catalog.value.matchRules[eco])}`);
+    }
+  }
+  const method = checkMethod(eco, s.method, file, bad);
+  checkEnumeration(eco, s.enumeration, file, bad);
+  if (eco === 'go') {
+    if (!isObject(s.versionYears) || !Object.keys(s.versionYears).every((year) => /^\d{4}$/.test(year)) ||
+        !Object.values(s.versionYears).every(isCount)) {
+      bad(`${at} versionYears is ${describe(s.versionYears)}, not an object of counts by year`);
+    }
+  } else if (s.versionYears !== null) {
+    bad(`${at} versionYears is ${describe(s.versionYears)}; it is kept for Go alone and is null for ${eco}`);
+  }
+  const coverage = checkScanCoverage(s.coverage, method, file, bad);
+  if (coverage && isObject(s.enumeration) && s.enumeration.listed !== coverage.listed) {
+    bad(`${at} enumeration.listed is ${describe(s.enumeration.listed)} and coverage.listed is ${coverage.listed}; both count ` +
+      'the packages the scan set out to read');
+  }
+  if (closed(s.listing, KEYS.listing, `${at} listing`, bad)) {
+    const expected = fileNameFor('listing', eco);
+    const ledger = found.listings[eco];
+    if (s.listing.file !== expected) bad(`${at} listing.file is ${describe(s.listing.file)}; the ledger of ${eco} is ${expected}`);
+    if (!isSha256(s.listing.sha256)) {
+      bad(`${at} listing.sha256 is ${describe(s.listing.sha256)}, not a SHA-256 digest`);
+    } else if (ledger && s.listing.sha256 !== ledger.sha256) {
+      bad(`${at} listing.sha256 does not match ${expected}. The scan file is bound to the ledger it was written with.`);
+    }
+    if (!isCount(s.listing.rows)) {
+      bad(`${at} listing.rows is ${describe(s.listing.rows)}, not a count`);
+    } else if (coverage && s.listing.rows !== coverage.listed) {
+      bad(`${at} listing.rows is ${s.listing.rows} and coverage.listed is ${coverage.listed}; the ledger has one row per listed package`);
+    }
+  }
+  checkCatalogCheck(eco, s.catalogCheck, catalog, file, bad);
+  const packages = checkPackages(eco, s.packages, method, catalog, file, bad);
+  if (!isCount(s.packagesWithMatch)) {
+    bad(`${at} packagesWithMatch is ${describe(s.packagesWithMatch)}, not a count`);
+  } else if (Array.isArray(s.packages) && s.packagesWithMatch !== s.packages.length) {
+    bad(`${at} packagesWithMatch is ${s.packagesWithMatch}, and packages lists ${s.packages.length}. Only packages with a ` +
+      'match are listed, so the two are one count.');
+  } else if (s.packagesWithMatch === 0) {
+    bad(`${at} matched no package. A registry that matched nothing fails checks.noMatches: a scan that went wrong and a ` +
+      'registry without cryptography look the same in it.');
+  }
+  return { file, value: s, method, coverage, packages, sound: method !== null && coverage !== null && packages !== null };
+}
+
 /** Every rule of a version 2 dataset, in the order its files depend on each other. */
 function validateVersion2(name, dir) {
   const bad = (message) => fail(name, message);
   const manifest = readManifest2(dir, bad);
   if (manifest === null) return;
   checkManifest2(name, manifest, bad);
-  readListedFiles(name, dir, manifest, bad);
+  const found = readListedFiles(name, dir, manifest, bad);
+  if (found === null) return;
+  const catalog = found.catalog ? checkCatalog(name, found.catalog, bad) : null;
+  for (const eco of ECOSYSTEMS) {
+    if (found.scans[eco]) checkScan(name, eco, found.scans[eco], catalog, found, bad);
+  }
 }
 
 // ---------------------------------------------------------------------------

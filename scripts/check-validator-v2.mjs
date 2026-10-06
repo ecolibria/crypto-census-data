@@ -860,6 +860,218 @@ test('a first-shape manifest under a version 2 date is refused', async () => {
   assert.match(result.stderr, /2026-09-30: MANIFEST\.json declares no schemaVersion\. The first file shape is accepted only for 2026-03-18 and 2026-08-03/);
 });
 
+// --- Catalogue snapshot and raw scan files ---------------------------------------
+
+const entryOf = (eco, name, fn) => catalogOf((c) => fn(c.entries.find((e) => e.ecosystem === eco && e.name === name)));
+
+// Each object is closed: a field the contract does not define fails, at every level.
+const closedInTheSnapshotAndScans = [
+  ['the catalogue snapshot', catalogOf((c) => { c.note = 'x'; }), /catalog-2026-09-30\.json carries note/],
+  ['a catalogue entry', entryOf('npm', 'md5', (e) => { e.replacedBy = '@noble/hashes'; }), /entries\[\d+\] \(npm:md5\) carries replacedBy/],
+  ['an entry\'s class evidence', entryOf('npm', 'md5', (e) => { e.classEvidence.note = 'x'; }), /\(npm:md5\): classEvidence carries note/],
+  ['an entry\'s reason for being unclassified', entryOf('npm', '@types/bcryptjs', (e) => { e.unclassifiedReason.note = 'x'; }), /unclassifiedReason carries note/],
+  ['an entry\'s end-of-life review', entryOf('npm', 'md5', (e) => { e.endOfLifeReview.note = 'x'; }), /endOfLifeReview carries note/],
+  ['an entry\'s multi-purpose record', entryOf('pypi', 'cryptography', (e) => { e.multiPurpose.note = 'x'; }), /multiPurpose carries note/],
+  ['an entry\'s unmatchable record', entryOf('go', 'crypto/md5', (e) => { e.unmatchable.note = 'x'; }), /unmatchable carries note/],
+  ['an entry\'s registry-absent record', entryOf('npm', 'tripledes', (e) => { e.registryAbsent.extra = 'x'; }), /registryAbsent carries extra/],
+  ['an alias', entryOf('go', 'golang.org/x/crypto', (e) => { e.aliases[0].note = 'x'; }), /aliases\[0\] carries note/],
+  ['an entry\'s last release', entryOf('npm', 'crypto-js', (e) => { e.lastRelease.note = 'x'; }), /lastRelease carries note/],
+  ['a raw scan file', scanOf('hex', (s) => { s.totalScanned = 1; }), /scan-results-hex\.json carries totalScanned/],
+  ['the scanner record', scanOf('hex', (s) => { s.scanner.note = 'x'; }), /scan-results-hex\.json: scanner carries note/],
+  ['the scan\'s catalogue record', scanOf('hex', (s) => { s.catalog.note = 'x'; }), /scan-results-hex\.json: catalog carries note/],
+  ['the scan method', scanOf('hex', (s) => { s.method.note = 'x'; }), /scan-results-hex\.json: method carries note/],
+  ['the enumeration', scanOf('hex', (s) => { s.enumeration.collected = 1; }), /scan-results-hex\.json: enumeration carries collected/],
+  ['the sampling', scanOf('hex', (s) => { s.enumeration.sampling.size = 1; }), /enumeration\.sampling carries size/],
+  ['the Go index window', scanOf('go', (s) => { s.enumeration.indexWindow.note = 'x'; }), /enumeration\.indexWindow carries note/],
+  ['the scan coverage', scanOf('hex', (s) => { s.coverage.fetchErrors = 0; }), /scan-results-hex\.json: coverage carries fetchErrors/],
+  ['the listing record', scanOf('hex', (s) => { s.listing.note = 'x'; }), /scan-results-hex\.json: listing carries note/],
+  ['a registry check', scanOf('hex', (s) => { s.catalogCheck[0].note = 'x'; }), /catalogCheck\[0\] carries note/],
+  ['a package record', scanOf('hex', (s) => { s.packages[0].posture = 'modern'; }), /packages\[0\] \(acme_hex\) carries posture/],
+  ['a match record', scanOf('hex', (s) => { s.packages[0].matches[0].direct = true; }), /matches\[0\] carries direct/],
+  ['a declaration', scanOf('hex', (s) => { s.packages[0].matches[0].declarations[0].tier = 'other'; }), /declarations\[0\] carries tier/],
+];
+for (const [level, change, problem] of closedInTheSnapshotAndScans) plant(`a field the contract does not define, in ${level}`, change, problem);
+
+// Each object is closed: a field the contract does not define fails, at every level.
+plant('a stored share in a scan file', scanOf('npm', (s) => { s.coverage.unresolvedShare = 0; }), /coverage carries unresolvedShare, a stored share/);
+plant('a missing field', scanOf('hex', (s) => { delete s.versionYears; }), /scan-results-hex\.json is missing versionYears\. Every field of a version 2 file is written out/);
+
+// The catalogue snapshot: the entry's fields, and the states the contract makes impossible.
+plant('a snapshot of another kind', catalogOf((c) => { c.kind = 'censusCorpus'; }), /catalog-2026-09-30\.json: kind is "censusCorpus", not "censusCatalog"/);
+plant('a snapshot of another date', catalogOf((c) => { c.collectedAt = '2026-09-01'; }), /catalog-2026-09-30\.json: collectedAt is "2026-09-01", not the dataset's date/);
+plant('a snapshot with no source commit', catalogOf((c) => { c.sourceCommit = null; }), /sourceCommit is null, not the commit/);
+plant('a digest that is not one', catalogOf((c) => { c.classificationSha256 = 'PLACEHOLDER'; }), /classificationSha256 is "PLACEHOLDER", not a SHA-256 digest/);
+plant('a registry with no match rule', catalogOf((c) => { delete c.matchRules.hex; }), /matchRules is missing hex/);
+plant('entries that are not a list', catalogOf((c) => { c.entries = {}; }), /catalog-2026-09-30\.json: entries is \{\}, not a list/);
+plant('entries out of order', catalogOf((c) => { c.entries.reverse(); }), /does not follow .*Entries are sorted by registry and then by name/);
+plant('an entry listed twice', catalogOf((c) => { c.entries.splice(1, 0, structuredClone(c.entries[1])); }), /does not follow .*each appears once/);
+plant('an entry of a registry that is not one', entryOf('hex', 'enacl', (e) => { e.ecosystem = 'conda'; }), /ecosystem is "conda", not one of the eleven registries/);
+plant('a tier that is not one', entryOf('npm', 'node-forge', (e) => { e.tier = 'modern'; }), /\(npm:node-forge\): tier is "modern", not weak, other, pqc or null/);
+plant('a weak class that is not one', entryOf('npm', 'md5', (e) => { e.weakClass = 'mixedUse'; }), /weakClass is "mixedUse", not brokenAlgorithm, deprecatedLibrary or null/);
+plant('classified written as text', entryOf('npm', 'md5', (e) => { e.classified = 'yes'; }), /classified is "yes", not true or false/);
+plant('an evidence basis that is not one', entryOf('npm', 'md5', (e) => { e.classEvidence.basis = 'other'; }), /classEvidence\.basis is "other", not entryAlgorithms or endOfLifeSignal/);
+plant('a limb that is not one', entryOf('npm', 'crypto-js', (e) => { e.classEvidence.limb = 'D5'; }), /classEvidence\.limb is "D5", not D1 to D4 or null/);
+plant('evidence over http', entryOf('npm', 'crypto-js', (e) => { e.classEvidence.url = 'http://evidence.example/x'; }), /classEvidence\.url is "http:\/\/evidence\.example\/x", not an https URL or null/);
+plant('an evidence time that is not one', entryOf('npm', 'crypto-js', (e) => { e.classEvidence.checkedAt = '2026-02-31'; }), /classEvidence\.checkedAt is "2026-02-31", not a time or null/);
+plant('further evidence that is not a list of URLs', entryOf('npm', 'crypto-js', (e) => { e.classEvidence.additionalUrls = ['see above']; }), /classEvidence\.additionalUrls is \["see above"\], not a list of https URLs/);
+plant('a page cited for a class read from the entry\'s own algorithms', entryOf('npm', 'md5', (e) => { e.classEvidence.url = evidence('npm/md5'); }), /classEvidence cites a limb, a page or a check time with basis entryAlgorithms/);
+plant('an end-of-life signal with no limb', entryOf('npm', 'crypto-js', (e) => { e.classEvidence.limb = null; }), /classEvidence has basis endOfLifeSignal without a limb, a page and a check time/);
+plant('a reason code that is not one', entryOf('npm', '@types/bcryptjs', (e) => { e.unclassifiedReason.code = 'notCrypto'; }), /unclassifiedReason\.code is "notCrypto"/);
+plant('a reason with no page', entryOf('npm', '@types/bcryptjs', (e) => { e.unclassifiedReason.url = null; }), /unclassifiedReason\.url is null, not an https URL/);
+plant('a reason with no time', entryOf('npm', '@types/bcryptjs', (e) => { e.unclassifiedReason.checkedAt = null; }), /unclassifiedReason\.checkedAt is null, not a time/);
+plant('a review status that is not one', entryOf('npm', 'node-forge', (e) => { e.endOfLifeReview.status = 'maintained'; }), /endOfLifeReview\.status is "maintained"/);
+plant('a review page that is not a URL', entryOf('npm', 'crypto-js', (e) => { e.endOfLifeReview.url = 'registry'; }), /endOfLifeReview\.url is "registry", not an https URL or null/);
+plant('a review time that is not one', entryOf('npm', 'crypto-js', (e) => { e.endOfLifeReview.checkedAt = 'today'; }), /endOfLifeReview\.checkedAt is "today", not a time or null/);
+plant('an end-of-life review left out', entryOf('npm', 'md5', (e) => { e.endOfLifeReview = null; }), /endOfLifeReview is null, not an object/);
+plant('a multi-purpose record with no version', entryOf('pypi', 'cryptography', (e) => { e.multiPurpose.version = ''; }), /multiPurpose\.version is "", not the version inspected/);
+plant('a multi-purpose record with no page', entryOf('pypi', 'cryptography', (e) => { e.multiPurpose.url = null; }), /multiPurpose\.url is null, not an https URL/);
+plant('a multi-purpose record with no time', entryOf('pypi', 'cryptography', (e) => { e.multiPurpose.checkedAt = null; }), /multiPurpose\.checkedAt is null, not a time/);
+plant('an unmatchable reason that is not one', entryOf('go', 'crypto/md5', (e) => { e.unmatchable.reason = 'vendored'; }), /unmatchable\.reason is "vendored"/);
+plant('an unmatchable record with no page', entryOf('go', 'crypto/md5', (e) => { e.unmatchable.url = null; }), /unmatchable\.url is null, not an https URL/);
+plant('an unmatchable record with no time', entryOf('go', 'crypto/md5', (e) => { e.unmatchable.checkedAt = null; }), /unmatchable\.checkedAt is null, not a time/);
+plant('an absence with no time', entryOf('npm', 'tripledes', (e) => { e.registryAbsent.checkedAt = null; }), /registryAbsent\.checkedAt is null, not a time/);
+plant('an absence note that is not text', entryOf('npm', 'tripledes', (e) => { e.registryAbsent.note = 404; }), /registryAbsent\.note is 404, not text or null/);
+plant('aliases that are not a list', entryOf('npm', 'md5', (e) => { e.aliases = null; }), /aliases is null, not a list/);
+plant('an alias with no name', entryOf('go', 'golang.org/x/crypto', (e) => { e.aliases[0].name = ''; }), /aliases\[0\]\.name is ""/);
+plant('an alias with no page', entryOf('go', 'golang.org/x/crypto', (e) => { e.aliases[0].url = null; }), /aliases\[0\]\.url is null, not an https URL/);
+plant('an alias with no time', entryOf('go', 'golang.org/x/crypto', (e) => { e.aliases[0].checkedAt = null; }), /aliases\[0\]\.checkedAt is null, not a time/);
+plant('a last release with no version', entryOf('npm', 'crypto-js', (e) => { e.lastRelease.version = null; }), /lastRelease\.version is null, not a version/);
+plant('a last release on a date that is not one', entryOf('npm', 'crypto-js', (e) => { e.lastRelease.date = '2020-13-01'; }), /lastRelease\.date is "2020-13-01", not a YYYY-MM-DD date/);
+plant('a last release with no time checked', entryOf('npm', 'crypto-js', (e) => { e.lastRelease.checkedAt = null; }), /lastRelease\.checkedAt is null, not a time/);
+plant('algorithms left unstated', entryOf('go', 'golang.org/x/crypto', (e) => { e.algorithms = null; }), /algorithms is null, not a list of names/);
+plant('a category left unstated', entryOf('go', 'golang.org/x/crypto', (e) => { e.category = null; }), /category is null, not a category/);
+plant('an entry with no name', entryOf('hex', 'enacl', (e) => { e.name = ''; }), /name is ""/);
+plant('a classified entry with no tier', entryOf('npm', 'node-forge', (e) => { e.tier = null; }), /tier is null, classified true and unclassifiedReason null\. An entry has no tier exactly when it is unclassified/);
+plant('an unclassified entry with a tier', entryOf('npm', '@types/bcryptjs', (e) => { e.tier = 'other'; }), /tier is "other", classified false and unclassifiedReason set/);
+plant('a weak class on a tier other than weak', entryOf('npm', 'md5', (e) => { e.tier = 'other'; }), /weakClass is "brokenAlgorithm" on tier "other"\. A weak entry is in exactly one weak class/);
+plant('class evidence with no weak class', entryOf('npm', 'node-forge', (e) => { e.classEvidence = { basis: 'entryAlgorithms', limb: null, url: null, checkedAt: null, additionalUrls: [] }; }),
+  /classEvidence is set with weakClass null\. The evidence for a weak class is given exactly when there is one/);
+plant('a deprecated library classed from its algorithms', entryOf('npm', 'crypto-js', (e) => { e.classEvidence = { basis: 'entryAlgorithms', limb: null, url: null, checkedAt: null, additionalUrls: [] }; }),
+  /is a deprecatedLibrary with classEvidence\.basis entryAlgorithms/);
+plant('a broken algorithm off the closed list', entryOf('npm', 'md5', (e) => { e.algorithms = ['MD5', 'GOST']; }), /is a brokenAlgorithm entry whose algorithms include GOST, which is not on the closed list/);
+plant('a multi-purpose library counted as post-quantum', entryOf('pypi', 'cryptography', (e) => { e.tier = 'pqc'; }), /multiPurpose is set on tier "pqc"/);
+plant('a signal found on a library that is not deprecated', entryOf('npm', 'node-forge', (e) => { e.endOfLifeReview = { status: 'signalFound', url: evidence('x'), checkedAt: CHECKED }; }),
+  /endOfLifeReview\.status is signalFound with weakClass null/);
+plant('a deprecated library with no signal found', entryOf('npm', 'crypto-js', (e) => { e.endOfLifeReview.status = 'noSignalFound'; }), /endOfLifeReview\.status is noSignalFound with weakClass "deprecatedLibrary"/);
+plant('an alias that is also an entry\'s name', entryOf('go', 'golang.org/x/crypto', (e) => { e.aliases.push(alias('github.com/cloudflare/circl')); }),
+  /has the alias github\.com\/cloudflare\/circl, which is also the name of an entry/);
+plant('an alias given to two entries', entryOf('go', 'github.com/cloudflare/circl', (e) => { e.aliases.push(alias('github.com/golang/crypto')); }),
+  /the alias github\.com\/golang\/crypto belongs to both/);
+
+// The raw scan file's header.
+plant('a scan of another kind', scanOf('hex', (s) => { s.kind = 'scan'; }), /scan-results-hex\.json: kind is "scan", not "censusScan"/);
+plant('a scan of another registry', scanOf('hex', (s) => { s.ecosystem = 'pub'; }), /ecosystem is "pub", and the file is the scan of hex/);
+plant('a scan with no start', scanOf('hex', (s) => { s.startedAt = null; }), /startedAt is null, not an ISO 8601 UTC time/);
+plant('a scan with no instrument commit', scanOf('hex', (s) => { s.scanner.commit = null; }), /scanner\.commit is null\. A published scan names the instrument commit/);
+plant('a scan with no script', scanOf('hex', (s) => { s.scanner.script = ''; }), /scanner\.script is ""/);
+plant('a source outside the allowlist', scanOf('go', (s) => { s.sources.manifests = 'http://127.0.0.1:8080'; }), /sources\.manifests is http:\/\/127\.0\.0\.1:8080, which is off the allowlist for go \(https:\/\/proxy\.golang\.org\/cached-only\)/);
+plant('a source role the allowlist does not have', scanOf('go', (s) => { s.sources.mirror = 'https://goproxy.example'; }), /sources\.mirror is https:\/\/goproxy\.example, which is off the allowlist for go\. A source off the list/);
+plant('a scan that does not say where it enumerated', scanOf('hex', (s) => { delete s.sources.enumeration; }), /sources has no enumeration/);
+plant('a source that is not a URL', scanOf('hex', (s) => { s.sources.manifests = 'the registry'; }), /sources\.manifests is "the registry", not a URL/);
+plant('a source role that is not a name', scanOf('hex', (s) => { s.sources['base-url'] = 'https://hex.registry.example/'; }), /sources has the role "base-url", not a camelCase name/);
+plant('sources that are not an object', scanOf('hex', (s) => { s.sources = 'https://hex.registry.example/'; }), /sources is "https:\/\/hex\.registry\.example\/", not an object of base URLs/);
+plant('a scan matched against another number of entries', scanOf('hex', (s) => { s.catalog.entries = 2; }), /catalog\.entries is 2, and the catalogue snapshot has 1 hex entries/);
+plant('a scan matched against another set of names', scanOf('hex', (s) => { s.catalog.matchSetSha256 = sha256('other'); }), /catalog\.matchSetSha256 differs from the catalogue snapshot's/);
+plant('a scan with another match rule', scanOf('hex', (s) => { s.catalog.matchRule = 'hexName/2'; }), /catalog\.matchRule is "hexName\/2", and the catalogue snapshot's rule for hex is "hexName\/1"/);
+plant('a version selection that is not a code', scanOf('hex', (s) => { s.method.versionSelection = 'latest stable'; }), /method\.versionSelection is "latest stable", not a camelCase code/);
+plant('a scan that reads from nowhere', scanOf('hex', (s) => { s.method.readFrom = []; }), /method\.readFrom is \[\], not a list of distinct camelCase codes with at least one/);
+plant('a condition that is not a code', scanOf('go', (s) => { s.method.notObservableWhen = ['only a module line']; }), /method\.notObservableWhen is \["only a module line"\]/);
+plant('limits listed twice', scanOf('maven', (s) => { s.method.limits = ['parentPomNotFollowed', 'parentPomNotFollowed']; }), /method\.limits is .*not a list of distinct camelCase codes/);
+plant('a scan that does not record every kind', scanOf('npm', (s) => { s.method.declarationKinds = ['dependencies']; }), /method\.declarationKinds is \["dependencies"\]\. A scan of npm records every kind of the closed list/);
+plant('a requested count that is not one', scanOf('hex', (s) => { s.enumeration.requested = null; }), /enumeration\.requested is null, not a whole count/);
+plant('truncation that is not a yes or no', scanOf('hex', (s) => { s.enumeration.truncated = 'no'; }), /enumeration\.truncated is "no", not true or false/);
+plant('a reason for a run that was not truncated', scanOf('hex', (s) => { s.enumeration.reason = 'budget'; }), /enumeration\.reason is "budget" for a run that was not truncated/);
+plant('a truncated run that does not say why', scanOf('hex', (s) => { s.enumeration.truncated = true; }), /enumeration\.reason is null; a truncated run says why it stopped/);
+plant('an enumeration with no unit', scanOf('hex', (s) => { s.enumeration.unit = ''; }), /enumeration\.unit is "", not the unit enumerated/);
+plant('a budget that is not a number of minutes', scanOf('hex', (s) => { s.enumeration.budgetMinutes = -5; }), /enumeration\.budgetMinutes is -5, not a number of minutes or null/);
+plant('an elapsed time left out', scanOf('hex', (s) => { s.enumeration.elapsedMinutes = null; }), /enumeration\.elapsedMinutes is null, not a number of minutes/);
+plant('a frame size that is not a count', scanOf('hex', (s) => { s.enumeration.frameSize = 2.5; }), /enumeration\.frameSize is 2\.5, not a whole count or null/);
+plant('a sampling method that is not one', scanOf('hex', (s) => { s.enumeration.sampling.method = 'random'; }), /enumeration\.sampling\.method is "random"/);
+plant('a shuffled sample with no seed', scanOf('npm', (s) => { s.enumeration.sampling.seed = null; }), /enumeration\.sampling\.seed is null\. A shuffled sample names its seed/);
+plant('a seed for a sample that shuffles nothing', scanOf('hex', (s) => { s.enumeration.sampling.seed = 'abc'; }), /enumeration\.sampling\.seed is "abc" for registryOrder, which shuffles nothing/);
+plant('a Go index window that is not times', scanOf('go', (s) => { s.enumeration.indexWindow.until = 'later'; }), /enumeration\.indexWindow\.until is "later", not a time/);
+plant('a Go scan with no index window', scanOf('go', (s) => { s.enumeration.indexWindow = null; }), /enumeration\.indexWindow is null, not an object/);
+plant('an index window outside Go', scanOf('hex', (s) => { s.enumeration.indexWindow = { since: '2026-09-01', until: '2026-09-30' }; }), /enumeration\.indexWindow is .*; it is kept for Go's index alone and is null for hex/);
+plant('version years that are not years', scanOf('go', (s) => { s.versionYears = { recent: 5 }; }), /versionYears is \{"recent":5\}, not an object of counts by year/);
+plant('version years outside Go', scanOf('hex', (s) => { s.versionYears = { 2025: 1 }; }), /versionYears is \{"2025":1\}; it is kept for Go alone and is null for hex/);
+plant('a count that is null', scanOf('hex', (s) => { s.coverage.unresolved = null; }), /coverage\.unresolved is null, not a whole count\. null has no meaning in a version 2 count/);
+plant('counts by source that are not counts', scanOf('hex', (s) => { s.coverage.scannedByReadFrom = { release: '1' }; }), /coverage\.scannedByReadFrom is \{"release":"1"\}, not an object of counts by read source/);
+plant('coverage whose parts do not add up', scanOf('npm', (s) => { s.coverage.listed = 9; s.enumeration.listed = 9; s.listing.rows = 9; }),
+  /coverage\.listed is 9, and scanned \+ absent \+ unresolved \+ unversioned is 8\. Every listed package has one disposition/);
+plant('more unobservable manifests than manifests read', scanOf('go', (s) => { s.coverage.dependenciesNotObservable = 9; }), /coverage\.dependenciesNotObservable is 9, more than the 5 manifests read/);
+plant('unobservable manifests where the registry always shows them', scanOf('npm', (s) => { s.coverage.dependenciesNotObservable = 1; }),
+  /coverage\.dependenciesNotObservable is 1 while method\.notObservableWhen is empty/);
+plant('counts by source that are not the method\'s sources', scanOf('packagist', (s) => { s.coverage.scannedByReadFrom = { taggedRelease: 3 }; }),
+  /coverage\.scannedByReadFrom has \["taggedRelease"\]; it has one count for each of method\.readFrom/);
+plant('counts by source that do not sum to the manifests read', scanOf('hex', (s) => { s.coverage.scannedByReadFrom.release = 2; }), /coverage\.scannedByReadFrom sums to 2, and scanned is 1/);
+plant('an enumeration that listed another number', scanOf('hex', (s) => { s.enumeration.listed = 5; }), /enumeration\.listed is 5 and coverage\.listed is 1; both count the packages the scan set out to read/);
+plant('a scan that names another ledger', scanOf('hex', (s) => { s.listing.file = 'listing-pub.tsv.gz'; }), /listing\.file is "listing-pub\.tsv\.gz"; the ledger of hex is listing-hex\.tsv\.gz/);
+plant('a scan bound to other ledger bytes', scanOf('hex', (s) => { s.listing.sha256 = sha256('other'); }), /listing\.sha256 does not match listing-hex\.tsv\.gz\. The scan file is bound to the ledger/);
+plant('a ledger row count that is not the listed count', scanOf('hex', (s) => { s.listing.rows = 2; }), /listing\.rows is 2 and coverage\.listed is 1; the ledger has one row per listed package/);
+plant('a ledger digest that is not one', scanOf('hex', (s) => { s.listing.sha256 = null; }), /listing\.sha256 is null, not a SHA-256 digest/);
+
+// The scan's own registry check, against the tags.
+plant('registry checks that are not a list', scanOf('hex', (s) => { s.catalogCheck = {}; }), /catalogCheck is \{\}, not a list/);
+plant('a check status that is not one', scanOf('hex', (s) => { s.catalogCheck[0].status = 'ok'; }), /catalogCheck\[0\]\.status is "ok"/);
+plant('an HTTP status that is not one', scanOf('hex', (s) => { s.catalogCheck[0].httpStatus = '200'; }), /catalogCheck\[0\]\.httpStatus is "200", not a status code or null/);
+plant('a check URL that is not one', scanOf('hex', (s) => { s.catalogCheck[0].url = 'registry'; }), /catalogCheck\[0\]\.url is "registry", not a URL or null/);
+plant('a check with no time', scanOf('hex', (s) => { s.catalogCheck[0].checkedAt = null; }), /catalogCheck\[0\]\.checkedAt is null, not a time/);
+plant('a latest version that is not one', scanOf('hex', (s) => { s.catalogCheck[0].latestVersion = 1; }), /catalogCheck\[0\]\.latestVersion is 1, not a version or null/);
+plant('a latest release that is not a time', scanOf('hex', (s) => { s.catalogCheck[0].latestReleaseAt = 'recent'; }), /catalogCheck\[0\]\.latestReleaseAt is "recent", not a time or null/);
+plant('a check of an alias that is not a name', scanOf('hex', (s) => { s.catalogCheck[0].alias = ''; }), /catalogCheck\[0\]\.alias is "", not a name or null/);
+plant('a check of an entry the snapshot does not have', scanOf('hex', (s) => { s.catalogCheck.push({ ...s.catalogCheck[0], entry: 'other' }); }), /checks "other", which is not a hex entry of the catalogue snapshot/);
+plant('a check of an alias the entry does not have', scanOf('go', (s) => { s.catalogCheck.push({ ...s.catalogCheck[1], alias: 'example.com/alias' }); }), /checks the alias "example\.com\/alias", which .* does not have/);
+plant('an entry checked twice', scanOf('hex', (s) => { s.catalogCheck.push({ ...s.catalogCheck[0] }); }), /catalogCheck\[1\] checks "enacl" a second time/);
+plant('an entry left unchecked', scanOf('hex', (s) => { s.catalogCheck = []; }), /catalogCheck has no row for enacl/);
+plant('an alias left unchecked', scanOf('go', (s) => { s.catalogCheck = s.catalogCheck.filter((row) => row.alias === null); }), /catalogCheck has no row for github\.com\/square\/go-jose by its alias gopkg\.in\/square\/go-jose\.v2/);
+plant('a check that finds absent an entry the tags say is present', scanOf('hex', (s) => { s.catalogCheck[0].status = 'absent'; }),
+  /the scan's own registry check finds enacl absent, and the catalogue snapshot does not tag it registryAbsent/);
+plant('a check that finds present an entry the tags say is absent', scanOf('npm', (s) => { s.catalogCheck.find((row) => row.entry === 'tripledes').status = 'present'; }),
+  /finds tripledes present, and the catalogue snapshot tags it registryAbsent/);
+plant('an unmatchable entry found on the registry', scanOf('go', (s) => { s.catalogCheck.find((row) => row.entry === 'crypto/md5').status = 'present'; }),
+  /crypto\/md5 is tagged unmatchable, and the registry has a package under that name/);
+plant('an unresolved check of a classified entry', scanOf('hex', (s) => { s.catalogCheck[0].status = 'unresolved'; }), /the registry check of "enacl" is unresolved\. For a classified entry that leaves K unestablished/);
+
+// Package records, matches and declarations.
+plant('packages that are not a list', scanOf('hex', (s) => { s.packages = {}; }), /scan-results-hex\.json: packages is \{\}, not a list/);
+plant('a package listed twice', scanOf('npm', (s) => { s.packages.push(structuredClone(s.packages[0])); s.packagesWithMatch += 1; }), /packages\[6\] \(@acme\/alpha\) is listed a second time/);
+plant('a package with no name', scanOf('hex', (s) => { s.packages[0].name = ''; }), /packages\[0\]\.name is ""/);
+plant('a package with no version', scanOf('hex', (s) => { s.packages[0].version = ''; }), /packages\[0\] \(acme_hex\)\.version is "", not the version read/);
+plant('a package read from a source the method does not name', scanOf('hex', (s) => { s.packages[0].readFrom = 'mirror'; }), /\.readFrom is "mirror", not one of method\.readFrom/);
+plant('a NuGet package without its groups', scanOf('nuget', (s) => { s.packages[0].manifest = null; }), /\.manifest is null; for nuget it is \{ dependencyGroups/);
+plant('a CocoaPods package without its default subspecs', scanOf('cocoapods', (s) => { delete s.packages[0].manifest.defaultSubspecs; }), /\.manifest is .*; for cocoapods it is \{ subspecs/);
+plant('a Maven package whose coordinates are not a count', scanOf('maven', (s) => { s.packages[0].manifest.propertyCoordinates = -1; }), /\.manifest is .*; for maven it is \{ hasParent/);
+plant('package-level facts where the registry has none', scanOf('hex', (s) => { s.packages[0].manifest = {}; }), /\.manifest is \{\}; hex has no package-level facts, so it is null/);
+plant('a package with no match', scanOf('hex', (s) => { s.packages[0].matches = []; }), /\.matches is \[\]\. Only packages with a match are listed/);
+plant('a match with no declared name', scanOf('hex', (s) => { s.packages[0].matches[0].declaredName = null; }), /matches\[0\]\.declaredName is null/);
+plant('a match by a way that is not one', scanOf('hex', (s) => { s.packages[0].matches[0].matchedBy = 'fuzzy'; }), /matches\[0\]\.matchedBy is "fuzzy"/);
+plant('a match with no entry', scanOf('hex', (s) => { s.packages[0].matches[0].entry = null; }), /matches\[0\]\.entry is null\. It is always written/);
+plant('a match to an entry the snapshot does not have', scanOf('hex', (s) => { s.packages[0].matches[0].entry = 'other'; }), /matches\[0\]\.entry is "other", which is not a hex entry of the catalogue snapshot/);
+plant('an exact match under another name', scanOf('hex', (s) => { s.packages[0].matches[0].declaredName = 'enacl_compat'; }), /is matched exactly, but the declared name "enacl_compat" is not the entry's name/);
+plant('an alias match by a name that is not an alias', scanOf('go', (s) => { s.packages[0].matches[0].declaredName = 'example.com/jose'; }), /is matched by alias, but "example\.com\/jose" is not an alias of github\.com\/square\/go-jose/);
+plant('a match with no declaration', scanOf('hex', (s) => { s.packages[0].matches[0].declarations = []; }), /declarations is \[\]\. A match has at least one declaration/);
+plant('a declaration of a kind the registry does not have', scanOf('npm', (s) => { s.packages[0].matches[0].declarations[0].kind = 'bundledDependencies'; }), /declarations\[0\]\.kind is "bundledDependencies", not one of the npm kinds/);
+plant('a declaration member of the wrong type', scanOf('go', (s) => { s.packages[0].matches[0].declarations[0].indirect = 'no'; }), /declarations\[0\]\.indirect is "no", not true or false/);
+plant('a replacement that is not one', scanOf('go', (s) => { s.packages.find((p) => p.name === 'example.com/lib').matches[0].declarations[0].replace = { path: 'x' }; }), /declarations\[0\]\.replace is .*, not null or \{ path, version \}/);
+plant('a marker that is not one', scanOf('pypi', (s) => { s.packages[0].matches[0].declarations[0].marker = 'platform'; }), /declarations\[0\]\.marker is "platform", not none, extra or environmentOnly/);
+plant('a package count that is not the packages listed', scanOf('hex', (s) => { s.packagesWithMatch = 2; }), /packagesWithMatch is 2, and packages lists 1/);
+plant('a package count that is not a count', scanOf('hex', (s) => { s.packagesWithMatch = null; }), /packagesWithMatch is null, not a count/);
+plant('a registry that matched nothing', {
+  fixture: (f) => { f.hex.rows[0].matches = []; },
+  consolidation: () => {},
+}, /scan-results-hex\.json: matched no package\. A registry that matched nothing fails checks\.noMatches/);
+
+// Fields left out of nested objects, and the remaining types.
+plant('class evidence missing a field', entryOf('npm', 'md5', (e) => { delete e.classEvidence.additionalUrls; }), /\(npm:md5\): classEvidence is missing additionalUrls/);
+plant('an alias missing a field', entryOf('go', 'golang.org/x/crypto', (e) => { delete e.aliases[0].url; }), /aliases\[0\] is missing url/);
+plant('a declaration missing a member', scanOf('go', (s) => { delete s.packages[0].matches[0].declarations[0].replace; }), /declarations\[0\] is missing replace/);
+plant('a package record missing a field', scanOf('hex', (s) => { delete s.packages[0].manifest; }), /packages\[0\] \(acme_hex\) is missing manifest/);
+plant('a match record missing a field', scanOf('hex', (s) => { delete s.packages[0].matches[0].matchedBy; }), /matches\[0\] is missing matchedBy/);
+plant('a catalogue size that is not a count', scanOf('hex', (s) => { s.catalog.entries = '1'; }), /catalog\.entries is "1", not a count/);
+plant('a match set that is not a digest', scanOf('hex', (s) => { s.catalog.matchSetSha256 = 'PLACEHOLDER'; }), /catalog\.matchSetSha256 is "PLACEHOLDER", not a SHA-256 digest/);
+plant('a match rule that is not an id', scanOf('hex', (s) => { s.catalog.matchRule = null; }), /catalog\.matchRule is null, not a rule id/);
+plant('a ledger row count that is not a count', scanOf('hex', (s) => { s.listing.rows = null; }), /listing\.rows is null, not a count/);
+
 // --- Running the planted defects -------------------------------------------------
 
 for (const [what, change, problem, prepare] of defects) {
