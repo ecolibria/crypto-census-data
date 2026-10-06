@@ -73,9 +73,12 @@ measured, and how to check it.
 | npm, PyPI, Go, Maven, Packagist, NuGet, CocoaPods | A package that could not be read was counted as scanned and as using no cryptography. | `packagesScanned` overstates; match counts understate |
 | npm, Go, Maven, NuGet, RubyGems, Hex, pub.dev | The packages listed are the first part of the registry's list. | Not a sample |
 | Every ecosystem but Hex and pub.dev | The weak tier mixes libraries that implement broken algorithms with libraries that are deprecated or unmaintained, and holds entries the corrected classes do not class as weak. | Overstates |
+| Every ecosystem but CocoaPods | The class counts leave out the packages three processing steps dropped. | Understates |
 | Totals | Packages three processing steps dropped were counted as using no cryptography. | `packagesWithCrypto` understates; `withNoCrypto` overstates |
+| Shares | They were computed over the packages three processing steps left, not all that matched. | Overstates |
 | Totals and shares | They sum or divide the counts above. | Not established |
 | `topExposedProjects`, `topPqcProjects` | The two lists name packages through entries not classed weak, or through optional declarations. | Overstates |
+| `topExposedProjects`, `topPqcProjects` | They were drawn after two processing steps removed packages that could have entered them. | Not established |
 
 Not known: the effect of the unread packages on any count, the cause of the NuGet read failures, whether any
 pub.dev answer came without a pubspec (its scanner did not count one as a failure), the effect of the 38 NuGet
