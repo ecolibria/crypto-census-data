@@ -1806,9 +1806,9 @@ function checkScan(name, eco, record, catalog, found, bad) {
 
 /**
  * The ceiling on packages listed and not read: a registry whose unresolved
- * count is above 1 in 100 of the packages it listed is a blocked row, and a
- * dataset with a blocked row is not published. Held here independently of
- * the code that produces the files, and compared in whole numbers.
+ * count is above 1 in 100 of the packages it listed is a withheld row, not
+ * published and summed by no total. Held here independently of the code that
+ * produces the files, and compared in whole numbers.
  */
 const ONE_IN = 100;
 
@@ -2013,10 +2013,6 @@ function compareLedger(eco, ledger, scan, bad) {
           'the scan file still shows in the ledger.');
       }
     }
-  }
-  if (c.unresolved * ONE_IN > c.listed) {
-    bad(`${eco}: ${c.unresolved} of the ${c.listed} packages listed are unresolved, above the ceiling of 1 in ${ONE_IN}. The ` +
-      'row is blocked, and a dataset with a blocked row is not published.');
   }
 }
 
@@ -2278,7 +2274,9 @@ Object.assign(KEYS, {
   manifestEcosystem: ['ecosystem', 'coverage', 'enumeration', 'sources'],
   knownIssue: ['defect', 'summary', 'affects', 'direction', 'magnitude', 'correctedIn'],
   corpus: ['schemaVersion', 'kind', 'collectedAt', 'generatedAt', 'aggregator', 'inputs', 'definitions', 'comparability', 'blocked',
-    'coverage', 'byEcosystem', 'total', 'multiPurposeLibraries'],
+    'withheld', 'coverage', 'byEcosystem', 'total', 'multiPurposeLibraries'],
+  withheld: ['ecosystem', 'reasons', 'coverage'],
+  withheldReason: ['code', 'detail'],
   aggregator: ['script', 'commit'],
   inputs: ['scans', 'catalog', 'consolidation'],
   inputScan: ['ecosystem', 'file', 'sha256'],
@@ -2454,8 +2452,8 @@ function expectedRow(eco, registry, scan, ledger, map, includes) {
 }
 
 /** A total: each class cell sums the rows where the class is measurable, and says which rows those are. */
-function totalOf(rows, consolidated) {
-  const total = { definitionId: rows[0].block.definitionId };
+function totalOf(rows, consolidated, definitionId) {
+  const total = { definitionId };
   for (const cls of CLASSES) {
     const measurable = rows.filter(({ block }) => block[cls].k > 0);
     total[cls] = {
@@ -2494,9 +2492,12 @@ function totalOf(rows, consolidated) {
   return total;
 }
 
-function expectedTotal(rows) {
+/** The total of every row not withheld. A withheld row's figures are not published, so no total sums them. */
+function expectedTotal(rows, withheld) {
+  const published = publishedRows(withheld);
   return Object.fromEntries(MATCH_DEFINITIONS.map((definition) => [definition, Object.fromEntries(UNITS.map((unit) => [
-    unit, totalOf(ECOSYSTEMS.map((eco) => ({ eco, block: rows[eco].row[definition][unit] })), unit === 'consolidated')]))]));
+    unit, totalOf(published.map((eco) => ({ eco, block: rows[eco].row[definition][unit] })), unit === 'consolidated',
+      `${DEFINITIONS[definition]}+${DEFINITIONS[unit]}`)]))]));
 }
 
 // --- The corpus: comparison -----------------------------------------------------
@@ -2766,7 +2767,7 @@ function compareMeasurability(stored, expected, registry, where, ctx) {
   }
 }
 
-function compareMultiPurpose(stored, rows, catalog, file, ctx) {
+function compareMultiPurpose(stored, rows, withheld, catalog, file, ctx) {
   if (!Array.isArray(stored)) {
     ctx.bad(`${file}: multiPurposeLibraries is ${describe(stored)}, not a list`);
     return;
@@ -2777,7 +2778,9 @@ function compareMultiPurpose(stored, rows, catalog, file, ctx) {
       const dependents = {};
       for (const definition of MATCH_DEFINITIONS) {
         dependents[definition] = {};
-        for (const unit of UNITS) dependents[definition][unit] = rows[eco].units[definition][unit].filter((set) => set.has(entry)).length;
+        for (const unit of UNITS) {
+          dependents[definition][unit] = withheld.has(eco) ? null : rows[eco].units[definition][unit].filter((set) => set.has(entry)).length;
+        }
       }
       expected.set(`${eco}\0${entry}`, { ecosystem: eco, entry, dependents });
     }
@@ -2805,7 +2808,9 @@ function compareMultiPurpose(stored, rows, catalog, file, ctx) {
       if (!closed(item.dependents[definition], UNITS, `${where}.dependents.${definition}`, ctx.bad)) continue;
       for (const unit of UNITS) {
         const value = item.dependents[definition][unit];
-        if (!isCount(value)) ctx.bad(`${where}.dependents.${definition}.${unit} is ${describe(value)}, not a whole count`);
+        if (want[definition][unit] === null) {
+          if (value !== null) ctx.bad(`${where}.dependents.${definition}.${unit} is ${describe(value)}; ${item.ecosystem} is withheld, so it is null`);
+        } else if (!isCount(value)) ctx.bad(`${where}.dependents.${definition}.${unit} is ${describe(value)}, not a whole count`);
         else if (value !== want[definition][unit]) {
           ctx.figureBad(`${where}.dependents.${definition}.${unit} is ${value}; recomputed it is ${want[definition][unit]}`);
         }
@@ -3112,12 +3117,112 @@ function checkBlocked(list, file, bad) {
   return true;
 }
 
-function checkCorpusCoverage(coverage, ctx, file, bad) {
+/** Why a row may be withheld, as the aggregator writes it. A withheld row is not published, and no total sums it. */
+const WITHHELD_CODES = ['noScanFile', 'listingNotWhole', 'notUnderPopulationRule', 'sampleNotDrawnToSize', 'seedNotRunId',
+  'unresolvedShareAboveCeiling'];
+
+/** True when a registry's scan reads more than the ceiling of its listed packages as unresolved. */
+const aboveCeiling = (coverage) => coverage.unresolved * ONE_IN > coverage.listed;
+
+/**
+ * The rows the corpus withholds, as a set of registries, or null when the list
+ * cannot be read as one. Each says why. noScanFile is false wherever it is
+ * given, because a version 2 dataset holds the scan file of every registry;
+ * the ceiling is recomputed both ways; the other reasons rest on the
+ * population rule, which is not held here, and are taken as stated.
+ */
+function checkWithheld(list, ctx, file, bad) {
+  const where = `${file}: withheld`;
+  if (!Array.isArray(list)) {
+    bad(`${where} is ${describe(list)}, not a list`);
+    return null;
+  }
+  const withheld = new Set();
+  let sound = true;
+  list.forEach((item, index) => {
+    const at = `${where}[${index}]`;
+    if (!closed(item, KEYS.withheld, at, bad)) {
+      sound = false;
+      return;
+    }
+    if (!ECOSYSTEMS.includes(item.ecosystem) || withheld.has(item.ecosystem)) {
+      bad(`${at}.ecosystem is ${describe(item.ecosystem)}, not one of the eleven registries withheld once`);
+      sound = false;
+      return;
+    }
+    withheld.add(item.ecosystem);
+    const scan = ctx.scans[item.ecosystem];
+    const codes = [];
+    if (!Array.isArray(item.reasons) || item.reasons.length === 0) {
+      bad(`${at}.reasons is ${describe(item.reasons)}, not a list with a reason in it. A row withheld for no stated reason reads ` +
+        'as a row left out.');
+      sound = false;
+    } else {
+      item.reasons.forEach((reason, number) => {
+        const r = `${at}.reasons[${number}]`;
+        if (!closed(reason, KEYS.withheldReason, r, bad)) {
+          sound = false;
+          return;
+        }
+        if (!WITHHELD_CODES.includes(reason.code)) {
+          bad(`${r}.code is ${describe(reason.code)}, not one of: ${WITHHELD_CODES.join(', ')}`);
+          sound = false;
+        } else {
+          codes.push(reason.code);
+        }
+        if (!isText(reason.detail)) {
+          bad(`${r}.detail is ${describe(reason.detail)}, not text`);
+          sound = false;
+        }
+      });
+    }
+    if (codes.includes('noScanFile')) {
+      if (scan) {
+        bad(`${at} gives noScanFile for ${item.ecosystem}, and the dataset holds ${scan.file}. A version 2 dataset holds the scan ` +
+          'file of every registry.');
+        sound = false;
+      } else if (item.coverage !== null) {
+        bad(`${at}.coverage is ${describe(item.coverage)}. A row with no scan file has no counts, so it is null.`);
+        sound = false;
+      }
+    } else if (item.coverage === null) {
+      bad(`${at}.coverage is null. It is null only for a row with no scan file; the counts of ${item.ecosystem} are in its scan file.`);
+      sound = false;
+    } else if (closed(item.coverage, KEYS.scanCoverage, `${at}.coverage`, bad)) {
+      if (scan && scan.coverage && !sameValue(item.coverage, scan.coverage)) {
+        bad(`${at}.coverage is not the coverage of ${scan.file}. A withheld row keeps its counts, copied from the raw file.`);
+      }
+    } else {
+      sound = false;
+    }
+    if (codes.includes('unresolvedShareAboveCeiling') && scan && scan.coverage && !aboveCeiling(scan.coverage)) {
+      bad(`${at} gives unresolvedShareAboveCeiling, and ${item.ecosystem} has ${scan.coverage.unresolved} of ${scan.coverage.listed} ` +
+        `listed packages unresolved, within the ceiling of 1 in ${ONE_IN}`);
+    }
+  });
+  // Every row above the ceiling is withheld for it.
+  for (const eco of ECOSYSTEMS) {
+    const scan = ctx.scans[eco];
+    if (!scan || !scan.coverage || !aboveCeiling(scan.coverage)) continue;
+    const item = list.find((x) => isObject(x) && x.ecosystem === eco);
+    if (!item || !Array.isArray(item.reasons) || !item.reasons.some((r) => isObject(r) && r.code === 'unresolvedShareAboveCeiling')) {
+      bad(`${eco}: ${scan.coverage.unresolved} of the ${scan.coverage.listed} packages listed are unresolved, above the ceiling of ` +
+        `1 in ${ONE_IN}, and ${file} does not withhold the row for it. A row above the ceiling is not published.`);
+    }
+  }
+  return sound ? withheld : null;
+}
+
+function checkCorpusCoverage(coverage, withheld, ctx, file, bad) {
   const where = `${file}: coverage`;
   if (!closed(coverage, KEYS.corpusCoverage, where, bad)) return;
   if (closed(coverage.byEcosystem, ECOSYSTEMS, `${where}.byEcosystem`, bad)) {
     for (const eco of ECOSYSTEMS) {
       const at = `${where}.byEcosystem.${eco}`;
+      if (withheld && withheld.has(eco)) {
+        if (coverage.byEcosystem[eco] !== null) bad(`${at} is ${describe(coverage.byEcosystem[eco])}; ${eco} is withheld, so it is null`);
+        continue;
+      }
       if (!closed(coverage.byEcosystem[eco], KEYS.rowCoverage, at, bad)) continue;
       const scan = ctx.scans[eco];
       if (!scan || !scan.coverage) continue;
@@ -3129,14 +3234,34 @@ function checkCorpusCoverage(coverage, ctx, file, bad) {
     }
   }
   if (closed(coverage.total, COVERAGE_COUNTS, `${where}.total`, bad)) {
-    const scans = ECOSYSTEMS.map((eco) => ctx.scans[eco]);
+    const published = publishedRows(withheld);
+    const scans = (published ?? []).map((eco) => ctx.scans[eco]);
     for (const field of COVERAGE_COUNTS) {
       if (!isCount(coverage.total[field])) {
         bad(`${where}.total.${field} is ${describe(coverage.total[field])}, not a whole count`);
-      } else if (scans.every((scan) => scan && scan.coverage)) {
+      } else if (published && scans.every((scan) => scan && scan.coverage)) {
         const summed = sum(scans.map((scan) => scan.coverage[field]));
-        if (coverage.total[field] !== summed) bad(`${where}.total.${field} is ${coverage.total[field]}; the eleven scan files sum to ${summed}`);
+        if (coverage.total[field] !== summed) {
+          bad(`${where}.total.${field} is ${coverage.total[field]}; the scan files of the ${published.length} rows not withheld sum to ${summed}`);
+        }
       }
+    }
+  }
+}
+
+/** The registries a total sums: every one the corpus does not withhold. Null when the withheld rows cannot be read. */
+const publishedRows = (withheld) => (withheld ? ECOSYSTEMS.filter((eco) => !withheld.has(eco)) : null);
+
+/** A total names each registry once: as measurable, as not measurable, or as withheld. */
+function totalPartition(block, where, withheld, ctx) {
+  for (const key of [...CLASSES, ...JOINT]) {
+    const cell = block[key];
+    const named = [...cell.measurableIn, ...cell.notMeasurableIn, ...withheld];
+    const twice = ECOSYSTEMS.filter((eco) => named.filter((x) => x === eco).length > 1);
+    const missing = ECOSYSTEMS.filter((eco) => !named.includes(eco));
+    if (twice.length > 0 || missing.length > 0) {
+      ctx.bad(`${where}.${key}: measurableIn, notMeasurableIn and the withheld rows do not name the eleven registries once each` +
+        `${twice.length > 0 ? ` (named twice: ${twice.join(', ')})` : ''}${missing.length > 0 ? ` (not named: ${missing.join(', ')})` : ''}`);
     }
   }
 }
@@ -3170,15 +3295,16 @@ function checkCorpus(name, record, ctx, bad) {
   const includes = checkDefinitions(c.definitions, file, bad);
   checkComparability(name, c.comparability, c, ctx, file, bad);
   const publishable = checkBlocked(c.blocked, file, bad);
-  checkCorpusCoverage(c.coverage, ctx, file, bad);
+  const withheld = checkWithheld(c.withheld, ctx, file, bad);
+  checkCorpusCoverage(c.coverage, withheld, ctx, file, bad);
   const rowsShaped = closed(c.byEcosystem, ECOSYSTEMS, `${file}: byEcosystem`, bad);
   const totalShaped = closed(c.total, KEYS.total, `${file}: total`, bad);
 
   // The figures are recomputed only from files that passed their own checks:
   // where one did not, it has been reported above, and the dataset fails.
-  const ready = publishable && includes !== null && ctx.catalog && ctx.catalog.sound && ctx.map &&
+  const ready = publishable && withheld !== null && includes !== null && ctx.catalog && ctx.catalog.sound && ctx.map &&
     ECOSYSTEMS.every((eco) => ctx.scans[eco] && ctx.scans[eco].sound && ctx.ledgers[eco] && ctx.ledgers[eco].sound);
-  if (!ready) return;
+  if (!ready) return withheld;
 
   let differing = 0;
   const figureContext = {
@@ -3197,6 +3323,10 @@ function checkCorpus(name, record, ctx, bad) {
       const where = `${file}: byEcosystem.${eco}`;
       const stored = c.byEcosystem[eco];
       const expected = rows[eco];
+      if (withheld.has(eco)) {
+        if (stored !== null) bad(`${where} is set; ${eco} is withheld, so its row is null and none of its figures is published`);
+        continue;
+      }
       if (!closed(stored, KEYS.row, where, bad)) continue;
       compareMeasurability(stored.measurability, expected.row.measurability, ctx.catalog.byEco[eco], `${where}.measurability`, figureContext);
       const items = blocksOf(stored, expected.row, where, expected.coverage, figureContext);
@@ -3239,16 +3369,18 @@ function checkCorpus(name, record, ctx, bad) {
     }
   }
   if (totalShaped) {
-    const items = blocksOf(c.total, expectedTotal(rows), `${file}: total`, null, figureContext);
+    const items = blocksOf(c.total, expectedTotal(rows, withheld), `${file}: total`, null, figureContext);
     const ready = items.filter((item) => blockRules(item.stored, item.consolidated, item.where, figureContext, true));
     for (const item of ready) {
+      totalPartition(item.stored, item.where, withheld, figureContext);
       totalIdentity(item.stored, item.where, figureContext);
       if (item.consolidated) statsIdentity(item.stored.consolidation, `${item.where}.consolidation`, figureContext);
     }
     for (const item of ready) blockValues(item.stored, item.expected, item.where, figureContext, true);
   }
-  compareMultiPurpose(c.multiPurposeLibraries, rows, ctx.catalog, file, figureContext);
+  compareMultiPurpose(c.multiPurposeLibraries, rows, withheld, ctx.catalog, file, figureContext);
   if (differing > 40) bad(`${file}: ${differing - 40} more figure(s) differ from their recomputed values`);
+  return withheld;
 }
 
 // --- MANIFEST.json against the files --------------------------------------------
@@ -3286,17 +3418,20 @@ function checkKnownIssues(list, corpus, bad) {
   });
 }
 
-function checkManifestAgainstFiles(manifest, found, scans, bad) {
+function checkManifestAgainstFiles(manifest, found, scans, withheld, bad) {
   const at = 'MANIFEST.json';
   const corpus = found.corpus ? found.corpus.value : null;
   if (closed(manifest.coverage, COVERAGE_COUNTS, `${at}: coverage`, bad)) {
-    const all = ECOSYSTEMS.map((eco) => scans[eco]);
+    const published = publishedRows(withheld);
+    const rows = (published ?? []).map((eco) => scans[eco]);
     for (const field of COVERAGE_COUNTS) {
       if (!isCount(manifest.coverage[field])) {
         bad(`${at}: coverage.${field} is ${describe(manifest.coverage[field])}, not a whole count`);
-      } else if (all.every((scan) => scan && scan.coverage)) {
-        const summed = sum(all.map((scan) => scan.coverage[field]));
-        if (manifest.coverage[field] !== summed) bad(`${at}: coverage.${field} is ${manifest.coverage[field]}; the eleven scan files sum to ${summed}`);
+      } else if (published && rows.every((scan) => scan && scan.coverage)) {
+        const summed = sum(rows.map((scan) => scan.coverage[field]));
+        if (manifest.coverage[field] !== summed) {
+          bad(`${at}: coverage.${field} is ${manifest.coverage[field]}; the scan files of the ${published.length} rows not withheld sum to ${summed}`);
+        }
       }
     }
   }
@@ -3368,8 +3503,8 @@ function validateVersion2Files(name, dir, bad) {
     ledgers[eco] = ledger;
   }
   const map = found.consolidation ? checkConsolidation(name, found.consolidation, scans, bad) : null;
-  if (found.corpus) checkCorpus(name, found.corpus, { catalog, scans, ledgers, map, found }, bad);
-  checkManifestAgainstFiles(manifest, found, scans, bad);
+  const withheld = found.corpus ? checkCorpus(name, found.corpus, { catalog, scans, ledgers, map, found }, bad) : null;
+  checkManifestAgainstFiles(manifest, found, scans, withheld ?? null, bad);
   listRegeneratedScans(name, manifest, found);
 }
 

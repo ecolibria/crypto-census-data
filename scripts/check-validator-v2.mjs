@@ -537,7 +537,11 @@ function totalTables() {
 
 /** The total blocks, from the tables written out above. */
 function totalsFrom(t) {
-  const rows = (cell) => ({ measurableIn: t.measurable[cell], notMeasurableIn: ECOSYSTEMS.filter((eco) => !t.measurable[cell].includes(eco)) });
+  const withheld = t.withheld ?? [];
+  const rows = (cell) => ({
+    measurableIn: t.measurable[cell],
+    notMeasurableIn: ECOSYSTEMS.filter((eco) => !t.measurable[cell].includes(eco) && !withheld.includes(eco)),
+  });
   const UNITS_FIELD = { excludedUnclassified: 'unitsWithOnlyUnclassifiedMatches', excludedNotCountable: 'unitsWithOnlyNotCountableMatches' };
   return Object.fromEntries(DEFINITIONS.map((definition) => [definition, Object.fromEntries(UNITS.map((unit) => {
     const cells = t.cells[definition][unit];
@@ -691,7 +695,10 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
       };
     }
   }
-  const tables = totalTables();
+  // Rows the corpus withholds: not published, and summed by no total.
+  const withhold = change.withhold ?? [];
+  const isPublished = (eco) => !withhold.some((w) => w.ecosystem === eco);
+  const tables = { ...totalTables(), withheld: withhold.map((w) => w.ecosystem) };
   change.totalTables?.(tables);
   const comparability = earlier.map(({ dataset, version, comparable = true, changes = [] }) => (version === 1
     ? { dataset, doi: null, comparable: false, reason: 'instrumentChanged', changes: [...CHANGE_CODES] }
@@ -719,19 +726,26 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
     },
     comparability,
     blocked: [],
+    withheld: withhold.map(({ ecosystem, reasons }) => ({ ecosystem, reasons: structuredClone(reasons), coverage: structuredClone(scans[ecosystem].coverage) })),
     coverage: {
-      total: Object.fromEntries(COVERAGE.map((field) => [field, sum(ECOSYSTEMS.map((eco) => scans[eco].coverage[field]))])),
+      total: Object.fromEntries(COVERAGE.map((field) => [field, sum(ECOSYSTEMS.filter(isPublished).map((eco) => scans[eco].coverage[field]))])),
       byEcosystem: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, structuredClone({ ...scans[eco].coverage, enumeration: scans[eco].enumeration, sources: scans[eco].sources })])),
     },
     byEcosystem: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, { measurability: fixture[eco].measurability, ...rows[eco] }])),
     total: totalsFrom(tables),
     multiPurposeLibraries: MULTI_PURPOSE.map(({ ecosystem, entry: name, counts }) => ({
       ecosystem, entry: name, definitionId: 'census.table.multiPurposeLibrary/1',
-      dependents: { anyManifestMatch: { raw: counts[0], consolidated: counts[1] }, directUnconditional: { raw: counts[2], consolidated: counts[3] } },
+      dependents: isPublished(ecosystem)
+        ? { anyManifestMatch: { raw: counts[0], consolidated: counts[1] }, directUnconditional: { raw: counts[2], consolidated: counts[3] } }
+        : { anyManifestMatch: { raw: null, consolidated: null }, directUnconditional: { raw: null, consolidated: null } },
     })),
   };
   // The measurability objects of the fixture are shared with the corpus above; copy them so a change to one is a change to one.
   for (const eco of ECOSYSTEMS) corpus.byEcosystem[eco].measurability = structuredClone(fixture[eco].measurability);
+  for (const eco of ECOSYSTEMS.filter((x) => !isPublished(x))) {
+    corpus.byEcosystem[eco] = null;
+    corpus.coverage.byEcosystem[eco] = null;
+  }
   change.corpus?.(corpus);
   files[fileName.corpus(date)] = json(corpus);
 
@@ -753,7 +767,7 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
     license: 'CC-BY-4.0',
     provenance: { sourceRepository: 'example/census', sourceCommit: COMMIT, workflowRun: RUN_URL },
     files: listing.map((item) => ({ ...item, bytes: Buffer.byteLength(files[item.file]), sha256: sha256(files[item.file]), schemaVersion: 2 })),
-    coverage: Object.fromEntries(COVERAGE.map((field) => [field, sum(ECOSYSTEMS.map((eco) => scans[eco].coverage[field]))])),
+    coverage: Object.fromEntries(COVERAGE.map((field) => [field, sum(ECOSYSTEMS.filter(isPublished).map((eco) => scans[eco].coverage[field]))])),
     ecosystems: ECOSYSTEMS.map((eco) => structuredClone({ ecosystem: eco, coverage: scans[eco].coverage, enumeration: scans[eco].enumeration, sources: scans[eco].sources })),
     comparability: structuredClone(corpus.comparability),
     checks: Object.fromEntries(CHECKS.map((check) => [check, []])),
@@ -1369,7 +1383,8 @@ plant('a scan file with one match deleted', scanOf('npm', (s) => { s.packages[0]
 plant('a scan file with one matched package deleted', scanOf('npm', (s) => { s.packages.shift(); s.packagesWithMatch -= 1; }), /listing-npm\.tsv\.gz records 2 match\(es\) for @acme\/alpha, which scan-results-npm\.json does not list/);
 plant('a package read at another version than the ledger says', scanOf('hex', (s) => { s.packages[0].version = '2.0.0'; }), /acme_hex was read at "2\.0\.0", and listing-hex\.tsv\.gz says 1\.0\.0/);
 plant('a package read from another source than the ledger says', scanOf('packagist', (s) => { s.packages[0].readFrom = 'devDefaultBranch'; }), /acme\/api was read from "devDefaultBranch", and listing-packagist\.tsv\.gz says taggedRelease/);
-plant('a row over the ceiling', { fixture: fillers(90, unread('kappa', 'unresolved', 'timeout')) }, /npm: 1 of the 99 packages listed are unresolved, above the ceiling of 1 in 100\. The row is blocked/);
+plant('a row over the ceiling that the corpus publishes', { fixture: fillers(90, unread('kappa', 'unresolved', 'timeout')) },
+  /npm: 1 of the 99 packages listed are unresolved, above the ceiling of 1 in 100, and corpus-2026-09-30\.json does not withhold the row for it/);
 plant('a deterministic non-read over the ceiling', { fixture: (f) => { f.hex.rows.push(unread('broken_pkg', 'unresolved', 'parseError')); } }, /hex: 1 of the 2 packages listed are unresolved, above the ceiling/);
 
 // Where a dataset sits.
@@ -1436,6 +1451,43 @@ plant('a removal missing its rule', mapOf((m) => { m.byEcosystem.pub.removed = [
 const EARLIER_V2 = '2026-09-15';
 
 const corpusOf = (fn) => ({ corpus: fn });
+
+/**
+ * The totals with one row withheld, written out by hand from the rows above.
+ * RubyGems is one package matching rbnacl, so it leaves matched alone: one
+ * fewer in every block, one less K, one unit fewer. PyPI leaves matched,
+ * weak, brokenAlgorithm and deprecatedLibrary: [2, 2, 1, 1] in each any block
+ * and [1, 0, 0, 0] in each direct one, K 3, 2, 1 and 1, units 2 and 1.
+ */
+const WITHHELD_TOTALS = {
+  rubygems: (t) => {
+    t.measurable.matched = ECOSYSTEMS.filter((eco) => eco !== 'rubygems');
+    Object.assign(t.k, { matched: 22 });
+    t.cells.anyManifestMatch = { raw: [19, 13, 4, 9, 3, 3, 0], consolidated: [14, 11, 3, 9, 3, 3, 0] };
+    t.cells.directUnconditional = { raw: [14, 6, 2, 4, 2, 1, 1], consolidated: [11, 6, 2, 4, 2, 1, 0] };
+    t.stats = { anyManifestMatch: [22, 17, 5], directUnconditional: [15, 12, 3] };
+  },
+  pypi: (t) => {
+    t.measurable.matched = ECOSYSTEMS.filter((eco) => eco !== 'pypi');
+    t.measurable.weak = ['npm', 'go', 'maven', 'crates', 'packagist', 'nuget', 'cocoapods'];
+    t.measurable.brokenAlgorithm = ['npm'];
+    t.measurable.deprecatedLibrary = ['npm', 'go', 'maven', 'crates', 'packagist', 'nuget', 'cocoapods'];
+    Object.assign(t.k, { matched: 20, weak: 8, brokenAlgorithm: 1, deprecatedLibrary: 7 });
+    t.cells.anyManifestMatch = { raw: [18, 11, 3, 8, 3, 3, 0], consolidated: [13, 9, 2, 8, 3, 3, 0] };
+    t.cells.directUnconditional = { raw: [14, 6, 2, 4, 2, 1, 1], consolidated: [11, 6, 2, 4, 2, 1, 0] };
+    t.stats = { anyManifestMatch: [21, 16, 5], directUnconditional: [15, 12, 3] };
+  },
+};
+
+/** One row withheld for the reasons given, with the totals and the rest of the dataset as they then are. */
+const withholding = (eco, reasons, extra = {}) => ({
+  withhold: [{ ecosystem: eco, reasons }],
+  totalTables: WITHHELD_TOTALS[eco],
+  ...extra,
+});
+const NOT_UNDER_RULE = [{ code: 'notUnderPopulationRule', detail: 'The row was not read under the population rule.' }];
+const ABOVE_CEILING = [{ code: 'unresolvedShareAboveCeiling', detail: '1 of 2 listed unresolved.' }];
+const oneUnresolvedGem = { fixture: (f) => { f.rubygems.rows.push(unread('acme-two', 'unresolved', 'timeout')); } };
 
 const npmRaw = (c) => c.byEcosystem.npm.anyManifestMatch.raw;
 
@@ -1576,7 +1628,7 @@ plant('a direct definition without the module that evaluates it', corpusOf((c) =
 plant('a direct definition whose module is not named', corpusOf((c) => { c.definitions.directUnconditional.code = null; }), /directUnconditional\.code is null, not the module that evaluates the rule/);
 plant('coverage without dev metadata that repeats the unread counts', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata.coverage.listed = 3; }),
   /packagist\.excludingDevMetadata\.coverage carries listed/);
-plant('a coverage total that is not the sum of the rows', corpusOf((c) => { c.coverage.total.listed += 1; }), /coverage\.total\.listed is 37; the eleven scan files sum to 36/);
+plant('a coverage total that is not the sum of the rows', corpusOf((c) => { c.coverage.total.listed += 1; }), /coverage\.total\.listed is 37; the scan files of the 11 rows not withheld sum to 36/);
 plant('a coverage without a registry', corpusOf((c) => { delete c.coverage.byEcosystem.pub; }), /coverage\.byEcosystem is missing pub/);
 plant('a corpus without a registry\'s row', corpusOf((c) => { delete c.byEcosystem.pub; }), /corpus-2026-09-30\.json: byEcosystem is missing pub/);
 
@@ -1647,7 +1699,9 @@ plant('a total whose five cells sum the same registries and do not add up', corp
   Object.assign(total.neitherWeakNorPqc, { count: 1, ...npmAndCrates });
 }), /total\.anyManifestMatch\.raw: matched \(5\) is not weak \(5\) \+ pqc \(3\) - weakAndPqc \(3\) \+ neitherWeakNorPqc \(1\), and all five sum the same registries/);
 plant('a total joint cell that does not name its registries', corpusOf((c) => { delete c.total.directUnconditional.raw.weakAndPqc.measurableIn; }), /total\.directUnconditional\.raw\.weakAndPqc is missing measurableIn/);
-plant('a total joint cell that names the wrong registries', corpusOf((c) => { c.total.directUnconditional.raw.neitherWeakNorPqc.measurableIn = ['npm']; }), /total\.directUnconditional\.raw\.neitherWeakNorPqc is .*recomputed/);
+plant('a total joint cell that names the wrong registries', corpusOf((c) => {
+  Object.assign(c.total.directUnconditional.raw.neitherWeakNorPqc, { measurableIn: ['npm'], notMeasurableIn: [...c.total.directUnconditional.raw.neitherWeakNorPqc.notMeasurableIn, 'crates'] });
+}), /total\.directUnconditional\.raw\.neitherWeakNorPqc is .*recomputed/);
 plant('a total entry that does not name its registry', corpusOf((c) => { delete c.total.anyManifestMatch.raw.excludedUnclassified.byEntry[0].ecosystem; }),
   /total\.anyManifestMatch\.raw\.excludedUnclassified\.byEntry\[0\] is missing ecosystem/);
 plant('a total entry under another registry', corpusOf((c) => { c.total.anyManifestMatch.raw.excludedUnclassified.byEntry[0].ecosystem = 'pypi'; }),
@@ -1663,7 +1717,13 @@ plant('coverage without dev metadata off by one', corpusOf((c) => { c.byEcosyste
 plant('coverage without dev metadata that is not a count', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata.coverage.scanned = -1; }),
   /packagist\.excludingDevMetadata\.coverage\.scanned is -1, not a whole count/);
 plant('a figure without dev metadata off by one', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata.anyManifestMatch.raw.matched.count = 2; }), /packagist\.excludingDevMetadata\.anyManifestMatch\.raw\.matched is \{"count":2.*recomputed/);
-plant('a total that names the wrong rows as measurable', corpusOf((c) => { c.total.directUnconditional.raw.pqc.measurableIn = ['npm']; }), /total\.directUnconditional\.raw\.pqc is .*recomputed/);
+plant('a total that names the wrong rows as measurable', corpusOf((c) => {
+  Object.assign(c.total.directUnconditional.raw.pqc, { measurableIn: ['npm'], notMeasurableIn: [...c.total.directUnconditional.raw.pqc.notMeasurableIn, 'crates'] });
+}), /total\.directUnconditional\.raw\.pqc is .*recomputed/);
+plant('a total cell that leaves a registry out', corpusOf((c) => { c.total.anyManifestMatch.raw.weak.notMeasurableIn.pop(); }),
+  /total\.anyManifestMatch\.raw\.weak: measurableIn, notMeasurableIn and the withheld rows do not name the eleven registries once each \(not named: pub\)/);
+plant('a total cell that names a registry twice', corpusOf((c) => { c.total.anyManifestMatch.raw.pqc.notMeasurableIn.push('npm'); }),
+  /total\.anyManifestMatch\.raw\.pqc: measurableIn, notMeasurableIn and the withheld rows do not name the eleven registries once each \(named twice: npm\)/);
 plant('a total whose measurable rows are not registries', corpusOf((c) => { c.total.directUnconditional.raw.pqc.measurableIn = ['npm', 'npm']; }), /total\.directUnconditional\.raw\.pqc\.measurableIn is \["npm","npm"\], not a list of distinct registries/);
 plant('a total that carries figures without dev metadata', corpusOf((c) => { c.total.excludingDevMetadata = null; }), /corpus-2026-09-30\.json: total carries excludingDevMetadata/);
 plant('a multi-purpose library left out', corpusOf((c) => { c.multiPurposeLibraries.pop(); }), /multiPurposeLibraries has no row for go:github\.com\/cloudflare\/circl/);
@@ -1687,7 +1747,7 @@ plant('a DOI that is not one', corpusOf((c) => { c.comparability[0].doi = 'zenod
 plant('the manifest\'s comparability not a copy of the corpus\'s', manifestOf((m) => { m.comparability = [{ ...m.comparability[0], doi: '10.5281/zenodo.1' }]; }), /MANIFEST\.json: comparability is not the corpus's/);
 
 // MANIFEST.json against the files.
-plant('a manifest coverage that is not the files\'', manifestOf((m) => { m.coverage = { ...m.coverage, unresolved: 1 }; }), /MANIFEST\.json: coverage\.unresolved is 1; the eleven scan files sum to 0/);
+plant('a manifest coverage that is not the files\'', manifestOf((m) => { m.coverage = { ...m.coverage, unresolved: 1 }; }), /MANIFEST\.json: coverage\.unresolved is 1; the scan files of the 11 rows not withheld sum to 0/);
 plant('a manifest coverage count that is not a count', manifestOf((m) => { m.coverage = { ...m.coverage, absent: null }; }), /MANIFEST\.json: coverage\.absent is null, not a whole count/);
 plant('a manifest registry whose sources are not the raw file\'s', manifestOf((m) => { m.ecosystems[2] = { ...m.ecosystems[2], sources: { ...m.ecosystems[2].sources, manifests: 'https://mirror.example/go' } }; }),
   /MANIFEST\.json: ecosystems\[2\]\.sources is not the sources of scan-results-go\.json/);
@@ -1807,6 +1867,9 @@ const closedInTheCorpus = [
   ['the dependents of a multi-purpose library', corpusOf((c) => { c.multiPurposeLibraries[0].dependents.note = 1; }), /multiPurposeLibraries\[0\]\.dependents carries note/],
   ['the coverage of the manifest', manifestOf((m) => { m.coverage.note = 1; }), /MANIFEST\.json: coverage carries note/],
   ['the aggregator', corpusOf((c) => { c.aggregator.note = 'x'; }), /corpus-2026-09-30\.json: aggregator carries note/],
+  ['a withheld row', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].note = 'x'; })), /withheld\[0\] carries note/],
+  ['a reason a row is withheld', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].reasons[0].note = 'x'; })), /withheld\[0\]\.reasons\[0\] carries note/],
+  ['the counts of a withheld row', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].coverage.enumeration = {}; })), /withheld\[0\]\.coverage carries enumeration/],
   ['a multi-purpose library', corpusOf((c) => { c.multiPurposeLibraries[0].total = 2; }), /multiPurposeLibraries\[0\] carries total/],
   ['its dependents', corpusOf((c) => { c.multiPurposeLibraries[0].dependents.anyManifestMatch.total = 2; }), /dependents\.anyManifestMatch carries total/],
 ];
@@ -1819,6 +1882,52 @@ test('more malformed rows than are listed one by one are counted after the first
   assert.equal(result.stderr.split('\n').filter((line) => / listing-npm\.tsv\.gz: row \d+ /.test(line)).length, 5, result.stderr);
   assert.match(result.stderr, /listing-npm\.tsv\.gz: 3 more row\(s\) are malformed/);
 });
+
+// --- Withheld rows ---------------------------------------------------------------
+
+
+test('a row withheld for a reason the population rule gives passes, and no total sums it', async () => {
+  const result = await validateOne(withholding('rubygems', NOT_UNDER_RULE));
+  assert.equal(result.code, 0, result.stderr);
+});
+
+test('a row above the ceiling, withheld for it, passes', async () => {
+  const result = await validateOne(withholding('rubygems', ABOVE_CEILING, oneUnresolvedGem));
+  assert.equal(result.code, 0, result.stderr);
+});
+
+test('a withheld row with a multi-purpose library publishes none of its dependents', async () => {
+  const result = await validateOne(withholding('pypi', NOT_UNDER_RULE));
+  assert.equal(result.code, 0, result.stderr);
+});
+
+plant('a withheld row whose figures are published', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.byEcosystem.rubygems = structuredClone(c.byEcosystem.hex); })),
+  /byEcosystem\.rubygems is set; rubygems is withheld, so its row is null and none of its figures is published/);
+plant('a withheld row whose coverage is published', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.coverage.byEcosystem.rubygems = structuredClone(c.coverage.byEcosystem.hex); })),
+  /coverage\.byEcosystem\.rubygems is \{.*; rubygems is withheld, so it is null/);
+plant('a total that still sums a withheld row', { withhold: [{ ecosystem: 'rubygems', reasons: NOT_UNDER_RULE }] },
+  /total\.anyManifestMatch\.raw\.matched: measurableIn, notMeasurableIn and the withheld rows do not name the eleven registries once each \(named twice: rubygems\)/);
+plant('a coverage total that still counts a withheld row', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.coverage.total.listed += 1; c.coverage.total.scanned += 1; })),
+  /coverage\.total\.listed is 36; the scan files of the 10 rows not withheld sum to 35/);
+plant('a multi-purpose count published for a withheld row', withholding('pypi', NOT_UNDER_RULE, corpusOf((c) => { c.multiPurposeLibraries[0].dependents.anyManifestMatch.raw = 1; })),
+  /multiPurposeLibraries\[0\]\.dependents\.anyManifestMatch\.raw is 1; pypi is withheld, so it is null/);
+plant('a row withheld for a reason the aggregator does not give', withholding('rubygems', [{ code: 'tooSmall', detail: 'x' }]),
+  /withheld\[0\]\.reasons\[0\]\.code is "tooSmall", not one of: noScanFile, listingNotWhole, notUnderPopulationRule, sampleNotDrawnToSize, seedNotRunId, unresolvedShareAboveCeiling/);
+plant('a row withheld for no reason', withholding('rubygems', []), /withheld\[0\]\.reasons is \[\], not a list with a reason in it/);
+plant('a reason that does not say what it found', withholding('rubygems', [{ code: 'notUnderPopulationRule', detail: '' }]), /withheld\[0\]\.reasons\[0\]\.detail is "", not text/);
+plant('a row withheld twice', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld.push(structuredClone(c.withheld[0])); })),
+  /withheld\[1\]\.ecosystem is "rubygems", not one of the eleven registries withheld once/);
+plant('a registry withheld that is not one', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld.push({ ...structuredClone(c.withheld[0]), ecosystem: 'conda' }); })),
+  /withheld\[1\]\.ecosystem is "conda", not one of the eleven registries withheld once/);
+plant('a row withheld for having no scan file, beside its scan file', withholding('rubygems', [{ code: 'noScanFile', detail: 'x' }]),
+  /withheld\[0\] gives noScanFile for rubygems, and the dataset holds scan-results-rubygems\.json/);
+plant('a withheld row without its counts', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].coverage = null; })),
+  /withheld\[0\]\.coverage is null\. It is null only for a row with no scan file/);
+plant('a withheld row whose counts are not its scan file\'s', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].coverage.listed += 1; })),
+  /withheld\[0\]\.coverage is not the coverage of scan-results-rubygems\.json/);
+plant('a row withheld above the ceiling that is within it', withholding('rubygems', ABOVE_CEILING),
+  /withheld\[0\] gives unresolvedShareAboveCeiling, and rubygems has 0 of 1 listed packages unresolved, within the ceiling of 1 in 100/);
+plant('withheld rows that are not a list', corpusOf((c) => { c.withheld = null; }), /corpus-2026-09-30\.json: withheld is null, not a list/);
 
 // --- Errata for a version 2 dataset ----------------------------------------------
 
