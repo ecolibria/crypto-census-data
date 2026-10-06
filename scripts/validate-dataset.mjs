@@ -487,6 +487,15 @@ if (!existsSync(DATASETS)) {
 }
 
 const requested = process.argv[2];
+// Everything directly under datasets/ is a dataset directory. A file there is
+// read by none of these checks, so it would be published unchecked. Names that
+// begin with a dot are left to the check that reads the committed tree: an
+// operating system can leave one in a working copy.
+for (const entry of readdirSync(DATASETS)) {
+  if (!entry.startsWith('.') && !lstatSync(join(DATASETS, entry)).isDirectory()) {
+    fail('datasets', `${entry} is not a dataset directory. A file directly under datasets/ is read by none of these checks.`);
+  }
+}
 const all = readdirSync(DATASETS).filter((f) => statSync(join(DATASETS, f)).isDirectory());
 const names = requested ? [requested] : all;
 

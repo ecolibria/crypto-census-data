@@ -1,0 +1,119 @@
+name: Gate
+
+# Checks on a pull request, run by the default branch's copy of the scripts.
+#
+# On a `pull_request` event the workflow file and the scripts are the pull
+# request's own. A change could then edit a published file together with the
+# script that would have refused it, and pass. This workflow runs on
+# `pull_request_target`: its own text and the two scripts come from the default
+# branch, and the pull request is checked out beside them as data. Nothing the
+# pull request contains is executed here. The steps run git and the default
+# branch's two scripts, and those read JSON.
+#
+# validate.yml still runs on pull requests, on the pull request's own scripts
+# and their tests, which is what a change to the scripts needs.
+#
+# A pull request from another repository is not checked here and does not pass
+# here: see the first step.
+
+on:
+  pull_request_target:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: "Gate: ${{ matrix.name }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: hashes, schema and arithmetic
+            run: node scripts/validate-dataset.mjs
+          - name: nothing published is rewritten
+            run: node scripts/check-immutable.mjs refs/remotes/origin/main
+    # Every step runs with pipefail: a git command that fails inside a pipeline
+    # fails its step, and does not pass as an empty answer.
+    defaults:
+      run:
+        shell: bash
+    env:
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+      THIS_REPOSITORY: ${{ github.repository }}
+    steps:
+      # This workflow runs with this repository's own permissions, so it checks
+      # branches of this repository and nothing else. The step fails; it is not
+      # a condition on the job, because a job that is skipped is reported as a
+      # success. A head whose repository has since been deleted has no name,
+      # and stops here too.
+      - name: Stop at a pull request from another repository
+        run: |
+          if [ -z "$THIS_REPOSITORY" ] || [ "$HEAD_REPOSITORY" != "$THIS_REPOSITORY" ]; then
+            echo "This pull request is not from a branch of this repository, so these checks do not run on it and it is not merged as it is."
+            echo "A maintainer who takes the change cherry-picks it onto a branch of this repository, unless it touches scripts/ or .github/."
+            exit 1
+          fi
+
+      - name: Check out the default branch's scripts
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          path: trusted
+          sparse-checkout: scripts
+          persist-credentials: false
+
+      # The history between the default branch and the head has to be present:
+      # the immutability check compares against their merge base.
+      - name: Check out the pull request as data
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: data
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+
+      # A result is recorded against the commit the event names. Checked out at
+      # any other commit, a pass would be recorded for content nobody checked.
+      - name: Confirm the checkout is the commit this event is about
+        working-directory: data
+        run: |
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA" || { echo "The checkout is not the head of the pull request."; exit 1; }
+
+      # The checks read the tree the merge would produce, not the head alone. A
+      # head whose history joins the default branch's in more than one place can
+      # pass on its own and still remove a published file when it is merged. The
+      # base is named by its full ref: a tag called origin/main would otherwise
+      # be found first.
+      - name: Build the tree the merge would produce
+        working-directory: data
+        run: |
+          git -c user.name=gate -c user.email=gate@example.invalid merge --no-ff --no-edit --quiet refs/remotes/origin/main || {
+            echo "This pull request does not merge into the default branch as it stands. Update it and push again."
+            exit 1
+          }
+
+      # The pull request's scripts directory is removed whatever it is, a link
+      # included, and a real one holding the default branch's two scripts takes
+      # its place. The validator reads the tree it sits in, so it now reads the
+      # pull request's datasets and errata.
+      - name: Put the default branch's scripts in place of the pull request's
+        run: |
+          rm -rf data/scripts
+          mkdir data/scripts
+          cp trusted/scripts/validate-dataset.mjs trusted/scripts/check-immutable.mjs data/scripts/
+
+      - name: Check ${{ matrix.name }}
+        working-directory: data
+        run: ${{ matrix.run }}

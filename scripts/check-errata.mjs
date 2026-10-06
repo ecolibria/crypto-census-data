@@ -20,7 +20,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -264,6 +264,13 @@ test('an errata file that starts with a byte order mark is refused', async () =>
   assert.match(result.stderr, /errata\/2026-03-18\.json: does not parse/);
 });
 
+test('a file directly under datasets/ is refused', async () => {
+  const result = await validateWith({}, undefined, (dir) => writeFileSync(join(dir, 'datasets', 'corpus-latest.json'), '{}\n'));
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(result.stderr, /\n1 problem\(s\) across 1 dataset\(s\):/);
+  assert.match(result.stderr, /datasets: corpus-latest\.json is not a dataset directory/);
+});
+
 test('an errata file with a byte that is not UTF-8 is refused', async () => {
   const good = Buffer.from(`${JSON.stringify(wellFormed(), null, 2)}\n`, 'utf-8');
   const at = good.indexOf('A count');
@@ -386,6 +393,11 @@ const allowed = [
   ['adds an errata file for another dataset', (r) => r.write('errata/2026-08-03.json', { ...wellFormed(), dataset: '2026-08-03' })],
   ['rewrites the file with other spacing and key order', (r) => r.write(ERRATA_FILE, JSON.stringify(reversedKeys(wellFormed())))],
   ['adds a new dataset', (r) => r.write('datasets/2026-10-05/MANIFEST.json', { dataset: '2026-10-05' })],
+  ['adds a new dataset that holds an executable file', (r) => {
+    r.write('datasets/2026-10-05/MANIFEST.json', { dataset: '2026-10-05' });
+    chmodSync(join(r.dir, 'datasets', '2026-10-05', 'MANIFEST.json'), 0o755);
+    r.git('add', '--', 'datasets/2026-10-05/MANIFEST.json');
+  }],
   ['touches nothing', () => {}],
   ['adds an issue while the base has moved on with another change', (r) => {
     // Compared with the tip of the base, this change would seem to lack what
@@ -429,8 +441,8 @@ test('a change that left the base before the base gained a dataset passes', asyn
   assert.match(result.stdout, /No published dataset was modified \(2 protected\)/);
 });
 
-test('a checkout whose directory name ends in a space is the one that is checked', async () => {
-  // Beside it sits a checkout of the same name without the space, in which nothing was rewritten.
+for (const [what, name] of [['ends in a space', 'repo '], ['holds a line feed', 're\npo']]) test(`a checkout whose directory name ${what} is the one that is checked`, async () => {
+  // Beside it sits a checkout named without that character, in which nothing was rewritten.
   const parent = mkdtempSync(join(tmpdir(), 'census-errata-names-'));
   const build = (dir, rewrite) => {
     mkdirSync(dir);
@@ -450,8 +462,8 @@ test('a checkout whose directory name ends in a space is the one that is checked
   };
   try {
     build(join(parent, 'repo'), false);
-    build(join(parent, 'repo '), true);
-    const result = await run([join(ROOT, 'scripts', 'check-immutable.mjs'), 'published'], { cwd: join(parent, 'repo '), env: GIT_ENV });
+    build(join(parent, name), true);
+    const result = await run([join(ROOT, 'scripts', 'check-immutable.mjs'), 'published'], { cwd: join(parent, name), env: GIT_ENV });
     assert.equal(result.code, 1, result.stdout);
     assert.match(result.stderr, /modified datasets\/2026-03-18\/MANIFEST\.json/);
   } finally {
@@ -538,6 +550,31 @@ const forbidden = [
     symlinkSync(join('..', '..', 'attic', 'MANIFEST.json'), join(r.dir, 'datasets', PUBLISHED, 'MANIFEST.json'));
     r.git('add', '--', `datasets/${PUBLISHED}/MANIFEST.json`);
   }, /changed the type of datasets\/2026-03-18\/MANIFEST\.json/],
+  ['adds a file directly under datasets', (r) => r.write('datasets/corpus-latest.json', { dataset: 'latest' }),
+    /\n  datasets\/corpus-latest\.json is not a dataset directory/],
+  ['adds an attribute file at the top of the tree', (r) => r.write('.gitattributes', 'datasets/** export-ignore\n'),
+    /This tree holds an attribute file:\n\n  \.gitattributes\n/],
+  ['adds an attribute file inside a new dataset', (r) => {
+    r.write('datasets/2026-10-05/MANIFEST.json', { dataset: '2026-10-05' });
+    r.write('datasets/2026-10-05/.gitattributes', '*.json export-ignore\n');
+  }, /\n  datasets\/2026-10-05\/\.gitattributes\n/],
+  ['adds an attribute file under a directory whose name git prints in quotes', (r) => r.write('notes/na\u00efve/.gitattributes', '* text\n'),
+    /This tree holds an attribute file:/],
+  ['adds an attribute file named in capitals', (r) => r.write('.GITATTRIBUTES', 'datasets/** export-ignore\n'),
+    /This tree holds an attribute file:\n\n  \.GITATTRIBUTES\n/],
+  ['adds an attribute file named in mixed case inside a dataset', (r) => {
+    r.write('datasets/2026-10-05/MANIFEST.json', { dataset: '2026-10-05' });
+    r.write('datasets/2026-10-05/.GitAttributes', '*.json export-ignore\n');
+  }, /\n  datasets\/2026-10-05\/\.GitAttributes\n/],
+  // Names that are not the attribute file byte for byte, and that git reads as it on HFS+ or NTFS.
+  ['adds an attribute file with a format character in its name', (r) => r.write('.git\u200cattributes', 'datasets/** export-ignore\n'),
+    /This tree holds an attribute file:/],
+  ['adds an attribute file under its first NTFS short name', (r) => r.write('GITATT~1', 'datasets/** export-ignore\n'),
+    /This tree holds an attribute file:\n\n  GITATT~1\n/],
+  ['adds an attribute file under its fall-back NTFS short name', (r) => r.write('notes/gi7d29~1', 'datasets/** export-ignore\n'),
+    /This tree holds an attribute file:\n\n  notes\/gi7d29~1\n/],
+  ['adds an attribute file after a backslash in a name', (r) => r.write('notes\\.gitattributes', 'datasets/** export-ignore\n'),
+    /This tree holds an attribute file:/],
   ['puts a directory inside errata', (r) => r.write('errata/drafts/2026-08-03.json', wellFormed()),
     /errata\/drafts is not a regular file/],
   ['leaves a file that is not UTF-8', (r) => {
