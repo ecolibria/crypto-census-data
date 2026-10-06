@@ -8,9 +8,10 @@ Published under CC-BY-4.0. Every dataset is dated, hashed, and immutable once
 published.
 
 ```console
-$ git clone https://github.com/opena2a-org/crypto-census-data
+$ git clone https://github.com/ecolibria/crypto-census-data
 $ node scripts/validate-dataset.mjs
 2 dataset(s) validated: 2026-03-18, 2026-08-03
+1 errata file(s) validated: 2026-08-03.json
 ```
 
 Every file is verified against the SHA-256 recorded in its `MANIFEST.json`, so a
@@ -19,21 +20,21 @@ reading as valid.
 
 ## What is published
 
-| Dataset | Kind | Packages scanned | Using crypto | Ecosystems |
-|---|---|---|---|---|
-| [`2026-08-03`](datasets/2026-08-03) | raw+aggregate | 2,170,994 | 65,686 | 11 |
-| [`2026-03-18`](datasets/2026-03-18) | aggregate-only | 2,809,479 | 108,145 | 11 |
+| Dataset | Kind | Packages listed | Matched a catalogued library | Ecosystems | Known issues |
+|---|---|---|---|---|---|
+| [`2026-08-03`](datasets/2026-08-03) | raw+aggregate | 2,170,994 | 65,686 | 11 | [`errata/2026-08-03.json`](errata/2026-08-03.json) |
+| [`2026-03-18`](datasets/2026-03-18) | aggregate-only | 2,809,479 | 108,145 | 11 | two rows annotated in place (below) |
+| _The instrument changed between these two runs. The rows are not comparable._ | | | | | |
 
-The August dataset is the first published with its raw per-package output, one
-file per ecosystem, so a reader can recompute every figure rather than take the
-aggregate on trust.
+The August dataset is the first published with its raw per-package output, one file per ecosystem, so a reader
+can recount the packages behind each match count. The raw files list matched packages only; packages with no
+match appear as totals.
 
-**It scanned fewer packages than March and that is not a regression.** March
-enumerated more packages while classifying two ecosystems wrongly (below), and
-the August run refuses to publish an ecosystem that enumerated implausibly
-little. Compare the shares, which are over the crypto-using subset in both:
-post-quantum-ready went 0.17% to 0.54%, roughly a tripling; weak crypto is flat
-at about 19%.
+**The two datasets are not comparable, and no change over time can be read from them.** The instrument changed
+between the March and August runs, and the March raw output no longer exists, so its figures cannot be
+recomputed under the August method. A difference between a March figure and an August figure is not a
+measurement of change. That holds for the totals, for the share of packages matching weak-classed libraries and
+for the share matching post-quantum libraries.
 
 **The March 2026 dataset is the aggregate alone.** Its raw per-package output
 does not exist: it was written to a path matching a line in `.gitignore`, was
@@ -44,6 +45,45 @@ survived because it was committed, in two independent places that agree exactly.
 
 That loss is why the scan pipeline now persists raw output as a build artifact
 and fails the run when it produces nothing.
+
+## Known issues in the 2026-08-03 dataset
+
+Defects measured in this dataset after it was published are recorded in
+[`errata/2026-08-03.json`](errata/2026-08-03.json). The dataset directory is not edited. Its files, their hashes
+and the DOI stay as deposited, and its `MANIFEST.json` lists no known issue because none had been measured when
+it was written. Read the errata before quoting a figure.
+
+Each entry names the defect, the fields it affects, the direction of the error, its size where that has been
+measured, and how to check it.
+
+| Where | Defect | Direction |
+|---|---|---|
+| Maven | The scanner read the first `<dependencies>` element in a POM wherever it sat. | Both ways |
+| Maven, Packagist, npm | Entries are counted only through libraries that are being taken out of the count. | Overstates |
+| Go | Catalogue names were matched by path prefix. | Overstates |
+| Maven, CocoaPods | The catalogue's post-quantum entries name packages the registry does not have, so zero is not a measurement. | Not measurable |
+| Go | `// indirect` requirements were counted as direct. | Overstates |
+| Go | Each module was read at its first indexed version; the published entries that could be located were first indexed between 2019-04-10 and 2020-07-30. | Not current |
+| Go | A go.mod that holds only a module line was counted as using no cryptography. | Understates |
+| crates.io | A dependency was counted however it is declared, including optional, development, build and platform-specific ones. | Overstates |
+| PyPI | Requirements behind an extra or an environment marker were counted. | Overstates |
+| NuGet | A library that a package declares for only some of its target frameworks was counted. | Overstates |
+| NuGet | Packages with no listed version were counted. | Overstates |
+| CocoaPods | A library that a pod declares only in a subspec outside its default subspecs was counted. | Overstates |
+| npm, PyPI, Go, Maven, Packagist, NuGet, CocoaPods | A package that could not be read was counted as scanned and as using no cryptography. | `packagesScanned` overstates; match counts understate |
+| npm, Go, Maven, NuGet, RubyGems, Hex, pub.dev | The packages listed are the first part of the registry's list. | Not a sample |
+| Every ecosystem but Hex and pub.dev | The weak tier mixes libraries that implement broken algorithms with libraries that are deprecated or unmaintained, and holds entries the corrected classes do not class as weak. | Overstates |
+| Totals and shares | They sum or divide the counts above. | Not established |
+| `topExposedProjects`, `topPqcProjects` | The two lists name packages through entries not classed weak, or through optional declarations. | Overstates |
+
+Not known: the effect of the unread packages on any count, the cause of the NuGet read failures, whether any
+pub.dev answer came without a pubspec (its scanner did not count one as a failure), the effect of the 38 NuGet
+packages read at an unlisted version, why some of the published Go entries could not be located when the Go scan
+was reconstructed, and whether some libraries left out of the corrected weak class are weak. The corrected weak
+counts in the errata are ranges for that last reason.
+
+One correction has been made to a scanner, for Maven, and no scan has been published with it. The others are
+planned. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.
 
 ## Two rows in the March dataset are known to be wrong
 
@@ -59,6 +99,12 @@ makes unreliable, and **which way** the error runs:
 
 Both scanners were fixed on 2026-07-28. Corrected figures arrive with the next
 published dataset; they are not backfilled into this one.
+
+The issues recorded for the 2026-08-03 dataset may apply to this one as well. On 2026-03-18 the Go, crates.io,
+PyPI, Packagist and NuGet scanners in the source repository were identical to the ones that produced the August
+dataset, and the catalogue held the same post-quantum entries that Maven Central and CocoaPods do not have.
+Which commit the March run used was not recorded, and its raw output no longer exists, so this cannot be
+established or sized.
 
 ## Citing
 
@@ -98,19 +144,20 @@ datasets/<YYYY-MM-DD>/
 | `provenanceNote` | Why provenance is absent. Required when it is. |
 | `corpus` | The aggregate file, its counts, size and SHA-256. |
 | `ecosystems[]` | One entry per raw file: packages scanned, packages with crypto, size and SHA-256. |
-| `knownIssues[]` | Ecosystems whose figures carry a recorded defect. |
+| `knownIssues[]` | Ecosystems whose figures carried a recorded defect when the dataset was published. Defects measured later are in `errata/<date>.json`. |
 
-`totalScanned` counts packages **examined**, not packages using cryptography.
-The two differ by roughly a factor of 26, and every published share is over
-`packagesWithCrypto`. Read the denominator before quoting a percentage.
+`totalScanned` counts packages the scanner **listed**, including packages whose metadata it could not read
+(`fetchErrors` at the head of each raw file). It does not count packages using cryptography, and the two differ
+by more than an order of magnitude. Every published share is over `packagesWithCrypto`. Read the denominator
+before quoting a percentage.
 
 ## How a dataset gets here
 
-The census scan runs daily in
-[`opena2a-org/crypto-census`](https://github.com/opena2a-org/crypto-census) as a
-canary: it scans all eleven ecosystems, aggregates, uploads artifacts, and
-publishes nothing. A broken scanner is therefore found the day it breaks rather
-than the day someone needs the data.
+The scan is a workflow in the source repository that each manifest's `provenance` records. That repository is not
+public, so the addresses in `provenance` do not open for an outside reader. Run without `publish`, the workflow is
+a canary: it scans all eleven ecosystems, aggregates, uploads artifacts, and publishes nothing. It does not run on
+a schedule at present. Its daily schedule has been off since 2026-09-10, and one canary was run by hand on
+2026-10-05.
 
 Publication is deliberate. A maintainer triggers the workflow with
 `publish=true`, which opens a pull request here carrying the aggregate, the raw
@@ -119,8 +166,10 @@ a run in which any ecosystem enumerated implausibly little, or enumerated
 normally and matched nothing at all — both of which have happened, and neither
 of which looks like a failure in the totals.
 
-Scan limits are what they are. They are never tuned to reproduce a previously
-published figure.
+A scan limit is not to be chosen to reproduce a previously published figure. On 2026-10-05 four limits in the
+source repository were raised so that a run would list more packages than the March dataset did. No dataset was
+published from those limits. They are to be replaced by a rule that takes each limit from what the registry lists
+and not from a total, and no dataset is published until that rule is in the scanner.
 
 ## Immutability
 
@@ -128,20 +177,28 @@ A published dataset is never rewritten. CI rejects any change that modifies or
 deletes a file under an existing `datasets/<date>/`. A correction is published as
 a new dated dataset that supersedes the old one and says so.
 
+A defect measured after publication is recorded in `errata/<date>.json`, outside the dataset directory, so the
+deposited bytes do not change. An errata file only grows. CI rejects a pull request that edits, reorders or
+removes an issue already published in one, changes anything else in the file, or deletes or renames it. Each
+issue carries the date it was added.
+
 This is the property a DOI depends on: a citation points at bytes that must not
 move underneath it.
 
 ## Validating
 
 ```bash
-node scripts/validate-dataset.mjs             # every dataset
-node scripts/validate-dataset.mjs 2026-03-18  # one dataset
+node scripts/validate-dataset.mjs             # every dataset and every errata file
+node scripts/validate-dataset.mjs 2026-03-18  # one dataset, and its errata file if it has one
 ```
 
 The validator checks that every listed file exists and matches its hash, that no
 unlisted file is present, that the aggregate and the raw files describe the same
 run, that the aggregate's per-ecosystem counts sum to its own total, and that any
 `knownIssue` is complete and states a direction.
+It checks each errata file as well: that it is named for a dataset in this repository, that every issue names
+fields that exist in that dataset's aggregate, states a direction and carries the date it was added, that a size
+is given in whole counts or as null, and that the file is exactly what a JSON serialiser writes.
 
 The two datasets above were published before a manifest carried a
 `schemaVersion`. The validator accepts a manifest without one for those two
