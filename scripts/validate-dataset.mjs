@@ -722,8 +722,14 @@ const FILE_LIMIT = {
   why: 'The host refuses a file of 100 MB, so this one could not be published beside the others.',
 };
 
-const MANIFEST_CHECKS = ['missingEcosystems', 'noMatches', 'unresolvedAboveCeiling', 'sourcesOffAllowlist', 'catalogCheckMismatches',
-  'inputHashMismatches', 'identityFailures'];
+/**
+ * What the generator checks, each a list of refusals that must be empty. A
+ * missing scan file and an unresolved share above the ceiling are not checks:
+ * each withholds the row and refuses nothing, and a withheld row is recorded
+ * once, in the corpus's withheld. A manifest that carries either key carries
+ * a key the contract does not define.
+ */
+const MANIFEST_CHECKS = ['noMatches', 'sourcesOffAllowlist', 'catalogCheckMismatches', 'inputHashMismatches', 'identityFailures'];
 
 /** The fields of each object, all of them required. An object is closed: a key not listed here fails. Each section adds the objects it reads. */
 const KEYS = {

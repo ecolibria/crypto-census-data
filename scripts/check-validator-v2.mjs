@@ -38,8 +38,7 @@ const DEFINITIONS = ['anyManifestMatch', 'directUnconditional'];
 const UNITS = ['raw', 'consolidated'];
 const CHANGE_CODES = ['enumerationFrame', 'versionSelection', 'manifestReader', 'declarationKinds', 'matchRule', 'matchSet',
   'coverageDefinition', 'matchDefinition', 'classDefinition', 'classification', 'consolidationRule'];
-const CHECKS = ['missingEcosystems', 'noMatches', 'unresolvedAboveCeiling', 'sourcesOffAllowlist', 'catalogCheckMismatches',
-  'inputHashMismatches', 'identityFailures'];
+const CHECKS = ['noMatches', 'sourcesOffAllowlist', 'catalogCheckMismatches', 'inputHashMismatches', 'identityFailures'];
 const COVERAGE = ['listed', 'scanned', 'absent', 'unresolved', 'unversioned', 'dependenciesNotObservable'];
 /** The columns two registries' ledgers add after the seven. */
 const LEDGER_EXTRA = { packagist: ['type'], maven: ['page'] };
@@ -931,7 +930,16 @@ test('a date where the source gives no time passes', async () => {
 });
 plant('another licence', manifestOf((m) => { m.license = 'CC0-1.0'; }), /MANIFEST\.json: license is "CC0-1\.0"/);
 plant('a run that is not named', manifestOf((m) => { m.provenance.workflowRun = null; }), /MANIFEST\.json: provenance\.workflowRun is null\. A published dataset that cannot say which run/);
-plant('a check the generator found failing', manifestOf((m) => { m.checks.noMatches = ['hex']; }), /MANIFEST\.json: checks\.noMatches lists \["hex"\]\. The generator found the dataset incomplete/);
+for (const check of CHECKS) {
+  plant(`a check the generator found failing (${check})`, manifestOf((m) => { m.checks[check] = ['hex']; }),
+    new RegExp(`MANIFEST\\.json: checks\\.${check} lists \\["hex"\\]\\. The generator found the dataset incomplete`));
+}
+plant('the checks without one of the five', manifestOf((m) => { delete m.checks.identityFailures; }), /MANIFEST\.json: checks is missing identityFailures/);
+// A missing scan file and an unresolved share above the ceiling withhold a row; neither is a check, empty or not.
+plant('a check for missing registries, which a manifest no longer carries', manifestOf((m) => { m.checks.missingEcosystems = []; }),
+  /MANIFEST\.json: checks carries missingEcosystems, which the schema version 2 contract does not define/);
+plant('a check for rows above the ceiling, which a manifest no longer carries', manifestOf((m) => { m.checks.unresolvedAboveCeiling = []; }),
+  /MANIFEST\.json: checks carries unresolvedAboveCeiling, which the schema version 2 contract does not define/);
 plant('a check that is not a list', manifestOf((m) => { m.checks.identityFailures = null; }), /MANIFEST\.json: checks\.identityFailures is null, not a list/);
 plant('a manifest that carries a verdict of its own', manifestOf((m) => { m.complete = true; }), /MANIFEST\.json is not a version 2 manifest: it carries complete/);
 plant('a plausible-minimum check, which a manifest no longer carries', manifestOf((m) => { m.checks.belowPlausibleMinimum = []; }), /MANIFEST\.json: checks carries belowPlausibleMinimum/);
@@ -2028,6 +2036,9 @@ plant('a withheld row whose counts are not its scan file\'s', withholding('rubyg
 plant('a row withheld above the ceiling that is within it', withholding('rubygems', ABOVE_CEILING),
   /withheld\[0\] gives unresolvedShareAboveCeiling, and rubygems has 0 of 1 listed packages unresolved, within the ceiling of 1 in 100/);
 plant('withheld rows that are not a list', corpusOf((c) => { c.withheld = null; }), /corpus-2026-09-30\.json: withheld is null, not a list/);
+// A row withheld is recorded once, in the corpus: listing it as a check as well refuses it.
+plant('a withheld row listed as a check as well', withholding('rubygems', ABOVE_CEILING, { ...oneUnresolvedGem, ...manifestOf((m) => { m.checks.unresolvedAboveCeiling = ['rubygems']; }) }),
+  /MANIFEST\.json: checks carries unresolvedAboveCeiling, which the schema version 2 contract does not define/);
 
 // --- Errata for a version 2 dataset ----------------------------------------------
 
