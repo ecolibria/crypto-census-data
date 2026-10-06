@@ -740,10 +740,15 @@ const describe = (value) => {
 const isCount = (v) => Number.isSafeInteger(v) && v >= 0;
 const isSha256 = (v) => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
 /** An ISO 8601 UTC time: a date-time ending in Z, or a date where the source gives no time of day. */
+/**
+ * A time is a date-time in exactly the form toISOString() writes, milliseconds
+ * and Z included and never an offset, or a date where the source has no time.
+ * One form, so that two times of one instant are one string.
+ */
 const isTime = (v) => {
   if (isCalendarDate(v)) return true;
   if (typeof v !== 'string') return false;
-  const match = /^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,9})?Z$/.exec(v);
+  const match = /^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):[0-5]\d:[0-5]\d\.\d{3}Z$/.exec(v);
   return match !== null && isCalendarDate(match[1]);
 };
 const startsWithVersion = (text) => /^\s*\{\s*"schemaVersion"\s*:/.test(text);
@@ -909,7 +914,7 @@ function checkManifest2(name, m, bad) {
     bad(`${at}: collectedAt is ${describe(m.collectedAt)}, and the directory is ${name}. The date names the dataset, its files ` +
       'and its citation, so they agree.');
   }
-  if (!isTime(m.generatedAt)) bad(`${at}: generatedAt is ${describe(m.generatedAt)}, not an ISO 8601 UTC time`);
+  if (!isTime(m.generatedAt)) bad(`${at}: generatedAt is ${describe(m.generatedAt)}, not a time as toISOString() writes it, or a date`);
   if (m.license !== 'CC-BY-4.0') bad(`${at}: license is ${describe(m.license)}; published datasets here are CC-BY-4.0`);
   if (closed(m.provenance, KEYS.provenance, `${at}: provenance`, bad)) {
     for (const field of KEYS.provenance) {
@@ -1126,7 +1131,7 @@ function checkEntry(e, where, bad) {
     if (!EVIDENCE_BASES.includes(c.basis)) wrong(`classEvidence.basis is ${describe(c.basis)}, not entryAlgorithms or endOfLifeSignal`);
     if (c.limb !== null && !LIMBS.includes(c.limb)) wrong(`classEvidence.limb is ${describe(c.limb)}, not D1 to D4 or null`);
     if (c.url !== null && !isHttpsUrl(c.url)) wrong(`classEvidence.url is ${describe(c.url)}, not an https URL or null`);
-    if (c.checkedAt !== null && !isTime(c.checkedAt)) wrong(`classEvidence.checkedAt is ${describe(c.checkedAt)}, not a time or null`);
+    if (c.checkedAt !== null && !isTime(c.checkedAt)) wrong(`classEvidence.checkedAt is ${describe(c.checkedAt)}, not a time as toISOString() writes it, a date or null`);
     if (!Array.isArray(c.additionalUrls) || !c.additionalUrls.every(isHttpsUrl)) wrong(`classEvidence.additionalUrls is ${describe(c.additionalUrls)}, not a list of https URLs`);
     const cited = [c.limb, c.url, c.checkedAt].filter((v) => v !== null).length;
     if (c.basis === 'entryAlgorithms' && cited !== 0) {
@@ -1141,28 +1146,28 @@ function checkEntry(e, where, bad) {
   nested(e.unclassifiedReason, KEYS.unclassifiedReason, 'unclassifiedReason', (u) => {
     if (!UNCLASSIFIED_CODES.includes(u.code)) wrong(`unclassifiedReason.code is ${describe(u.code)}, not one of: ${UNCLASSIFIED_CODES.join(', ')}`);
     if (!isHttpsUrl(u.url)) wrong(`unclassifiedReason.url is ${describe(u.url)}, not an https URL`);
-    if (!isTime(u.checkedAt)) wrong(`unclassifiedReason.checkedAt is ${describe(u.checkedAt)}, not a time`);
+    if (!isTime(u.checkedAt)) wrong(`unclassifiedReason.checkedAt is ${describe(u.checkedAt)}, not a time as toISOString() writes it, or a date`);
   });
   if (closed(e.endOfLifeReview, KEYS.endOfLifeReview, `${where}: endOfLifeReview`, bad)) {
     const r = e.endOfLifeReview;
     if (!REVIEW_STATUSES.includes(r.status)) wrong(`endOfLifeReview.status is ${describe(r.status)}, not one of: ${REVIEW_STATUSES.join(', ')}`);
     if (r.url !== null && !isHttpsUrl(r.url)) wrong(`endOfLifeReview.url is ${describe(r.url)}, not an https URL or null`);
-    if (r.checkedAt !== null && !isTime(r.checkedAt)) wrong(`endOfLifeReview.checkedAt is ${describe(r.checkedAt)}, not a time or null`);
+    if (r.checkedAt !== null && !isTime(r.checkedAt)) wrong(`endOfLifeReview.checkedAt is ${describe(r.checkedAt)}, not a time as toISOString() writes it, a date or null`);
   } else {
     sound = false;
   }
   nested(e.multiPurpose, KEYS.multiPurpose, 'multiPurpose', (m) => {
     if (!isText(m.version)) wrong(`multiPurpose.version is ${describe(m.version)}, not the version inspected`);
     if (!isHttpsUrl(m.url)) wrong(`multiPurpose.url is ${describe(m.url)}, not an https URL`);
-    if (!isTime(m.checkedAt)) wrong(`multiPurpose.checkedAt is ${describe(m.checkedAt)}, not a time`);
+    if (!isTime(m.checkedAt)) wrong(`multiPurpose.checkedAt is ${describe(m.checkedAt)}, not a time as toISOString() writes it, or a date`);
   });
   nested(e.unmatchable, KEYS.unmatchable, 'unmatchable', (u) => {
     if (!UNMATCHABLE_REASONS.includes(u.reason)) wrong(`unmatchable.reason is ${describe(u.reason)}, not standardLibraryPath or packagePathInModule`);
     if (!isHttpsUrl(u.url)) wrong(`unmatchable.url is ${describe(u.url)}, not an https URL`);
-    if (!isTime(u.checkedAt)) wrong(`unmatchable.checkedAt is ${describe(u.checkedAt)}, not a time`);
+    if (!isTime(u.checkedAt)) wrong(`unmatchable.checkedAt is ${describe(u.checkedAt)}, not a time as toISOString() writes it, or a date`);
   });
   nested(e.registryAbsent, KEYS.registryAbsent, 'registryAbsent', (a) => {
-    if (!isTime(a.checkedAt)) wrong(`registryAbsent.checkedAt is ${describe(a.checkedAt)}, not a time`);
+    if (!isTime(a.checkedAt)) wrong(`registryAbsent.checkedAt is ${describe(a.checkedAt)}, not a time as toISOString() writes it, or a date`);
     if (a.note !== null && !isText(a.note)) wrong(`registryAbsent.note is ${describe(a.note)}, not text or null`);
   });
   if (!Array.isArray(e.aliases)) {
@@ -1175,13 +1180,13 @@ function checkEntry(e, where, bad) {
       }
       if (!isText(alias.name)) wrong(`aliases[${index}].name is ${describe(alias.name)}`);
       if (!isHttpsUrl(alias.url)) wrong(`aliases[${index}].url is ${describe(alias.url)}, not an https URL`);
-      if (!isTime(alias.checkedAt)) wrong(`aliases[${index}].checkedAt is ${describe(alias.checkedAt)}, not a time`);
+      if (!isTime(alias.checkedAt)) wrong(`aliases[${index}].checkedAt is ${describe(alias.checkedAt)}, not a time as toISOString() writes it, or a date`);
     });
   }
   nested(e.lastRelease, KEYS.lastRelease, 'lastRelease', (l) => {
     if (!isText(l.version)) wrong(`lastRelease.version is ${describe(l.version)}, not a version`);
     if (!isCalendarDate(l.date)) wrong(`lastRelease.date is ${describe(l.date)}, not a YYYY-MM-DD date`);
-    if (!isTime(l.checkedAt)) wrong(`lastRelease.checkedAt is ${describe(l.checkedAt)}, not a time`);
+    if (!isTime(l.checkedAt)) wrong(`lastRelease.checkedAt is ${describe(l.checkedAt)}, not a time as toISOString() writes it, or a date`);
   });
   if (!isTextList(e.algorithms)) wrong(`algorithms is ${describe(e.algorithms)}, not a list of names`);
   if (!isText(e.category)) wrong(`category is ${describe(e.category)}, not a category`);
@@ -1504,7 +1509,7 @@ function checkEnumeration(eco, e, file, bad) {
   if (eco === 'go') {
     if (closed(e.indexWindow, KEYS.indexWindow, `${where}.indexWindow`, bad)) {
       for (const field of KEYS.indexWindow) {
-        if (!isTime(e.indexWindow[field])) bad(`${where}.indexWindow.${field} is ${describe(e.indexWindow[field])}, not a time`);
+        if (!isTime(e.indexWindow[field])) bad(`${where}.indexWindow.${field} is ${describe(e.indexWindow[field])}, not a time as toISOString() writes it, or a date`);
       }
     }
   } else if (e.indexWindow !== null) {
@@ -1564,9 +1569,9 @@ function checkCatalogCheck(eco, rows, catalog, file, bad) {
     if (!CHECK_STATUSES.includes(row.status)) bad(`${where}.status is ${describe(row.status)}, not one of: ${CHECK_STATUSES.join(', ')}`);
     if (row.httpStatus !== null && !isCount(row.httpStatus)) bad(`${where}.httpStatus is ${describe(row.httpStatus)}, not a status code or null`);
     if (row.url !== null && !isUrl(row.url)) bad(`${where}.url is ${describe(row.url)}, not a URL or null`);
-    if (!isTime(row.checkedAt)) bad(`${where}.checkedAt is ${describe(row.checkedAt)}, not a time`);
+    if (!isTime(row.checkedAt)) bad(`${where}.checkedAt is ${describe(row.checkedAt)}, not a time as toISOString() writes it, or a date`);
     if (row.latestVersion !== null && !isText(row.latestVersion)) bad(`${where}.latestVersion is ${describe(row.latestVersion)}, not a version or null`);
-    if (row.latestReleaseAt !== null && !isTime(row.latestReleaseAt)) bad(`${where}.latestReleaseAt is ${describe(row.latestReleaseAt)}, not a time or null`);
+    if (row.latestReleaseAt !== null && !isTime(row.latestReleaseAt)) bad(`${where}.latestReleaseAt is ${describe(row.latestReleaseAt)}, not a time as toISOString() writes it, a date or null`);
     const label = row.alias === null ? describe(row.entry) : `${describe(row.entry)} by its alias ${describe(row.alias)}`;
     const key = `${row.entry}\0${row.alias ?? ''}`;
     if (seen.has(key)) bad(`${where} checks ${label} a second time`);
@@ -1710,7 +1715,7 @@ function checkScan(name, eco, record, catalog, found, bad) {
   if (s.kind !== 'censusScan') bad(`${at} kind is ${describe(s.kind)}, not "censusScan"`);
   if (s.ecosystem !== eco) bad(`${at} ecosystem is ${describe(s.ecosystem)}, and the file is the scan of ${eco}`);
   for (const field of ['startedAt', 'finishedAt']) {
-    if (!isTime(s[field])) bad(`${at} ${field} is ${describe(s[field])}, not an ISO 8601 UTC time`);
+    if (!isTime(s[field])) bad(`${at} ${field} is ${describe(s[field])}, not a time as toISOString() writes it, or a date`);
   }
   if (closed(s.scanner, KEYS.scanner, `${at} scanner`, bad)) {
     if (!isText(s.scanner.script)) bad(`${at} scanner.script is ${describe(s.scanner.script)}`);
@@ -3136,7 +3141,7 @@ function checkCorpus(name, record, ctx, bad) {
       }
     }
   }
-  if (!isTime(c.generatedAt)) bad(`${file}: generatedAt is ${describe(c.generatedAt)}, not an ISO 8601 UTC time`);
+  if (!isTime(c.generatedAt)) bad(`${file}: generatedAt is ${describe(c.generatedAt)}, not a time as toISOString() writes it, or a date`);
   checkInputs(name, c.inputs, ctx, file, bad);
   const includes = checkDefinitions(c.definitions, file, bad);
   checkComparability(name, c.comparability, c, ctx, file, bad);

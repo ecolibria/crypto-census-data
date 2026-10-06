@@ -87,7 +87,7 @@ const digestsOf = (catalog) => {
     }),
   };
 };
-const CHECKED = '2026-09-28T12:00:00Z';
+const CHECKED = '2026-09-28T12:00:00.000Z';
 const evidence = (path) => `https://evidence.example/${path}`;
 const ABSENT = { checkedAt: '2026-09-28', note: null };
 
@@ -639,17 +639,17 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
         status: e.registryAbsent ? 'absent' : e.unmatchable ? 'notApplicable' : 'present',
         httpStatus: e.registryAbsent ? 404 : e.unmatchable ? null : 200,
         url: e.unmatchable ? null : `https://${eco}.registry.example/check/${encodeURIComponent(e.name)}`,
-        checkedAt: `${date}T00:30:00Z`, latestVersion: null, latestReleaseAt: null,
+        checkedAt: `${date}T00:30:00.000Z`, latestVersion: null, latestReleaseAt: null,
       },
       ...e.aliases.map((a) => ({
         entry: e.name, alias: a.name, status: 'present', httpStatus: 200,
         url: `https://${eco}.registry.example/check/${encodeURIComponent(a.name)}`,
-        checkedAt: `${date}T00:30:00Z`, latestVersion: null, latestReleaseAt: null,
+        checkedAt: `${date}T00:30:00.000Z`, latestVersion: null, latestReleaseAt: null,
       })),
     ]);
     scans[eco] = {
       schemaVersion: 2, kind: 'censusScan', ecosystem: eco,
-      startedAt: `${date}T00:00:00Z`, finishedAt: `${date}T06:00:00Z`,
+      startedAt: `${date}T00:00:00.000Z`, finishedAt: `${date}T06:00:00.000Z`,
       scanner: { script: `scripts/scan-${eco}.mjs`, commit: COMMIT },
       sources: structuredClone(ADMITTED_SOURCES[eco]),
       catalog: { entries: r.entries.length, matchSetSha256: MATCH_SET, matchRule: `${eco}Name/1` },
@@ -657,7 +657,7 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
       enumeration: {
         requested: 1000, listed: coverage.listed, truncated: false, reason: null, unit: 'packages', budgetMinutes: null,
         elapsedMinutes: 1.5, frameSize: null, sampling: r.sampling ?? { method: 'registryOrder', seed: null, draw: 'package', pageRows: null },
-        indexWindow: eco === 'go' ? { since: '2026-09-01T00:00:00Z', until: `${date}T00:00:00Z` } : null,
+        indexWindow: eco === 'go' ? { since: '2026-09-01T00:00:00.000Z', until: `${date}T00:00:00.000Z` } : null,
       },
       versionYears: eco === 'go' ? { 2024: 2, 2025: 3 } : null,
       coverage: { ...coverage, scannedByReadFrom: byReadFrom },
@@ -696,7 +696,7 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
     ? { dataset, doi: null, comparable: false, reason: 'instrumentChanged', changes: [...CHANGE_CODES] }
     : { dataset, doi: null, comparable, reason: comparable ? null : 'instrumentChanged', changes }));
   const corpus = {
-    schemaVersion: 2, kind: 'censusCorpus', collectedAt: date, generatedAt: `${date}T12:00:00Z`,
+    schemaVersion: 2, kind: 'censusCorpus', collectedAt: date, generatedAt: `${date}T12:00:00.000Z`,
     inputs: {
       scans: ECOSYSTEMS.map((eco) => ({ ecosystem: eco, file: fileName.scan(eco), sha256: sha256(files[fileName.scan(eco)]) })),
       catalog: { file: fileName.catalog(date), sha256: sha256(files[fileName.catalog(date)]), matchSetSha256: MATCH_SET, classificationSha256: CLASSIFICATION },
@@ -747,7 +747,7 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
     dataset: 'Example census dataset, built by the validator tests',
     kind: 'raw+aggregate',
     collectedAt: date,
-    generatedAt: `${date}T13:00:00Z`,
+    generatedAt: `${date}T13:00:00.000Z`,
     license: 'CC-BY-4.0',
     provenance: { sourceRepository: 'example/census', sourceCommit: COMMIT, workflowRun: 'https://ci.example/runs/1' },
     files: listing.map((item) => ({ ...item, bytes: Buffer.byteLength(files[item.file]), sha256: sha256(files[item.file]), schemaVersion: 2 })),
@@ -874,8 +874,16 @@ plant('a manifest that is a link to a file elsewhere', {}, /MANIFEST\.json is no
 plant('a dataset with no title', manifestOf((m) => { m.dataset = ' '; }), /MANIFEST\.json: dataset is " ", not a title/);
 plant('the aggregate-only kind', manifestOf((m) => { m.kind = 'aggregate-only'; }), /MANIFEST\.json: kind is "aggregate-only"\. A version 2 dataset is raw\+aggregate/);
 plant('a collection date that is not the directory\'s', manifestOf((m) => { m.collectedAt = '2026-09-29'; }), /MANIFEST\.json: collectedAt is "2026-09-29", and the directory is 2026-09-30/);
-plant('a generation time that is not a time', manifestOf((m) => { m.generatedAt = 'yesterday'; }), /MANIFEST\.json: generatedAt is "yesterday", not an ISO 8601 UTC time/);
-plant('a time without its zone', manifestOf((m) => { m.generatedAt = '2026-09-30T13:00:00'; }), /MANIFEST\.json: generatedAt is "2026-09-30T13:00:00", not an ISO 8601 UTC time/);
+plant('a generation time that is not a time', manifestOf((m) => { m.generatedAt = 'yesterday'; }), /MANIFEST\.json: generatedAt is "yesterday", not a time as toISOString\(\) writes it, or a date/);
+plant('a time without its zone', manifestOf((m) => { m.generatedAt = '2026-09-30T13:00:00.000'; }), /MANIFEST\.json: generatedAt is "2026-09-30T13:00:00\.000", not a time as toISOString\(\) writes it, or a date/);
+plant('a time without its milliseconds', manifestOf((m) => { m.generatedAt = '2026-09-30T13:00:00Z'; }), /MANIFEST\.json: generatedAt is "2026-09-30T13:00:00Z", not a time as toISOString\(\) writes it/);
+plant('a time with an offset', scanOf('hex', (s) => { s.finishedAt = '2026-09-30T06:00:00.000+00:00'; }), /scan-results-hex\.json: finishedAt is "2026-09-30T06:00:00\.000\+00:00", not a time as toISOString\(\) writes it/);
+plant('a time to the microsecond', scanOf('hex', (s) => { s.catalogCheck[0].checkedAt = '2026-09-30T00:30:00.000000Z'; }), /catalogCheck\[0\]\.checkedAt is "2026-09-30T00:30:00\.000000Z", not a time as toISOString\(\) writes it/);
+
+test('a date where the source gives no time passes', async () => {
+  const result = await validateOne(scanOf('hex', (s) => { s.catalogCheck[0].latestReleaseAt = '2026-01-15'; }));
+  assert.equal(result.code, 0, result.stderr);
+});
 plant('another licence', manifestOf((m) => { m.license = 'CC0-1.0'; }), /MANIFEST\.json: license is "CC0-1\.0"/);
 plant('a run that is not named', manifestOf((m) => { m.provenance.workflowRun = null; }), /MANIFEST\.json: provenance\.workflowRun is null\. A published dataset that cannot say which run/);
 plant('a check the generator found failing', manifestOf((m) => { m.checks.noMatches = ['hex']; }), /MANIFEST\.json: checks\.noMatches lists \["hex"\]\. The generator found the dataset incomplete/);
@@ -1032,32 +1040,32 @@ plant('classified written as text', entryOf('npm', 'md5', (e) => { e.classified 
 plant('an evidence basis that is not one', entryOf('npm', 'md5', (e) => { e.classEvidence.basis = 'other'; }), /classEvidence\.basis is "other", not entryAlgorithms or endOfLifeSignal/);
 plant('a limb that is not one', entryOf('npm', 'crypto-js', (e) => { e.classEvidence.limb = 'D5'; }), /classEvidence\.limb is "D5", not D1 to D4 or null/);
 plant('evidence over http', entryOf('npm', 'crypto-js', (e) => { e.classEvidence.url = 'http://evidence.example/x'; }), /classEvidence\.url is "http:\/\/evidence\.example\/x", not an https URL or null/);
-plant('an evidence time that is not one', entryOf('npm', 'crypto-js', (e) => { e.classEvidence.checkedAt = '2026-02-31'; }), /classEvidence\.checkedAt is "2026-02-31", not a time or null/);
+plant('an evidence time that is not one', entryOf('npm', 'crypto-js', (e) => { e.classEvidence.checkedAt = '2026-02-31'; }), /classEvidence\.checkedAt is "2026-02-31", not a time as toISOString\(\) writes it, a date or null/);
 plant('further evidence that is not a list of URLs', entryOf('npm', 'crypto-js', (e) => { e.classEvidence.additionalUrls = ['see above']; }), /classEvidence\.additionalUrls is \["see above"\], not a list of https URLs/);
 plant('a page cited for a class read from the entry\'s own algorithms', entryOf('npm', 'md5', (e) => { e.classEvidence.url = evidence('npm/md5'); }), /classEvidence cites a limb, a page or a check time with basis entryAlgorithms/);
 plant('an end-of-life signal with no limb', entryOf('npm', 'crypto-js', (e) => { e.classEvidence.limb = null; }), /classEvidence has basis endOfLifeSignal without a limb, a page and a check time/);
 plant('a reason code that is not one', entryOf('npm', '@types/bcryptjs', (e) => { e.unclassifiedReason.code = 'notCrypto'; }), /unclassifiedReason\.code is "notCrypto"/);
 plant('a reason with no page', entryOf('npm', '@types/bcryptjs', (e) => { e.unclassifiedReason.url = null; }), /unclassifiedReason\.url is null, not an https URL/);
-plant('a reason with no time', entryOf('npm', '@types/bcryptjs', (e) => { e.unclassifiedReason.checkedAt = null; }), /unclassifiedReason\.checkedAt is null, not a time/);
+plant('a reason with no time', entryOf('npm', '@types/bcryptjs', (e) => { e.unclassifiedReason.checkedAt = null; }), /unclassifiedReason\.checkedAt is null, not a time as toISOString\(\) writes it, or a date/);
 plant('a review status that is not one', entryOf('npm', 'node-forge', (e) => { e.endOfLifeReview.status = 'maintained'; }), /endOfLifeReview\.status is "maintained"/);
 plant('a review page that is not a URL', entryOf('npm', 'crypto-js', (e) => { e.endOfLifeReview.url = 'registry'; }), /endOfLifeReview\.url is "registry", not an https URL or null/);
-plant('a review time that is not one', entryOf('npm', 'crypto-js', (e) => { e.endOfLifeReview.checkedAt = 'today'; }), /endOfLifeReview\.checkedAt is "today", not a time or null/);
+plant('a review time that is not one', entryOf('npm', 'crypto-js', (e) => { e.endOfLifeReview.checkedAt = 'today'; }), /endOfLifeReview\.checkedAt is "today", not a time as toISOString\(\) writes it, a date or null/);
 plant('an end-of-life review left out', entryOf('npm', 'md5', (e) => { e.endOfLifeReview = null; }), /endOfLifeReview is null, not an object/);
 plant('a multi-purpose record with no version', entryOf('pypi', 'cryptography', (e) => { e.multiPurpose.version = ''; }), /multiPurpose\.version is "", not the version inspected/);
 plant('a multi-purpose record with no page', entryOf('pypi', 'cryptography', (e) => { e.multiPurpose.url = null; }), /multiPurpose\.url is null, not an https URL/);
-plant('a multi-purpose record with no time', entryOf('pypi', 'cryptography', (e) => { e.multiPurpose.checkedAt = null; }), /multiPurpose\.checkedAt is null, not a time/);
+plant('a multi-purpose record with no time', entryOf('pypi', 'cryptography', (e) => { e.multiPurpose.checkedAt = null; }), /multiPurpose\.checkedAt is null, not a time as toISOString\(\) writes it, or a date/);
 plant('an unmatchable reason that is not one', entryOf('go', 'crypto/md5', (e) => { e.unmatchable.reason = 'vendored'; }), /unmatchable\.reason is "vendored"/);
 plant('an unmatchable record with no page', entryOf('go', 'crypto/md5', (e) => { e.unmatchable.url = null; }), /unmatchable\.url is null, not an https URL/);
-plant('an unmatchable record with no time', entryOf('go', 'crypto/md5', (e) => { e.unmatchable.checkedAt = null; }), /unmatchable\.checkedAt is null, not a time/);
-plant('an absence with no time', entryOf('npm', 'tripledes', (e) => { e.registryAbsent.checkedAt = null; }), /registryAbsent\.checkedAt is null, not a time/);
+plant('an unmatchable record with no time', entryOf('go', 'crypto/md5', (e) => { e.unmatchable.checkedAt = null; }), /unmatchable\.checkedAt is null, not a time as toISOString\(\) writes it, or a date/);
+plant('an absence with no time', entryOf('npm', 'tripledes', (e) => { e.registryAbsent.checkedAt = null; }), /registryAbsent\.checkedAt is null, not a time as toISOString\(\) writes it, or a date/);
 plant('an absence note that is not text', entryOf('npm', 'tripledes', (e) => { e.registryAbsent.note = 404; }), /registryAbsent\.note is 404, not text or null/);
 plant('aliases that are not a list', entryOf('npm', 'md5', (e) => { e.aliases = null; }), /aliases is null, not a list/);
 plant('an alias with no name', entryOf('go', 'golang.org/x/crypto', (e) => { e.aliases[0].name = ''; }), /aliases\[0\]\.name is ""/);
 plant('an alias with no page', entryOf('go', 'golang.org/x/crypto', (e) => { e.aliases[0].url = null; }), /aliases\[0\]\.url is null, not an https URL/);
-plant('an alias with no time', entryOf('go', 'golang.org/x/crypto', (e) => { e.aliases[0].checkedAt = null; }), /aliases\[0\]\.checkedAt is null, not a time/);
+plant('an alias with no time', entryOf('go', 'golang.org/x/crypto', (e) => { e.aliases[0].checkedAt = null; }), /aliases\[0\]\.checkedAt is null, not a time as toISOString\(\) writes it, or a date/);
 plant('a last release with no version', entryOf('npm', 'crypto-js', (e) => { e.lastRelease.version = null; }), /lastRelease\.version is null, not a version/);
 plant('a last release on a date that is not one', entryOf('npm', 'crypto-js', (e) => { e.lastRelease.date = '2020-13-01'; }), /lastRelease\.date is "2020-13-01", not a YYYY-MM-DD date/);
-plant('a last release with no time checked', entryOf('npm', 'crypto-js', (e) => { e.lastRelease.checkedAt = null; }), /lastRelease\.checkedAt is null, not a time/);
+plant('a last release with no time checked', entryOf('npm', 'crypto-js', (e) => { e.lastRelease.checkedAt = null; }), /lastRelease\.checkedAt is null, not a time as toISOString\(\) writes it, or a date/);
 plant('algorithms left unstated', entryOf('go', 'golang.org/x/crypto', (e) => { e.algorithms = null; }), /algorithms is null, not a list of names/);
 plant('a category left unstated', entryOf('go', 'golang.org/x/crypto', (e) => { e.category = null; }), /category is null, not a category/);
 plant('an entry with no name', entryOf('hex', 'enacl', (e) => { e.name = ''; }), /name is ""/);
@@ -1081,7 +1089,7 @@ plant('an alias given to two entries', entryOf('go', 'github.com/cloudflare/circ
 // The raw scan file's header.
 plant('a scan of another kind', scanOf('hex', (s) => { s.kind = 'scan'; }), /scan-results-hex\.json: kind is "scan", not "censusScan"/);
 plant('a scan of another registry', scanOf('hex', (s) => { s.ecosystem = 'pub'; }), /ecosystem is "pub", and the file is the scan of hex/);
-plant('a scan with no start', scanOf('hex', (s) => { s.startedAt = null; }), /startedAt is null, not an ISO 8601 UTC time/);
+plant('a scan with no start', scanOf('hex', (s) => { s.startedAt = null; }), /startedAt is null, not a time as toISOString\(\) writes it, or a date/);
 plant('a scan with no instrument commit', scanOf('hex', (s) => { s.scanner.commit = null; }), /scanner\.commit is null\. A published scan names the instrument commit/);
 plant('a scan with no script', scanOf('hex', (s) => { s.scanner.script = ''; }), /scanner\.script is ""/);
 plant('a source off the allowlist', scanOf('go', (s) => { s.sources.manifests = 'http://127.0.0.1:8080'; }),
@@ -1144,7 +1152,7 @@ plant('a registry read whole that names a draw', scanOf('hex', (s) => { s.enumer
 plant('a sample that does not say what it drew', scanOf('npm', (s) => { s.enumeration.sampling.draw = null; }), /enumeration\.sampling\.draw is null, not package or page/);
 plant('a draw by page with no page size', scanOf('maven', (s) => { s.enumeration.sampling.pageRows = null; }), /enumeration\.sampling\.pageRows is null; a draw by page says how many rows a page holds/);
 plant('a page size for a draw that is not by page', scanOf('npm', (s) => { s.enumeration.sampling.pageRows = 10; }), /enumeration\.sampling\.pageRows is 10 for a draw that is not by page/);
-plant('a Go index window that is not times', scanOf('go', (s) => { s.enumeration.indexWindow.until = 'later'; }), /enumeration\.indexWindow\.until is "later", not a time/);
+plant('a Go index window that is not times', scanOf('go', (s) => { s.enumeration.indexWindow.until = 'later'; }), /enumeration\.indexWindow\.until is "later", not a time as toISOString\(\) writes it, or a date/);
 plant('a Go scan with no index window', scanOf('go', (s) => { s.enumeration.indexWindow = null; }), /enumeration\.indexWindow is null, not an object/);
 plant('an index window outside Go', scanOf('hex', (s) => { s.enumeration.indexWindow = { since: '2026-09-01', until: '2026-09-30' }; }), /enumeration\.indexWindow is .*; it is kept for Go's index alone and is null for hex/);
 plant('version years that are not years', scanOf('go', (s) => { s.versionYears = { recent: 5 }; }), /versionYears is \{"recent":5\}, not an object of counts by year/);
@@ -1170,9 +1178,9 @@ plant('registry checks that are not a list', scanOf('hex', (s) => { s.catalogChe
 plant('a check status that is not one', scanOf('hex', (s) => { s.catalogCheck[0].status = 'ok'; }), /catalogCheck\[0\]\.status is "ok"/);
 plant('an HTTP status that is not one', scanOf('hex', (s) => { s.catalogCheck[0].httpStatus = '200'; }), /catalogCheck\[0\]\.httpStatus is "200", not a status code or null/);
 plant('a check URL that is not one', scanOf('hex', (s) => { s.catalogCheck[0].url = 'registry'; }), /catalogCheck\[0\]\.url is "registry", not a URL or null/);
-plant('a check with no time', scanOf('hex', (s) => { s.catalogCheck[0].checkedAt = null; }), /catalogCheck\[0\]\.checkedAt is null, not a time/);
+plant('a check with no time', scanOf('hex', (s) => { s.catalogCheck[0].checkedAt = null; }), /catalogCheck\[0\]\.checkedAt is null, not a time as toISOString\(\) writes it, or a date/);
 plant('a latest version that is not one', scanOf('hex', (s) => { s.catalogCheck[0].latestVersion = 1; }), /catalogCheck\[0\]\.latestVersion is 1, not a version or null/);
-plant('a latest release that is not a time', scanOf('hex', (s) => { s.catalogCheck[0].latestReleaseAt = 'recent'; }), /catalogCheck\[0\]\.latestReleaseAt is "recent", not a time or null/);
+plant('a latest release that is not a time', scanOf('hex', (s) => { s.catalogCheck[0].latestReleaseAt = 'recent'; }), /catalogCheck\[0\]\.latestReleaseAt is "recent", not a time as toISOString\(\) writes it, a date or null/);
 plant('a check of an alias that is not a name', scanOf('hex', (s) => { s.catalogCheck[0].alias = ''; }), /catalogCheck\[0\]\.alias is "", not a name or null/);
 plant('a check that names no entry', scanOf('hex', (s) => { s.catalogCheck[0].entry = 7; }), /scan-results-hex\.json: catalogCheck\[0\]\.entry is 7/);
 plant('a check of an entry the snapshot does not have', scanOf('hex', (s) => { s.catalogCheck.push({ ...s.catalogCheck[0], entry: 'other' }); }), /checks "other", which is not a hex entry of the catalogue snapshot/);
@@ -1503,8 +1511,8 @@ plant('consolidated figures that are not what the consolidation map produces', c
 // The corpus: its own fields.
 plant('a corpus of another kind', corpusOf((c) => { c.kind = 'corpus'; }), /corpus-2026-09-30\.json: kind is "corpus", not "censusCorpus"/);
 plant('a corpus of another date', corpusOf((c) => { c.collectedAt = '2026-09-29'; }), /corpus-2026-09-30\.json: collectedAt is "2026-09-29", and the dataset is 2026-09-30/);
-plant('a dataset dated before its last scan finished', scanOf('hex', (s) => { s.finishedAt = '2026-10-01T02:00:00Z'; }), /collectedAt is 2026-09-30, and the last scan finished on 2026-10-01/);
-plant('a corpus with no generation time', corpusOf((c) => { c.generatedAt = null; }), /corpus-2026-09-30\.json: generatedAt is null, not an ISO 8601 UTC time/);
+plant('a dataset dated before its last scan finished', scanOf('hex', (s) => { s.finishedAt = '2026-10-01T02:00:00.000Z'; }), /collectedAt is 2026-09-30, and the last scan finished on 2026-10-01/);
+plant('a corpus with no generation time', corpusOf((c) => { c.generatedAt = null; }), /corpus-2026-09-30\.json: generatedAt is null, not a time as toISOString\(\) writes it, or a date/);
 plant('input scans that are not a list', corpusOf((c) => { c.inputs.scans = {}; }), /inputs\.scans is \{\}, not a list/);
 plant('an input that binds no registry', corpusOf((c) => { c.inputs.scans[0].ecosystem = 'conda'; }), /inputs\.scans\[0\] is .*, not the binding of one registry's scan file/);
 plant('a scan bound twice', corpusOf((c) => { c.inputs.scans[1] = { ...c.inputs.scans[0] }; }), /inputs\.scans\[1\] binds npm a second time/);
