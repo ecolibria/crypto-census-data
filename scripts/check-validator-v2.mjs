@@ -656,7 +656,7 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
       catalog: { entries: r.entries.length, matchSetSha256: MATCH_SET, matchRule: `${eco}Name/1` },
       method: { versionSelection: 'latest', readFrom: r.method.readFrom, declarationKinds: [...KINDS[eco]], notObservableWhen: r.method.notObservableWhen, limits: r.method.limits },
       enumeration: {
-        requested: 1000, listed: coverage.listed, truncated: false, reason: null, unit: 'packages', budgetMinutes: null,
+        requested: r.sampling?.method === 'all' ? null : 1000, listed: coverage.listed, truncated: false, reason: null, unit: 'packages', budgetMinutes: null,
         elapsedMinutes: 1.5, frameSize: null, sampling: r.sampling ?? { method: 'registryOrder', seed: null, draw: 'package', pageRows: null },
         indexWindow: eco === 'go' ? { since: '2026-09-01T00:00:00.000Z', until: `${date}T00:00:00.000Z` } : null,
       },
@@ -686,7 +686,7 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
     rows[eco] = { ...blocksOf(r.blocks, k, r.notCountable), excludingDevMetadata: null };
     if (r.devBlocks) {
       rows[eco].excludingDevMetadata = {
-        coverage: coverageOf(r.rows.filter((row) => row.readFrom !== 'devDefaultBranch')),
+        coverage: (({ scanned, dependenciesNotObservable }) => ({ scanned, dependenciesNotObservable }))(coverageOf(r.rows.filter((row) => row.readFrom !== 'devDefaultBranch'))),
         ...blocksOf(r.devBlocks, k, r.notCountable),
       };
     }
@@ -698,6 +698,7 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
     : { dataset, doi: null, comparable, reason: comparable ? null : 'instrumentChanged', changes }));
   const corpus = {
     schemaVersion: 2, kind: 'censusCorpus', collectedAt: date, generatedAt: `${date}T12:00:00.000Z`,
+    aggregator: { script: 'scripts/aggregate.mjs', commit: COMMIT },
     inputs: {
       scans: ECOSYSTEMS.map((eco) => ({ ecosystem: eco, file: fileName.scan(eco), sha256: sha256(files[fileName.scan(eco)]) })),
       catalog: { file: fileName.catalog(date), sha256: sha256(files[fileName.catalog(date)]), matchSetSha256: MATCH_SET, classificationSha256: CLASSIFICATION },
@@ -707,7 +708,7 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
       coverage: { id: 'census.coverage/1' },
       unresolvedCeiling: 0.01,
       anyManifestMatch: { id: ID.anyManifestMatch, includes: structuredClone(INCLUDES) },
-      directUnconditional: { id: ID.directUnconditional, predicate: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, `The ${eco} declarations that count as direct and unconditional.`])) },
+      directUnconditional: { id: ID.directUnconditional, predicate: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, `The ${eco} declarations that count as direct and unconditional.`])), code: 'lib/census/declarations.mjs' },
       raw: { id: ID.raw },
       consolidated: { id: ID.consolidated },
       classes: {
@@ -720,7 +721,7 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
     blocked: [],
     coverage: {
       total: Object.fromEntries(COVERAGE.map((field) => [field, sum(ECOSYSTEMS.map((eco) => scans[eco].coverage[field]))])),
-      byEcosystem: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, structuredClone({ ...scans[eco].coverage, enumeration: scans[eco].enumeration })])),
+      byEcosystem: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, structuredClone({ ...scans[eco].coverage, enumeration: scans[eco].enumeration, sources: scans[eco].sources })])),
     },
     byEcosystem: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, { measurability: fixture[eco].measurability, ...rows[eco] }])),
     total: totalsFrom(tables),
@@ -1155,7 +1156,9 @@ plant('a scan that reads from nowhere', scanOf('hex', (s) => { s.method.readFrom
 plant('a condition that is not a code', scanOf('go', (s) => { s.method.notObservableWhen = ['only a module line']; }), /method\.notObservableWhen is \["only a module line"\]/);
 plant('limits listed twice', scanOf('maven', (s) => { s.method.limits = ['parentPomNotFollowed', 'parentPomNotFollowed']; }), /method\.limits is .*not a list of distinct camelCase codes/);
 plant('a scan that does not record every kind', scanOf('npm', (s) => { s.method.declarationKinds = ['dependencies']; }), /method\.declarationKinds is \["dependencies"\]\. A scan of npm records every kind of the closed list/);
-plant('a requested count that is not one', scanOf('hex', (s) => { s.enumeration.requested = null; }), /enumeration\.requested is null, not a whole count/);
+plant('a sample that does not name its size', scanOf('npm', (s) => { s.enumeration.requested = null; }), /scan-results-npm\.json: enumeration\.requested is null, not the size of the sample/);
+plant('a sample of no packages', scanOf('npm', (s) => { s.enumeration.requested = 0; }), /scan-results-npm\.json: enumeration\.requested is 0, not the size of the sample\. A row that is not read whole names how many packages it asked for, and that is never 0/);
+plant('a row read whole that names a size', scanOf('hex', (s) => { s.enumeration.requested = 1000; }), /scan-results-hex\.json: enumeration\.requested is 1000 for a row read whole; it is null then/);
 plant('truncation that is not a yes or no', scanOf('hex', (s) => { s.enumeration.truncated = 'no'; }), /enumeration\.truncated is "no", not true or false/);
 plant('a reason for a run that was not truncated', scanOf('hex', (s) => { s.enumeration.reason = 'budget'; }), /enumeration\.reason is "budget" for a run that was not truncated/);
 plant('a truncated run that does not say why', scanOf('hex', (s) => { s.enumeration.truncated = true; }), /enumeration\.reason is null; a truncated run says why it stopped/);
@@ -1561,8 +1564,18 @@ plant('a blocked row for a registry that is not one', corpusOf((c) => { c.blocke
   /blocked\[0\]\.ecosystem is "conda", not one of the eleven registries/);
 plant('a blocked row that does not say why', corpusOf((c) => { c.blocked = [{ ecosystem: 'hex', reason: 'coverageInvalid', detail: null }]; }), /blocked\[0\]\.detail is null, not text/);
 plant('blocked rows that are not a list', corpusOf((c) => { c.blocked = null; }), /corpus-2026-09-30\.json: blocked is null, not a list/);
-plant('a registry\'s coverage that is not the raw file\'s', corpusOf((c) => { c.coverage.byEcosystem.hex.scanned += 1; }), /coverage\.byEcosystem\.hex is not the coverage and enumeration of scan-results-hex\.json/);
-plant('a registry\'s enumeration that is not the raw file\'s', corpusOf((c) => { c.coverage.byEcosystem.go.enumeration = { requested: 1000, listed: 6, truncated: false, reason: null }; }), /coverage\.byEcosystem\.go is not the coverage and enumeration of scan-results-go\.json/);
+plant('a registry\'s coverage that is not the raw file\'s', corpusOf((c) => { c.coverage.byEcosystem.hex.scanned += 1; }), /coverage\.byEcosystem\.hex is not the coverage, enumeration and sources of scan-results-hex\.json/);
+plant('a registry\'s enumeration that is not the raw file\'s', corpusOf((c) => { c.coverage.byEcosystem.go.enumeration = { requested: 1000, listed: 6, truncated: false, reason: null }; }), /coverage\.byEcosystem\.go is not the coverage, enumeration and sources of scan-results-go\.json/);
+plant('a registry\'s sources that are not the raw file\'s', corpusOf((c) => { c.coverage.byEcosystem.go.sources.manifests = 'https://mirror.example/go'; }),
+  /coverage\.byEcosystem\.go is not the coverage, enumeration and sources of scan-results-go\.json/);
+plant('a registry\'s coverage without its sources', corpusOf((c) => { delete c.coverage.byEcosystem.go.sources; }), /coverage\.byEcosystem\.go is missing sources/);
+plant('a corpus that does not name its aggregator', corpusOf((c) => { delete c.aggregator; }), /corpus-2026-09-30\.json is missing aggregator/);
+plant('an aggregation with no instrument commit', corpusOf((c) => { c.aggregator.commit = null; }), /aggregator\.commit is null\. A published corpus names the instrument commit its aggregation ran at/);
+plant('an aggregation with no script', corpusOf((c) => { c.aggregator.script = ''; }), /aggregator\.script is ""/);
+plant('a direct definition without the module that evaluates it', corpusOf((c) => { delete c.definitions.directUnconditional.code; }), /directUnconditional is missing code/);
+plant('a direct definition whose module is not named', corpusOf((c) => { c.definitions.directUnconditional.code = null; }), /directUnconditional\.code is null, not the module that evaluates the rule/);
+plant('coverage without dev metadata that repeats the unread counts', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata.coverage.listed = 3; }),
+  /packagist\.excludingDevMetadata\.coverage carries listed/);
 plant('a coverage total that is not the sum of the rows', corpusOf((c) => { c.coverage.total.listed += 1; }), /coverage\.total\.listed is 37; the eleven scan files sum to 36/);
 plant('a coverage without a registry', corpusOf((c) => { delete c.coverage.byEcosystem.pub; }), /coverage\.byEcosystem is missing pub/);
 plant('a corpus without a registry\'s row', corpusOf((c) => { delete c.byEcosystem.pub; }), /corpus-2026-09-30\.json: byEcosystem is missing pub/);
@@ -1793,6 +1806,7 @@ const closedInTheCorpus = [
   ['the coverage without dev metadata', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata.coverage.note = 1; }), /packagist\.excludingDevMetadata\.coverage carries note/],
   ['the dependents of a multi-purpose library', corpusOf((c) => { c.multiPurposeLibraries[0].dependents.note = 1; }), /multiPurposeLibraries\[0\]\.dependents carries note/],
   ['the coverage of the manifest', manifestOf((m) => { m.coverage.note = 1; }), /MANIFEST\.json: coverage carries note/],
+  ['the aggregator', corpusOf((c) => { c.aggregator.note = 'x'; }), /corpus-2026-09-30\.json: aggregator carries note/],
   ['a multi-purpose library', corpusOf((c) => { c.multiPurposeLibraries[0].total = 2; }), /multiPurposeLibraries\[0\] carries total/],
   ['its dependents', corpusOf((c) => { c.multiPurposeLibraries[0].dependents.anyManifestMatch.total = 2; }), /dependents\.anyManifestMatch carries total/],
 ];

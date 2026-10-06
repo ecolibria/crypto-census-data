@@ -1481,9 +1481,7 @@ function checkMethod(eco, method, file, bad) {
 function checkEnumeration(eco, e, file, bad) {
   const where = `${file}: enumeration`;
   if (!closed(e, KEYS.enumeration, where, bad)) return;
-  for (const field of ['requested', 'listed']) {
-    if (!isCount(e[field])) bad(`${where}.${field} is ${describe(e[field])}, not a whole count`);
-  }
+  if (!isCount(e.listed)) bad(`${where}.listed is ${describe(e.listed)}, not a whole count`);
   if (typeof e.truncated !== 'boolean') bad(`${where}.truncated is ${describe(e.truncated)}, not true or false`);
   if (e.truncated === false && e.reason !== null) bad(`${where}.reason is ${describe(e.reason)} for a run that was not truncated; it is null then`);
   if (e.truncated === true && !isText(e.reason)) bad(`${where}.reason is ${describe(e.reason)}; a truncated run says why it stopped`);
@@ -1498,6 +1496,13 @@ function checkEnumeration(eco, e, file, bad) {
     if (!SAMPLING_METHODS.includes(s.method)) bad(`${where}.sampling.method is ${describe(s.method)}, not one of: ${SAMPLING_METHODS.join(', ')}`);
     else if (SHUFFLED.includes(s.method) && !isText(s.seed)) bad(`${where}.sampling.seed is ${describe(s.seed)}. A shuffled sample names its seed, so that it can be drawn again.`);
     else if (!SHUFFLED.includes(s.method) && s.seed !== null) bad(`${where}.sampling.seed is ${describe(s.seed)} for ${s.method}, which shuffles nothing; it is null then`);
+    // requested is a sampled row's size, and null for a row read whole. It is never 0.
+    if (s.method === 'all' && e.requested !== null) {
+      bad(`${where}.requested is ${describe(e.requested)} for a row read whole; it is null then`);
+    } else if (SAMPLING_METHODS.includes(s.method) && s.method !== 'all' && !(isCount(e.requested) && e.requested > 0)) {
+      bad(`${where}.requested is ${describe(e.requested)}, not the size of the sample. A row that is not read whole names how many ` +
+        'packages it asked for, and that is never 0.');
+    }
     if (s.method === 'all' && s.draw !== null) {
       bad(`${where}.sampling.draw is ${describe(s.draw)}, and a registry read whole draws nothing; it is null then`);
     } else if (s.method !== 'all' && !['package', 'page'].includes(s.draw)) {
@@ -2272,8 +2277,9 @@ const UNRESOLVED_CEILING = 1 / ONE_IN;
 Object.assign(KEYS, {
   manifestEcosystem: ['ecosystem', 'coverage', 'enumeration', 'sources'],
   knownIssue: ['defect', 'summary', 'affects', 'direction', 'magnitude', 'correctedIn'],
-  corpus: ['schemaVersion', 'kind', 'collectedAt', 'generatedAt', 'inputs', 'definitions', 'comparability', 'blocked', 'coverage',
-    'byEcosystem', 'total', 'multiPurposeLibraries'],
+  corpus: ['schemaVersion', 'kind', 'collectedAt', 'generatedAt', 'aggregator', 'inputs', 'definitions', 'comparability', 'blocked',
+    'coverage', 'byEcosystem', 'total', 'multiPurposeLibraries'],
+  aggregator: ['script', 'commit'],
   inputs: ['scans', 'catalog', 'consolidation'],
   inputScan: ['ecosystem', 'file', 'sha256'],
   inputCatalog: ['file', 'sha256', 'matchSetSha256', 'classificationSha256'],
@@ -2281,11 +2287,12 @@ Object.assign(KEYS, {
   definitions: ['coverage', 'unresolvedCeiling', 'anyManifestMatch', 'directUnconditional', 'raw', 'consolidated', 'classes', 'multiPurposeLibrary'],
   id: ['id'],
   includes: ['id', 'includes'],
-  predicate: ['id', 'predicate'],
+  predicate: ['id', 'predicate', 'code'],
   comparability: ['dataset', 'doi', 'comparable', 'reason', 'changes'],
   blocked: ['ecosystem', 'reason', 'detail'],
   corpusCoverage: ['total', 'byEcosystem'],
-  rowCoverage: [...COVERAGE_COUNTS, 'scannedByReadFrom', 'enumeration'],
+  rowCoverage: [...COVERAGE_COUNTS, 'scannedByReadFrom', 'enumeration', 'sources'],
+  devCoverage: ['scanned', 'dependenciesNotObservable'],
   row: ['measurability', 'anyManifestMatch', 'directUnconditional', 'excludingDevMetadata'],
   total: ['anyManifestMatch', 'directUnconditional'],
   pair: ['raw', 'consolidated'],
@@ -2886,6 +2893,9 @@ function checkDefinitions(d, file, bad) {
     if (d.directUnconditional.id !== DEFINITIONS.directUnconditional) {
       bad(`${where}.directUnconditional.id is ${describe(d.directUnconditional.id)}, not ${DEFINITIONS.directUnconditional}`);
     }
+    if (!isText(d.directUnconditional.code)) {
+      bad(`${where}.directUnconditional.code is ${describe(d.directUnconditional.code)}, not the module that evaluates the rule`);
+    }
     if (closed(d.directUnconditional.predicate, ECOSYSTEMS, `${where}.directUnconditional.predicate`, bad)) {
       for (const eco of ECOSYSTEMS) {
         if (!isText(d.directUnconditional.predicate[eco])) bad(`${where}.directUnconditional.predicate.${eco} is ${describe(d.directUnconditional.predicate[eco])}, not the rule in words`);
@@ -3111,10 +3121,10 @@ function checkCorpusCoverage(coverage, ctx, file, bad) {
       if (!closed(coverage.byEcosystem[eco], KEYS.rowCoverage, at, bad)) continue;
       const scan = ctx.scans[eco];
       if (!scan || !scan.coverage) continue;
-      const { enumeration, ...counts } = coverage.byEcosystem[eco];
-      if (!sameValue(counts, scan.coverage) || !sameValue(enumeration, scan.value.enumeration)) {
-        bad(`${at} is not the coverage and enumeration of ${scan.file}. The corpus copies them from the raw file, and a copy ` +
-          'that differs is a second answer.');
+      const { enumeration, sources, ...counts } = coverage.byEcosystem[eco];
+      if (!sameValue(counts, scan.coverage) || !sameValue(enumeration, scan.value.enumeration) || !sameValue(sources, scan.value.sources)) {
+        bad(`${at} is not the coverage, enumeration and sources of ${scan.file}. The corpus copies them from the raw file, and a ` +
+          'copy that differs is a second answer.');
       }
     }
   }
@@ -3149,6 +3159,13 @@ function checkCorpus(name, record, ctx, bad) {
     }
   }
   if (!isTime(c.generatedAt)) bad(`${file}: generatedAt is ${describe(c.generatedAt)}, not a time as toISOString() writes it, or a date`);
+  if (closed(c.aggregator, KEYS.aggregator, `${file}: aggregator`, bad)) {
+    if (!isText(c.aggregator.script)) bad(`${file}: aggregator.script is ${describe(c.aggregator.script)}`);
+    if (!isText(c.aggregator.commit)) {
+      bad(`${file}: aggregator.commit is ${describe(c.aggregator.commit)}. A published corpus names the instrument commit its ` +
+        'aggregation ran at; null belongs to a local run.');
+    }
+  }
   checkInputs(name, c.inputs, ctx, file, bad);
   const includes = checkDefinitions(c.definitions, file, bad);
   checkComparability(name, c.comparability, c, ctx, file, bad);
@@ -3192,9 +3209,9 @@ function checkCorpus(name, record, ctx, bad) {
         }
       } else if (closed(stored.excludingDevMetadata, KEYS.devRow, devWhere, bad)) {
         const dev = stored.excludingDevMetadata;
-        if (closed(dev.coverage, COVERAGE_COUNTS, `${devWhere}.coverage`, bad)) {
+        if (closed(dev.coverage, KEYS.devCoverage, `${devWhere}.coverage`, bad)) {
           devCoverage = dev.coverage;
-          for (const field of COVERAGE_COUNTS) {
+          for (const field of KEYS.devCoverage) {
             if (!isCount(dev.coverage[field])) {
               bad(`${devWhere}.coverage.${field} is ${describe(dev.coverage[field])}, not a whole count`);
               devCoverage = null;
@@ -3211,7 +3228,7 @@ function checkCorpus(name, record, ctx, bad) {
       monotone(stored, where, figureContext);
       if (expected.dev !== null && isObject(stored.excludingDevMetadata)) monotone(stored.excludingDevMetadata, devWhere, figureContext);
       if (devCoverage) {
-        for (const field of COVERAGE_COUNTS) {
+        for (const field of KEYS.devCoverage) {
           if (devCoverage[field] !== expected.dev.coverage[field]) {
             figureContext.figureBad(`${devWhere}.coverage.${field} is ${devCoverage[field]}; the ledger gives ` +
               `${expected.dev.coverage[field]} without the packages read from dev metadata`);
