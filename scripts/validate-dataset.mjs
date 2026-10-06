@@ -2608,8 +2608,10 @@ function blockValues(stored, expected, where, ctx, total) {
 
 /**
  * The identities the contract states for every block of a row, read from the
- * stored figures. That matched and the excluded units make every unit with a
- * match follows from recomputing each of them, so it is not checked apart.
+ * stored figures. Two follow from recomputing each figure from the scan file,
+ * so neither is checked apart: that matched and the units of both exclusions
+ * make every unit with a match that counts, and that in a raw block those
+ * units are at most the file's packagesWithMatch.
  */
 function blockIdentities(block, where, coverage, ctx) {
   const n = (cell) => (isObject(cell) && isCount(cell.count) ? cell.count : null);
