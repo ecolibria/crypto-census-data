@@ -27,6 +27,7 @@ import { readFileSync, readdirSync, existsSync, statSync, lstatSync } from 'node
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
+import { gunzipSync } from 'node:zlib';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DATASETS = join(ROOT, 'datasets');
@@ -1640,6 +1641,184 @@ function checkScan(name, eco, record, catalog, found, bad) {
   return { file, value: s, method, coverage, packages, sound: method !== null && coverage !== null && packages !== null };
 }
 
+// --- The listing ledgers --------------------------------------------------------
+
+/**
+ * The ceiling on packages listed and not read: a registry whose unresolved
+ * count is above 1 in 100 of the packages it listed is a blocked row, and a
+ * dataset with a blocked row is not published. Held here independently of
+ * the code that produces the files, and compared in whole numbers.
+ */
+const ONE_IN = 100;
+
+/**
+ * The most a listing ledger may decompress to. A small gzip file can expand a
+ * thousandfold, so without a bound one could exhaust the memory of whoever
+ * checks it. The schema version 2 contract estimates about 160 MB for all
+ * eleven ledgers together.
+ */
+const MAX_LEDGER_BYTES = 1024 * 1024 * 1024;
+
+const LEDGER_COLUMNS = ['name', 'disposition', 'reason', 'version', 'readFrom', 'observable', 'matches'];
+const LEDGER_REASONS = {
+  scanned: [''],
+  absent: ['http404', 'http410'],
+  unresolved: ['timeout', 'network', 'http429', 'http5xx', 'httpOther', 'parseError', 'oversize'],
+  unversioned: ['noRelease', 'allYanked', 'noDefaultBranch'],
+};
+
+/** Read one ledger: decompressed within the bound, one row per listed package, sorted by name in byte order. */
+function readLedger(listing, scan, bad) {
+  const file = listing.file;
+  let data;
+  try {
+    data = gunzipSync(listing.buffer, { maxOutputLength: MAX_LEDGER_BYTES });
+  } catch (err) {
+    bad(err.code === 'ERR_BUFFER_TOO_LARGE'
+      ? `${file} decompresses to more than ${MAX_LEDGER_BYTES.toLocaleString('en-US')} bytes, the most a ledger may hold. ` +
+        'Read whole, a file like it could exhaust the memory of whoever checks it.'
+      : `${file} is not a gzip file: ${err.message}`);
+    return null;
+  }
+  const readFrom = scan.method ? scan.method.readFrom : null;
+  const counts = { listed: 0, scanned: 0, absent: 0, unresolved: 0, unversioned: 0, dependenciesNotObservable: 0 };
+  const byReadFrom = {};
+  const hiddenByReadFrom = {};
+  const matched = new Map();
+  const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
+  let problems = 0;
+  const rowBad = (line, message) => {
+    problems += 1;
+    if (problems <= 5) bad(`${file}: row ${line} ${message}`);
+  };
+  let position = 0;
+  let line = 0;
+  let previous = null;
+  while (position < data.length) {
+    let end = data.indexOf(10, position);
+    if (end === -1) end = data.length;
+    const bytes = data.subarray(position, end);
+    position = end + 1;
+    line += 1;
+    let text;
+    try {
+      text = decoder.decode(bytes);
+    } catch {
+      rowBad(line, 'is not UTF-8');
+      continue;
+    }
+    if (line === 1) {
+      if (text !== LEDGER_COLUMNS.join('\t')) {
+        bad(`${file} does not begin with the header row (${LEDGER_COLUMNS.join(', ')}, tab-separated). Without it no column ` +
+          'can be read as what it says.');
+        return null;
+      }
+      continue;
+    }
+    counts.listed += 1;
+    const fields = text.split('\t');
+    const [name, disposition, reason, version, source, observable, matches] = fields;
+    const scanned = disposition === 'scanned';
+    if (!Object.hasOwn(LEDGER_REASONS, disposition)) {
+      rowBad(line, `has the disposition ${describe(disposition)}, not scanned, absent, unresolved or unversioned`);
+      continue;
+    }
+    if (!(fields.length === 7 || (!scanned && fields.length === 3))) {
+      rowBad(line, `has ${fields.length} columns. A row has seven, or three (name, disposition, reason) for a package that was not read.`);
+      continue;
+    }
+    if (name === '') {
+      rowBad(line, 'has no name');
+      continue;
+    }
+    const nameBytes = bytes.subarray(0, bytes.indexOf(9));
+    if (previous !== null && Buffer.compare(previous, nameBytes) >= 0) {
+      rowBad(line, `(${name}) does not follow the row above it. Rows are sorted by name in byte order, one per package, so ` +
+        'that a row is found, and the acceptance sample drawn, the same way every time.');
+    }
+    previous = nameBytes;
+    if (!LEDGER_REASONS[disposition].includes(reason)) {
+      rowBad(line, `(${name}) gives the reason ${describe(reason)} for ${disposition}; it is one of: ` +
+        `${LEDGER_REASONS[disposition].map((r) => (r === '' ? 'empty' : r)).join(', ')}`);
+      continue;
+    }
+    counts[disposition] += 1;
+    if (!scanned) {
+      if (fields.length === 7 && [version, source, observable, matches].some((field) => field !== '')) {
+        rowBad(line, `(${name}) records a version, a source, an observation or matches for a package that was not read`);
+      }
+      continue;
+    }
+    if (version === '') rowBad(line, `(${name}) is scanned with no version read`);
+    if (readFrom !== null && !readFrom.includes(source)) rowBad(line, `(${name}) is read from ${describe(source)}, not one of method.readFrom`);
+    if (observable !== '0' && observable !== '1') rowBad(line, `(${name}) has observable ${describe(observable)}, not 1 or 0`);
+    if (!/^(0|[1-9][0-9]{0,8})$/.test(matches)) {
+      rowBad(line, `(${name}) has matches ${describe(matches)}, not a whole count`);
+      continue;
+    }
+    byReadFrom[source] = (byReadFrom[source] ?? 0) + 1;
+    if (observable === '0') {
+      counts.dependenciesNotObservable += 1;
+      hiddenByReadFrom[source] = (hiddenByReadFrom[source] ?? 0) + 1;
+    }
+    if (Number(matches) > 0) matched.set(name, { version, readFrom: source, matches: Number(matches) });
+  }
+  if (line === 0) {
+    bad(`${file} is empty. A ledger has a header row and one row per listed package.`);
+    return null;
+  }
+  if (problems > 5) bad(`${file}: ${problems - 5} more row(s) are malformed`);
+  return { file, counts, byReadFrom, hiddenByReadFrom, matched, sound: problems === 0 };
+}
+
+/** The scan file against its ledger: coverage is recomputed from the rows, and the matched rows are the packages listed. */
+function compareLedger(eco, ledger, scan, bad) {
+  const file = scan.file;
+  const c = ledger.counts;
+  if (scan.coverage) {
+    for (const field of COVERAGE_COUNTS) {
+      if (scan.coverage[field] !== c[field]) {
+        bad(`${file}: coverage.${field} is ${scan.coverage[field]}, and ${ledger.file} gives ${c[field]}. Coverage is ` +
+          'recomputed from the ledger, so a count cannot move without the rows that make it.');
+      }
+    }
+    for (const source of new Set([...Object.keys(scan.coverage.scannedByReadFrom), ...Object.keys(ledger.byReadFrom)])) {
+      const stored = scan.coverage.scannedByReadFrom[source] ?? 0;
+      const counted = ledger.byReadFrom[source] ?? 0;
+      if (stored !== counted) {
+        bad(`${file}: coverage.scannedByReadFrom.${source} is ${stored}, and ${ledger.file} gives ${counted}`);
+      }
+    }
+  }
+  if (Array.isArray(scan.value.packages)) {
+    for (const p of scan.value.packages) {
+      if (!isObject(p) || !isText(p.name)) continue;
+      const row = ledger.matched.get(p.name);
+      if (!row) {
+        bad(`${file}: ${p.name} is in packages, and ${ledger.file} records no match for it. The ledger and the scan file ` +
+          'are written together, so a match added to one shows in the other.');
+        continue;
+      }
+      if (Array.isArray(p.matches) && row.matches !== p.matches.length) {
+        bad(`${file}: ${p.name} has ${p.matches.length} match record(s), and ${ledger.file} records ${row.matches}`);
+      }
+      if (row.version !== p.version) bad(`${file}: ${p.name} was read at ${describe(p.version)}, and ${ledger.file} says ${row.version}`);
+      if (row.readFrom !== p.readFrom) bad(`${file}: ${p.name} was read from ${describe(p.readFrom)}, and ${ledger.file} says ${row.readFrom}`);
+    }
+    const listed = new Set(scan.value.packages.filter(isObject).map((p) => p.name));
+    for (const [name, row] of ledger.matched) {
+      if (!listed.has(name)) {
+        bad(`${ledger.file} records ${row.matches} match(es) for ${name}, which ${file} does not list. A match deleted from ` +
+          'the scan file still shows in the ledger.');
+      }
+    }
+  }
+  if (c.unresolved * ONE_IN > c.listed) {
+    bad(`${eco}: ${c.unresolved} of the ${c.listed} packages listed are unresolved, above the ceiling of 1 in ${ONE_IN}. The ` +
+      'row is blocked, and a dataset with a blocked row is not published.');
+  }
+}
+
 /** Every rule of a version 2 dataset, in the order its files depend on each other. */
 function validateVersion2(name, dir) {
   const bad = (message) => fail(name, message);
@@ -1649,8 +1828,17 @@ function validateVersion2(name, dir) {
   const found = readListedFiles(name, dir, manifest, bad);
   if (found === null) return;
   const catalog = found.catalog ? checkCatalog(name, found.catalog, bad) : null;
+  const scans = {};
   for (const eco of ECOSYSTEMS) {
-    if (found.scans[eco]) checkScan(name, eco, found.scans[eco], catalog, found, bad);
+    if (found.scans[eco]) scans[eco] = checkScan(name, eco, found.scans[eco], catalog, found, bad);
+  }
+  const ledgers = {};
+  for (const eco of ECOSYSTEMS) {
+    if (!found.listings[eco] || !scans[eco]) continue;
+    const ledger = readLedger(found.listings[eco], scans[eco], bad);
+    if (ledger === null) continue;
+    if (ledger.sound) compareLedger(eco, ledger, scans[eco], bad);
+    ledgers[eco] = ledger;
   }
 }
 

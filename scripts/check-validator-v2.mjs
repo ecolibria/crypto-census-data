@@ -24,7 +24,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, trun
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { gzipSync } from 'node:zlib';
+import { createGzip, gzipSync } from 'node:zlib';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const FIRST_SHAPE = '2026-03-18';
@@ -1071,6 +1071,82 @@ plant('a catalogue size that is not a count', scanOf('hex', (s) => { s.catalog.e
 plant('a match set that is not a digest', scanOf('hex', (s) => { s.catalog.matchSetSha256 = 'PLACEHOLDER'; }), /catalog\.matchSetSha256 is "PLACEHOLDER", not a SHA-256 digest/);
 plant('a match rule that is not an id', scanOf('hex', (s) => { s.catalog.matchRule = null; }), /catalog\.matchRule is null, not a rule id/);
 plant('a ledger row count that is not a count', scanOf('hex', (s) => { s.listing.rows = null; }), /listing\.rows is null, not a count/);
+
+// --- Listing ledgers -----------------------------------------------------------
+
+const ledgerOf = (eco, fn) => ({ ledgers: (ledgers) => { ledgers[eco] = fn(ledgers[eco]); } });
+
+test('a ledger that leaves out the empty columns of an unread row passes', async () => {
+  // The contract's own example writes such a row as name, disposition and reason.
+  const result = await validateOne({
+    ledgers: (ledgers) => {
+      for (const eco of ECOSYSTEMS) ledgers[eco] = ledgers[eco].map((line) => line.replace(/^([^\t]+\t(?:absent|unversioned)\t[^\t]+)\t\t\t\t$/, '$1'));
+    },
+  });
+  assert.equal(result.code, 0, result.stderr);
+});
+
+const fillers = (count, extra) => (f) => {
+  for (let i = 0; i < count; i += 1) f.npm.rows.push(scanned(`filler-${String(i).padStart(3, '0')}`, []));
+  f.npm.rows.push(extra);
+};
+
+test('one unresolved package in 100 listed is at the ceiling, and passes', async () => {
+  const result = await validateOne({ fixture: fillers(91, unread('kappa', 'unresolved', 'parseError')) });
+  assert.equal(result.code, 0, result.stderr);
+});
+
+// The listing ledger.
+const swap = (lines, a, b) => { [lines[a], lines[b]] = [lines[b], lines[a]]; return lines; };
+plant('a ledger that is not gzip', { ledgers: (l) => { l.hex = Buffer.from('name\tdisposition\n'); } }, /listing-hex\.tsv\.gz is not a gzip file/);
+plant('a ledger without its header', ledgerOf('hex', (lines) => lines.slice(1)), /listing-hex\.tsv\.gz does not begin with the header row/);
+plant('an empty ledger', { ledgers: (l) => { l.hex = gzipSync(''); } }, /listing-hex\.tsv\.gz is empty/);
+plant('a ledger row that is not UTF-8', { ledgers: (l) => { l.hex = gzipSync(Buffer.concat([Buffer.from(`${l.hex[0]}\n`), Buffer.from([0x61, 0xff, 0x0a])])); } }, /listing-hex\.tsv\.gz: row 2 is not UTF-8/);
+plant('rows out of order', ledgerOf('npm', (lines) => swap(lines, 1, 2)), /listing-npm\.tsv\.gz: row 3 \(@acme\/alpha\) does not follow the row above it/);
+plant('a package listed twice in the ledger', ledgerOf('hex', (lines) => [...lines, lines[1]]), /listing-hex\.tsv\.gz: row 3 \(acme_hex\) does not follow the row above it/);
+plant('a disposition that is not one', ledgerOf('npm', (lines) => lines.map((line) => line.replace('\tabsent\t', '\tgone\t'))), /has the disposition "gone", not scanned, absent, unresolved or unversioned/);
+plant('a row with five columns', ledgerOf('hex', (lines) => [lines[0], lines[1].split('\t').slice(0, 5).join('\t')]), /listing-hex\.tsv\.gz: row 2 has 5 columns\. A row has seven, or three/);
+plant('a scanned row with three columns', ledgerOf('hex', (lines) => [lines[0], lines[1].split('\t').slice(0, 3).join('\t')]), /row 2 has 3 columns/);
+plant('a row with no name', ledgerOf('hex', (lines) => [lines[0], lines[1].replace(/^[^\t]+/, '')]), /listing-hex\.tsv\.gz: row 2 has no name/);
+plant('a scanned row that gives a reason', ledgerOf('hex', (lines) => [lines[0], lines[1].replace('\tscanned\t\t', '\tscanned\ttimeout\t')]), /gives the reason "timeout" for scanned/);
+plant('an absent row with a reason for an unresolved one', ledgerOf('npm', (lines) => lines.map((line) => line.replace('\tabsent\thttp404', '\tabsent\ttimeout'))), /gives the reason "timeout" for absent; it is one of: http404, http410/);
+plant('an unread row that records a version', ledgerOf('npm', (lines) => lines.map((line) => line.replace('\tabsent\thttp404\t', '\tabsent\thttp404\t1.0.0'))), /records a version, a source, an observation or matches for a package that was not read/);
+plant('a scanned row with no version', ledgerOf('hex', (lines) => [lines[0], lines[1].replace('\t1.0.0\t', '\t\t')]), /\(acme_hex\) is scanned with no version read/);
+plant('a row read from a source the method does not name', ledgerOf('hex', (lines) => [lines[0], lines[1].replace('\trelease\t', '\tmirror\t')]), /\(acme_hex\) is read from "mirror", not one of method\.readFrom/);
+plant('an observation that is not 1 or 0', ledgerOf('hex', (lines) => [lines[0], lines[1].replace('\trelease\t1\t', '\trelease\tyes\t')]), /\(acme_hex\) has observable "yes", not 1 or 0/);
+plant('a match count that is not a count', ledgerOf('hex', (lines) => [lines[0], lines[1].replace(/\t1$/, '\tone')]), /\(acme_hex\) has matches "one", not a whole count/);
+plant('more malformed rows than are listed one by one', ledgerOf('npm', (lines) => lines.map((line, i) => (i === 0 ? line : line.replace(/^([^\t]+)\t/, '$1\tgone\t')))), /listing-npm\.tsv\.gz: 3 more row\(s\) are malformed/);
+plant('a count that is not what the ledger gives', scanOf('npm', (s) => { s.coverage.scanned = 6; s.coverage.absent = 2; }), /scan-results-npm\.json: coverage\.scanned is 6, and listing-npm\.tsv\.gz gives 7\. Coverage is recomputed from the ledger/);
+plant('a ledger that reads an unread package as read', ledgerOf('npm', (lines) => lines.map((line) => line.replace(/^eta\tabsent\thttp404\t\t\t\t$/, 'eta\tscanned\t\t1.0.0\trelease\t1\t0'))),
+  /scan-results-npm\.json: coverage\.scanned is 7, and listing-npm\.tsv\.gz gives 8/);
+plant('counts by source that the ledger does not give', { fixture: (f) => { f.packagist.rows.find((r) => r.name === 'acme/cli').readFrom = 'taggedRelease'; }, scans: (s) => { s.packagist.coverage.scannedByReadFrom = { taggedRelease: 2, devDefaultBranch: 1 }; } },
+  /coverage\.scannedByReadFrom\.taggedRelease is 2, and listing-packagist\.tsv\.gz gives 3/);
+plant('a package whose ledger row records no match', ledgerOf('hex', (lines) => [lines[0], lines[1].replace(/\t1$/, '\t0')]), /acme_hex is in packages, and listing-hex\.tsv\.gz records no match for it/);
+plant('a scan file with one match deleted', scanOf('npm', (s) => { s.packages[0].matches.pop(); }), /@acme\/alpha has 1 match record\(s\), and listing-npm\.tsv\.gz records 2/);
+plant('a scan file with one matched package deleted', scanOf('npm', (s) => { s.packages.shift(); s.packagesWithMatch -= 1; }), /listing-npm\.tsv\.gz records 2 match\(es\) for @acme\/alpha, which scan-results-npm\.json does not list/);
+plant('a package read at another version than the ledger says', scanOf('hex', (s) => { s.packages[0].version = '2.0.0'; }), /acme_hex was read at "2\.0\.0", and listing-hex\.tsv\.gz says 1\.0\.0/);
+plant('a package read from another source than the ledger says', scanOf('packagist', (s) => { s.packages[0].readFrom = 'devDefaultBranch'; }), /acme\/api was read from "devDefaultBranch", and listing-packagist\.tsv\.gz says taggedRelease/);
+plant('a row over the ceiling', { fixture: fillers(90, unread('kappa', 'unresolved', 'timeout')) }, /npm: 1 of the 99 packages listed are unresolved, above the ceiling of 1 in 100\. The row is blocked/);
+plant('a deterministic non-read over the ceiling', { fixture: (f) => { f.hex.rows.push(unread('broken_pkg', 'unresolved', 'parseError')); } }, /hex: 1 of the 2 packages listed are unresolved, above the ceiling/);
+
+// Where a dataset sits.
+test('a ledger that decompresses past the bound is refused, and the run ends', async () => {
+  // About a megabyte of gzip that would grow past a gigabyte read whole.
+  const gzip = createGzip({ level: 9 });
+  const chunks = [];
+  gzip.on('data', (chunk) => chunks.push(chunk));
+  const ended = new Promise((done) => gzip.on('end', done));
+  gzip.write('name\tdisposition\treason\tversion\treadFrom\tobservable\tmatches\n');
+  const zeros = Buffer.alloc(16 * 1024 * 1024);
+  for (let i = 0; i < 65; i += 1) {
+    if (!gzip.write(zeros)) await new Promise((done) => gzip.once('drain', done));
+  }
+  gzip.end();
+  await ended;
+  const result = await validateOne({ ledgers: (l) => { l.hex = Buffer.concat(chunks); } });
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(result.stderr, /listing-hex\.tsv\.gz decompresses to more than 1,073,741,824 bytes, the most a ledger may hold/);
+});
 
 // --- Running the planted defects -------------------------------------------------
 
