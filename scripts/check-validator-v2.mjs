@@ -732,7 +732,9 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
     },
     comparability,
     blocked: [],
-    withheld: withhold.map(({ ecosystem, reasons }) => ({ ecosystem, reasons: structuredClone(reasons), coverage: structuredClone(scans[ecosystem].coverage) })),
+    // A withheld row keeps the coverage its row would have held: the raw coverage, its enumeration and its sources.
+    withheld: withhold.map(({ ecosystem, reasons }) => ({ ecosystem, reasons: structuredClone(reasons),
+      coverage: structuredClone({ ...scans[ecosystem].coverage, enumeration: scans[ecosystem].enumeration, sources: scans[ecosystem].sources }) })),
     coverage: {
       total: Object.fromEntries(COVERAGE.map((field) => [field, sum(ECOSYSTEMS.filter(isPublished).map((eco) => scans[eco].coverage[field]))])),
       byEcosystem: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, structuredClone({ ...scans[eco].coverage, enumeration: scans[eco].enumeration, sources: scans[eco].sources })])),
@@ -1977,7 +1979,7 @@ const closedInTheCorpus = [
   ['the aggregator', corpusOf((c) => { c.aggregator.note = 'x'; }), /corpus-2026-09-30\.json: aggregator carries note/],
   ['a withheld row', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].note = 'x'; })), /withheld\[0\] carries note/],
   ['a reason a row is withheld', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].reasons[0].note = 'x'; })), /withheld\[0\]\.reasons\[0\] carries note/],
-  ['the counts of a withheld row', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].coverage.enumeration = {}; })), /withheld\[0\]\.coverage carries enumeration/],
+  ['the coverage of a withheld row', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].coverage.note = 'x'; })), /withheld\[0\]\.coverage carries note/],
   ['a multi-purpose library', corpusOf((c) => { c.multiPurposeLibraries[0].total = 2; }), /multiPurposeLibraries\[0\] carries total/],
   ['its dependents', corpusOf((c) => { c.multiPurposeLibraries[0].dependents.anyManifestMatch.total = 2; }), /dependents\.anyManifestMatch carries total/],
 ];
@@ -2032,7 +2034,18 @@ plant('a row withheld for having no scan file, beside its scan file', withholdin
 plant('a withheld row without its counts', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].coverage = null; })),
   /withheld\[0\]\.coverage is null\. It is null only for a row with no scan file/);
 plant('a withheld row whose counts are not its scan file\'s', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].coverage.listed += 1; })),
-  /withheld\[0\]\.coverage is not the coverage of scan-results-rubygems\.json/);
+  /withheld\[0\]\.coverage is not the coverage, enumeration and sources of scan-results-rubygems\.json/);
+// A withheld row's coverage has the shape of the row's coverage.byEcosystem entry, so the codes can be read from it.
+plant('a withheld row with its counts alone', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { delete c.withheld[0].coverage.enumeration; delete c.withheld[0].coverage.sources; })),
+  /withheld\[0\]\.coverage is missing enumeration, sources/);
+plant('a withheld row without its enumeration', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { delete c.withheld[0].coverage.enumeration; })),
+  /withheld\[0\]\.coverage is missing enumeration\./);
+plant('a withheld row without its sources', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { delete c.withheld[0].coverage.sources; })),
+  /withheld\[0\]\.coverage is missing sources\./);
+plant('a withheld row whose enumeration is not its scan file\'s', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].coverage.enumeration.elapsedMinutes = 2; })),
+  /withheld\[0\]\.coverage is not the coverage, enumeration and sources of scan-results-rubygems\.json/);
+plant('a withheld row whose sources are not its scan file\'s', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].coverage.sources.manifests = 'https://rubygems.org/api/v2/gems'; })),
+  /withheld\[0\]\.coverage is not the coverage, enumeration and sources of scan-results-rubygems\.json/);
 plant('a row withheld above the ceiling that is within it', withholding('rubygems', ABOVE_CEILING),
   /withheld\[0\] gives unresolvedShareAboveCeiling, and rubygems has 0 of 1 listed packages unresolved, within the ceiling of 1 in 100/);
 plant('withheld rows that are not a list', corpusOf((c) => { c.withheld = null; }), /corpus-2026-09-30\.json: withheld is null, not a list/);

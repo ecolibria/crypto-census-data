@@ -3130,6 +3130,13 @@ function checkBlocked(list, file, bad) {
 const WITHHELD_CODES = ['noScanFile', 'listingNotWhole', 'notUnderPopulationRule', 'sampleNotDrawnToSize', 'seedNotRunId',
   'unresolvedShareAboveCeiling'];
 
+/**
+ * A registry's coverage as the corpus holds it, published or withheld: the
+ * raw header's coverage members, with its enumeration and sources, copied as
+ * they are. One shape, so that a withheld row says why it is withheld.
+ */
+const rowCoverageOf = (scan) => ({ ...scan.value.coverage, enumeration: scan.value.enumeration, sources: scan.value.sources });
+
 /** True when a registry's scan reads more than the ceiling of its listed packages as unresolved. */
 const aboveCeiling = (coverage) => coverage.unresolved * ONE_IN > coverage.listed;
 
@@ -3195,9 +3202,10 @@ function checkWithheld(list, ctx, file, bad) {
     } else if (item.coverage === null) {
       bad(`${at}.coverage is null. It is null only for a row with no scan file; the counts of ${item.ecosystem} are in its scan file.`);
       sound = false;
-    } else if (closed(item.coverage, KEYS.scanCoverage, `${at}.coverage`, bad)) {
-      if (scan && scan.coverage && !sameValue(item.coverage, scan.coverage)) {
-        bad(`${at}.coverage is not the coverage of ${scan.file}. A withheld row keeps its counts, copied from the raw file.`);
+    } else if (closed(item.coverage, KEYS.rowCoverage, `${at}.coverage`, bad)) {
+      if (scan && scan.coverage && !sameValue(item.coverage, rowCoverageOf(scan))) {
+        bad(`${at}.coverage is not the coverage, enumeration and sources of ${scan.file}. A withheld row keeps the coverage its ` +
+          'row would have held, copied from the raw file as it is, so that a reader holding only the corpus can see why it is withheld.');
       }
     } else {
       sound = false;
@@ -3233,8 +3241,7 @@ function checkCorpusCoverage(coverage, withheld, ctx, file, bad) {
       if (!closed(coverage.byEcosystem[eco], KEYS.rowCoverage, at, bad)) continue;
       const scan = ctx.scans[eco];
       if (!scan || !scan.coverage) continue;
-      const { enumeration, sources, ...counts } = coverage.byEcosystem[eco];
-      if (!sameValue(counts, scan.coverage) || !sameValue(enumeration, scan.value.enumeration) || !sameValue(sources, scan.value.sources)) {
+      if (!sameValue(coverage.byEcosystem[eco], rowCoverageOf(scan))) {
         bad(`${at} is not the coverage, enumeration and sources of ${scan.file}. The corpus copies them from the raw file, and a ` +
           'copy that differs is a second answer.');
       }
