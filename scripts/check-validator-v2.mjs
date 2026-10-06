@@ -1188,6 +1188,273 @@ plant('a unit member that is not a name', mapOf((m) => { m.byEcosystem.npm.units
 plant('a unit missing its members', mapOf((m) => { delete m.byEcosystem.npm.units[0].members; }), /byEcosystem\.npm\.units\[0\] is missing members/);
 plant('a removal missing its rule', mapOf((m) => { m.byEcosystem.pub.removed = [{ name: 'acme_dart' }]; }), /byEcosystem\.pub\.removed\[0\] is missing rule/);
 
+// --- Corpus ------------------------------------------------------------------
+
+const EARLIER_V2 = '2026-09-15';
+
+const corpusOf = (fn) => ({ corpus: fn });
+
+const npmRaw = (c) => c.byEcosystem.npm.anyManifestMatch.raw;
+
+test('a dataset in which no registry can measure post-quantum passes, with its joint totals null', async () => {
+  // Both countable post-quantum entries become absent from their registries. K drops, so every post-quantum
+  // cell and every joint cell is null; the matches to them still count toward matched, which needs only a
+  // classified entry. Written out by hand: npm and crates lose their pqc K, nothing else moves.
+  const result = await validateOne({
+    fixture: (f) => {
+      for (const [eco, name] of [['npm', '@noble/post-quantum'], ['crates', 'pqcrypto']]) {
+        f[eco].entries.find((e) => e.name === name).registryAbsent = { ...ABSENT };
+        f[eco].measurability.matched.k -= 1;
+        f[eco].measurability.matched.excluded.push({ entry: name, why: 'registryAbsent' });
+        f[eco].measurability.pqc = measure(0, [], [[name, 'registryAbsent']]);
+        for (const definition of DEFINITIONS) {
+          for (const unit of UNITS) f[eco].blocks[definition][unit][0].splice(4, 3, null, null, null);
+        }
+      }
+    },
+  });
+  assert.equal(result.code, 0, result.stderr);
+});
+
+test('a known issue in the vocabulary of an errata issue passes', async () => {
+  const result = await validateOne({ manifest: (m) => { m.knownIssues = [knownIssue()]; } });
+  assert.equal(result.code, 0, result.stderr);
+});
+
+function knownIssue() {
+  return {
+    defect: 'example-issue',
+    summary: 'A figure is known to be low.',
+    affects: ['byEcosystem.npm.anyManifestMatch.raw.weak'],
+    direction: 'understates',
+    magnitude: { value: 1, of: 5, unit: 'packages' },
+    correctedIn: 'the next dataset',
+  };
+}
+
+test('a later version 2 dataset that names an earlier one as comparable passes when their instruments are the same', async () => {
+  const result = await validate({
+    [EARLIER_V2]: [EARLIER_V2, {}],
+    [DATE]: [DATE, {}, [{ dataset: FIRST_SHAPE, version: 1 }, { dataset: EARLIER_V2, version: 2 }]],
+  });
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, /3 dataset\(s\) validated: 2026-03-18, 2026-09-15, 2026-09-30/);
+});
+
+// The manifest's own fields.
+plant('a known issue with no direction', manifestOf((m) => { m.knownIssues = [{ ...knownIssue(), direction: 'wrong' }]; }), /knownIssues\[0\]\.direction is "wrong", which tells a reader nothing/);
+plant('a known issue with a defect id of another form', manifestOf((m) => { m.knownIssues = [{ ...knownIssue(), defect: 'Example Issue' }]; }), /knownIssues\[0\]\.defect is "Example Issue", not an id of lower-case words/);
+plant('a known issue listed twice', manifestOf((m) => { m.knownIssues = [knownIssue(), knownIssue()]; }), /knownIssues\[1\] repeats the defect example-issue/);
+plant('a known issue with no summary', manifestOf((m) => { m.knownIssues = [{ ...knownIssue(), summary: '\u200B' }]; }), /knownIssues\[0\]\.summary is .*, not text a reader can see/);
+plant('a known issue naming a figure the corpus does not have', manifestOf((m) => { m.knownIssues = [{ ...knownIssue(), affects: ['packagesScanned'] }]; }), /knownIssues\[0\] affects packagesScanned, which is not a field of the corpus/);
+plant('a known issue naming no figure', manifestOf((m) => { m.knownIssues = [{ ...knownIssue(), affects: [] }]; }), /knownIssues\[0\]\.affects is \[\], not a list of the figures/);
+plant('a known issue larger than its whole', manifestOf((m) => { m.knownIssues = [{ ...knownIssue(), magnitude: { value: 6, of: 5, unit: 'packages' } }]; }), /knownIssues\[0\]\.magnitude is .*, not null or \{ value, of, unit \}/);
+
+// Each object is closed: a field the contract does not define fails, at every level.
+plant('a stored share at the top of the corpus', corpusOf((c) => { c.weakShareOfCryptoUsing = 0.42; }), /carries weakShareOfCryptoUsing, a stored share\. No share is stored/);
+plant('a stored share in a figure block', corpusOf((c) => { npmRaw(c).pqcRate = 0.4; }), /anyManifestMatch\.raw carries pqcRate, a stored share/);
+plant('a share stored where a count goes', corpusOf((c) => { npmRaw(c).weak.count = 0.5; }), /anyManifestMatch\.raw\.weak\.count is 0\.5, not a whole count or null/);
+
+// The consolidation map, and the rule it is held to.
+plant('a consolidation map that does not produce the consolidated figures', mapOf((m) => { m.byEcosystem.go.units = []; }),
+  /byEcosystem\.go\.anyManifestMatch\.consolidated\.matched is \{"count":2,"k":3,"nullReason":null\}; recomputed from the files it is bound to, it is \{"count":3/);
+
+// The corpus: its own fields.
+plant('a corpus of another kind', corpusOf((c) => { c.kind = 'corpus'; }), /corpus-2026-09-30\.json: kind is "corpus", not "censusCorpus"/);
+plant('a corpus of another date', corpusOf((c) => { c.collectedAt = '2026-09-29'; }), /corpus-2026-09-30\.json: collectedAt is "2026-09-29", and the dataset is 2026-09-30/);
+plant('a dataset dated before its last scan finished', scanOf('hex', (s) => { s.finishedAt = '2026-10-01T02:00:00Z'; }), /collectedAt is 2026-09-30, and the last scan finished on 2026-10-01/);
+plant('a corpus with no generation time', corpusOf((c) => { c.generatedAt = null; }), /corpus-2026-09-30\.json: generatedAt is null, not an ISO 8601 UTC time/);
+plant('input scans that are not a list', corpusOf((c) => { c.inputs.scans = {}; }), /inputs\.scans is \{\}, not a list/);
+plant('an input that binds no registry', corpusOf((c) => { c.inputs.scans[0].ecosystem = 'conda'; }), /inputs\.scans\[0\] is .*, not the binding of one registry's scan file/);
+plant('a scan bound twice', corpusOf((c) => { c.inputs.scans[1] = { ...c.inputs.scans[0] }; }), /inputs\.scans\[1\] binds npm a second time/);
+plant('a scan left unbound', corpusOf((c) => { c.inputs.scans.pop(); }), /inputs\.scans does not bind the scan file of cocoapods/);
+plant('a scan bound under another name', corpusOf((c) => { c.inputs.scans[0].file = 'scan-results-npm-clean.json'; }), /inputs\.scans\[0\]\.file is "scan-results-npm-clean\.json", not scan-results-npm\.json/);
+plant('a corpus bound to other scan bytes', corpusOf((c) => { c.inputs.scans[2].sha256 = sha256('other'); }), /inputs\.scans\[2\]\.sha256 is not the hash of scan-results-go\.json\. The corpus is bound to the bytes it was computed from/);
+plant('a scan binding that is not a digest', corpusOf((c) => { c.inputs.scans[2].sha256 = 'x'; }), /inputs\.scans\[2\]\.sha256 is "x", not a SHA-256 digest/);
+plant('a corpus bound to other snapshot bytes', corpusOf((c) => { c.inputs.catalog.sha256 = sha256('other'); }), /inputs\.catalog\.sha256 is not the hash of catalog-2026-09-30\.json/);
+plant('a corpus bound to other map bytes', corpusOf((c) => { c.inputs.consolidation.sha256 = sha256('other'); }), /inputs\.consolidation\.sha256 is not the hash of consolidation-2026-09-30\.json/);
+plant('a corpus naming another classification', corpusOf((c) => { c.inputs.catalog.classificationSha256 = sha256('other'); }), /inputs\.catalog\.classificationSha256 is not the catalogue snapshot's/);
+plant('a corpus naming another match set', corpusOf((c) => { c.inputs.catalog.matchSetSha256 = sha256('other'); }), /inputs\.catalog\.matchSetSha256 is not the one scan-results-npm\.json was matched with\. Aggregation refuses/);
+plant('a definition under another id', corpusOf((c) => { c.definitions.coverage.id = 'census.coverage/2'; }), /definitions\.coverage\.id is "census\.coverage\/2", not census\.coverage\/1/);
+plant('a corpus that sets its own ceiling', corpusOf((c) => { c.definitions.unresolvedCeiling = 0.05; }), /definitions\.unresolvedCeiling is 0\.05\. The ceiling is 0\.01, held here as well/);
+plant('a class under another id', corpusOf((c) => { c.definitions.classes.pqc = 'census.class.pqc/1'; }), /definitions\.classes\.pqc is "census\.class\.pqc\/1", not census\.class\.pqcDedicated\/1/);
+plant('a direct definition under another id', corpusOf((c) => { c.definitions.directUnconditional.id = 'census.match.direct/1'; }), /definitions\.directUnconditional\.id is "census\.match\.direct\/1"/);
+plant('a direct definition without a registry\'s rule', corpusOf((c) => { delete c.definitions.directUnconditional.predicate.hex; }), /directUnconditional\.predicate is missing hex/);
+plant('a direct rule that is not words', corpusOf((c) => { c.definitions.directUnconditional.predicate.hex = ''; }), /directUnconditional\.predicate\.hex is "", not the rule in words/);
+plant('a manifest-match definition under another id', corpusOf((c) => { c.definitions.anyManifestMatch.id = 'census.match.anyManifest/2'; }), /definitions\.anyManifestMatch\.id is "census\.match\.anyManifest\/2", not census\.match\.anyManifest\/1/);
+plant('a manifest-match definition without a registry', corpusOf((c) => { delete c.definitions.anyManifestMatch.includes.pub; }), /anyManifestMatch\.includes is missing pub/);
+plant('a kind the registry does not have', corpusOf((c) => { c.definitions.anyManifestMatch.includes.npm = ['dependencies', 'bundled']; }), /anyManifestMatch\.includes\.npm is \["dependencies","bundled"\], not a list of distinct npm declaration kinds/);
+plant('a kind the definition leaves out, counted', corpusOf((c) => { c.definitions.anyManifestMatch.includes.packagist = ['require', 'requireDev', 'suggest']; }),
+  /anyManifestMatch\.includes\.packagist is \["require","requireDev","suggest"\]; under census\.match\.anyManifest\/1 it is \["require","requireDev"\]/);
+plant('a blocked row', corpusOf((c) => { c.blocked = [{ ecosystem: 'hex', reason: 'unresolvedShareAboveCeiling', detail: 'Above the ceiling.' }]; }), /blocked names "hex"\. A corpus that blocks a row is not published/);
+plant('a blocked row for a reason that is not one', corpusOf((c) => { c.blocked = [{ ecosystem: 'hex', reason: 'tooSmall', detail: 'x' }]; }), /blocked\[0\]\.reason is "tooSmall"/);
+plant('blocked rows that are not a list', corpusOf((c) => { c.blocked = null; }), /corpus-2026-09-30\.json: blocked is null, not a list/);
+plant('a registry\'s coverage that is not the raw file\'s', corpusOf((c) => { c.coverage.byEcosystem.hex.scanned += 1; }), /coverage\.byEcosystem\.hex is not the coverage and enumeration of scan-results-hex\.json/);
+plant('a registry\'s enumeration that is not the raw file\'s', corpusOf((c) => { c.coverage.byEcosystem.go.enumeration = { requested: 1000, listed: 6, truncated: false, reason: null }; }), /coverage\.byEcosystem\.go is not the coverage and enumeration of scan-results-go\.json/);
+plant('a coverage total that is not the sum of the rows', corpusOf((c) => { c.coverage.total.listed += 1; }), /coverage\.total\.listed is 37; the eleven scan files sum to 36/);
+plant('a coverage without a registry', corpusOf((c) => { delete c.coverage.byEcosystem.pub; }), /coverage\.byEcosystem is missing pub/);
+plant('a corpus without a registry\'s row', corpusOf((c) => { delete c.byEcosystem.pub; }), /corpus-2026-09-30\.json: byEcosystem is missing pub/);
+
+// The corpus: measurability, every cell, and the identities.
+plant('K that does not follow from the snapshot', corpusOf((c) => { c.byEcosystem.go.measurability.pqc.k = 1; }), /byEcosystem\.go\.measurability\.pqc\.k is 1; the catalogue snapshot has 0 countable entries in this class/);
+plant('entries that do not follow from the snapshot', corpusOf((c) => { c.byEcosystem.maven.measurability.pqc.entries = ['org.bouncycastle:bcpqc-jdk18on']; }), /maven\.measurability\.pqc\.entries is \["org\.bouncycastle:bcpqc-jdk18on"\]; the countable entries of the snapshot are \[\]/);
+plant('an exclusion the snapshot does not give', corpusOf((c) => { c.byEcosystem.npm.measurability.weak.excluded = []; }), /npm\.measurability\.weak\.excluded is \[\]; the snapshot gives/);
+plant('an exclusion for a reason that is not one', corpusOf((c) => { c.byEcosystem.npm.measurability.weak.excluded[0].why = 'gone'; }), /measurability\.weak\.excluded is .*, not a list of \{ entry, why \}/);
+plant('entries that are not names', corpusOf((c) => { c.byEcosystem.npm.measurability.weak.entries = 'crypto-js'; }), /measurability\.weak\.entries is "crypto-js", not a list of distinct entry names/);
+plant('a multi-purpose library among the post-quantum entries', corpusOf((c) => { c.byEcosystem.go.measurability.pqc.entries = ['github.com/cloudflare/circl']; }),
+  /go\.measurability\.pqc\.entries names github\.com\/cloudflare\/circl, a multi-purpose library/);
+for (const [i, cell] of [...CLASSES, ...JOINT].entries()) {
+  plant(`the ${cell} cell off by one`, corpusOf((c) => { npmRaw(c)[cell].count += 1; }),
+    new RegExp(`byEcosystem\\.npm\\.anyManifestMatch\\.raw\\.${cell} is \\{"count":${[5, 5, 4, 1, 2, 2, 0][i] + 1}[,}].*recomputed from the files it is bound to`));
+}
+plant('a consolidated cell off by one', corpusOf((c) => { c.byEcosystem.maven.directUnconditional.consolidated.matched.count += 1; }), /maven\.directUnconditional\.consolidated\.matched is \{"count":2.*recomputed/);
+plant('a total cell off by one', corpusOf((c) => { c.total.anyManifestMatch.raw.matched.count += 1; }), /total\.anyManifestMatch\.raw\.matched is \{"count":22.*recomputed/);
+plant('a count where K is 0', corpusOf((c) => { c.byEcosystem.go.anyManifestMatch.raw.pqc = { count: 0, k: 0, nullReason: null }; }), /go\.anyManifestMatch\.raw\.pqc is \{"count":0,"k":0,"nullReason":null\}: count must be null when k is 0/);
+plant('null where K is not 0', corpusOf((c) => { c.byEcosystem.pypi.directUnconditional.raw.weak = { count: null, k: 2, nullReason: 'noCountableEntry' }; }), /pypi\.directUnconditional\.raw\.weak is .*: count is null while k is 2/);
+plant('a null with no reason', corpusOf((c) => { c.byEcosystem.go.anyManifestMatch.raw.pqc.nullReason = null; }), /go\.anyManifestMatch\.raw\.pqc is .*: nullReason says why count is null/);
+plant('a reason with no null', corpusOf((c) => { npmRaw(c).weakAndPqc.nullReason = 'noCountableEntry'; }), /anyManifestMatch\.raw\.weakAndPqc is .*: nullReason says why count is null/);
+plant('a null reason that is not one', corpusOf((c) => { c.byEcosystem.go.anyManifestMatch.raw.pqc.nullReason = 'notMeasured'; }), /pqc\.nullReason is "notMeasured", not noCountableEntry, rowBlocked or null/);
+plant('a K that is not a count', corpusOf((c) => { npmRaw(c).weak.k = null; }), /anyManifestMatch\.raw\.weak\.k is null, not a whole count/);
+plant('a cell under another K', corpusOf((c) => { npmRaw(c).weak.k = 3; }), /anyManifestMatch\.raw\.weak is \{"count":5,"k":3,"nullReason":null\}; recomputed/);
+plant('a block under another definition id', corpusOf((c) => { npmRaw(c).definitionId = 'census.match.anyManifest/1'; }), /anyManifestMatch\.raw\.definitionId is "census\.match\.anyManifest\/1", not census\.match\.anyManifest\/1\+census\.unit\.package\/1/);
+plant('a block without its consolidation figures', corpusOf((c) => { delete c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation; }), /anyManifestMatch\.consolidated is missing consolidation/);
+plant('a raw block with consolidation figures', corpusOf((c) => { npmRaw(c).consolidation = { unitsIn: 6, unitsOut: 6, merged: 0, removedByRule: {} }; }), /anyManifestMatch\.raw carries consolidation/);
+plant('unclassified matches off by one', corpusOf((c) => { npmRaw(c).excludedUnclassified.matches += 1; }), /raw\.excludedUnclassified\.matches is 3; recomputed it is 2/);
+plant('units with only unclassified matches off by one', corpusOf((c) => { npmRaw(c).excludedUnclassified.unitsWithOnlyUnclassifiedMatches = 2; }), /unitsWithOnlyUnclassifiedMatches is 2; recomputed it is 1/);
+plant('an unclassified entry\'s count off by one', corpusOf((c) => { npmRaw(c).excludedUnclassified.byEntry[0].matches = 3; }), /raw\.excludedUnclassified\.byEntry is .*; recomputed it is .*It lists every unclassified entry/);
+plant('an unclassified entry left out because nothing matched it', corpusOf((c) => { c.byEcosystem.packagist.directUnconditional.raw.excludedUnclassified.byEntry = []; }), /packagist\.directUnconditional\.raw\.excludedUnclassified\.byEntry is \[\]; recomputed it is/);
+plant('a merged count off by one', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation.merged = 1; }), /consolidated\.consolidation\.merged is 1; the consolidation map gives 2/);
+plant('consolidation figures that do not add up', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation.unitsIn = 7; }), /consolidated\.consolidation: unitsIn \(7\) is not unitsOut \+ merged \+ removed \(6\)/);
+plant('a removal count the map does not give', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation.removedByRule = { sharedNamespace: 1 }; }), /removedByRule\.sharedNamespace is 1; the consolidation map gives 0/);
+plant('a removal count under a rule the map does not have', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation.removedByRule = { nameTooShort: 0 }; }), /removedByRule names nameTooShort, which is not a rule of the consolidation map/);
+plant('removals that are not counts', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation.removedByRule = { sharedNamespace: '1' }; }), /removedByRule is .*, not an object of counts by rule/);
+plant('flags whose parts do not make the matched count', corpusOf((c) => { npmRaw(c).neitherWeakNorPqc.count = 1; }), /anyManifestMatch\.raw: matched \(5\) is not weak \(5\) \+ pqc \(2\) - weakAndPqc \(2\) \+ neitherWeakNorPqc \(1\)/);
+plant('weak outside its two classes', corpusOf((c) => { npmRaw(c).weak.count = 6; }), /anyManifestMatch\.raw: weak \(6\) is not between the larger of brokenAlgorithm \(4\) and deprecatedLibrary \(1\) and their sum/);
+plant('"neither" counted where post-quantum is not measurable', corpusOf((c) => { c.byEcosystem.go.anyManifestMatch.raw.neitherWeakNorPqc = { count: 2, nullReason: null }; }), /go\.anyManifestMatch\.raw: weakAndPqc or neitherWeakNorPqc is counted while weak or pqc is not measurable/);
+plant('matched and the unclassified-only units that do not make the units with a match', corpusOf((c) => { c.byEcosystem.maven.anyManifestMatch.raw.matched.count = 3; }), /maven\.anyManifestMatch\.raw: matched \(3\) and the units whose only matches are unclassified \(0\) make 3, and 2 unit\(s\) have a match/);
+plant('more matched than packages read with observable dependencies', corpusOf((c) => { c.byEcosystem.go.anyManifestMatch.raw.matched.count = 5; }), /go\.anyManifestMatch\.raw: matched \(5\) is more than the 4 packages read whose dependencies could be observed/);
+plant('a direct figure above the manifest-match one', corpusOf((c) => { c.byEcosystem.hex.directUnconditional.raw.matched.count = 2; }), /byEcosystem\.hex: directUnconditional\.raw\.matched \(2\) is more than anyManifestMatch\.raw\.matched \(1\)/);
+plant('figures without dev metadata for a registry that has none', corpusOf((c) => { c.byEcosystem.npm.excludingDevMetadata = c.byEcosystem.packagist.excludingDevMetadata; }), /byEcosystem\.npm\.excludingDevMetadata is .*\. It is kept for a registry read partly from dev metadata/);
+plant('no figures without dev metadata for Packagist', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata = null; }), /byEcosystem\.packagist\.excludingDevMetadata is null, not an object/);
+plant('coverage without dev metadata off by one', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata.coverage.scanned = 3; }), /excludingDevMetadata\.coverage\.scanned is 3; the ledger gives 2 without the packages read from dev metadata/);
+plant('a figure without dev metadata off by one', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata.anyManifestMatch.raw.matched.count = 2; }), /packagist\.excludingDevMetadata\.anyManifestMatch\.raw\.matched is \{"count":2.*recomputed/);
+plant('a total that names the wrong rows as measurable', corpusOf((c) => { c.total.directUnconditional.raw.pqc.measurableIn = ['npm']; }), /total\.directUnconditional\.raw\.pqc is .*recomputed/);
+plant('a total whose measurable rows are not registries', corpusOf((c) => { c.total.directUnconditional.raw.pqc.measurableIn = ['npm', 'npm']; }), /total\.directUnconditional\.raw\.pqc\.measurableIn is \["npm","npm"\], not a list of distinct registries/);
+plant('a total without dev metadata left out', corpusOf((c) => { c.total.excludingDevMetadata = null; }), /total\.excludingDevMetadata is null, not an object/);
+plant('a total coverage without dev metadata off by one', corpusOf((c) => { c.total.excludingDevMetadata.coverage.listed = 36; }), /total\.excludingDevMetadata\.coverage\.listed is 36; the ledgers give 35/);
+plant('a total figure without dev metadata off by one', corpusOf((c) => { c.total.excludingDevMetadata.directUnconditional.raw.weak.count += 1; }), /total\.excludingDevMetadata\.directUnconditional\.raw\.weak is .*recomputed/);
+plant('a multi-purpose library left out', corpusOf((c) => { c.multiPurposeLibraries.pop(); }), /multiPurposeLibraries has no row for go:github\.com\/cloudflare\/circl/);
+plant('a library listed as multi-purpose that is not', corpusOf((c) => { c.multiPurposeLibraries.push({ ...c.multiPurposeLibraries[0], entry: 'pyDes' }); }), /multiPurposeLibraries\[2\] names "pypi":"pyDes", which is not a multi-purpose entry/);
+plant('a multi-purpose library listed twice', corpusOf((c) => { c.multiPurposeLibraries.push(structuredClone(c.multiPurposeLibraries[0])); }), /multiPurposeLibraries\[2\] names pypi:cryptography a second time/);
+plant('a multi-purpose count off by one', corpusOf((c) => { c.multiPurposeLibraries[1].dependents.directUnconditional.consolidated = 2; }), /multiPurposeLibraries\[1\]\.dependents\.directUnconditional\.consolidated is 2; recomputed it is 1/);
+plant('a multi-purpose count that is not a count', corpusOf((c) => { c.multiPurposeLibraries[1].dependents.anyManifestMatch.raw = null; }), /dependents\.anyManifestMatch\.raw is null, not a whole count/);
+plant('a multi-purpose table under another id', corpusOf((c) => { c.multiPurposeLibraries[0].definitionId = 'census.table/1'; }), /multiPurposeLibraries\[0\]\.definitionId is "census\.table\/1"/);
+plant('multi-purpose libraries that are not a list', corpusOf((c) => { c.multiPurposeLibraries = {}; }), /multiPurposeLibraries is \{\}, not a list/);
+
+// Comparability with every earlier dataset.
+plant('an empty comparability', corpusOf((c) => { c.comparability = []; }), /comparability is \[\]\. It is required and names every earlier dataset/);
+plant('comparability that does not name an earlier directory', corpusOf((c) => { c.comparability[0].dataset = '2026-01-01'; }), /comparability does not name 2026-03-18\. Every earlier dataset is named/);
+plant('comparability naming a dataset that is not here', corpusOf((c) => { c.comparability.push({ ...c.comparability[0], dataset: '2026-08-03' }); }), /comparability\[1\] names "2026-08-03", which is not a dataset of this repository collected before 2026-09-30/);
+plant('comparability naming a dataset twice', corpusOf((c) => { c.comparability.push({ ...c.comparability[0] }); }), /comparability\[1\] names 2026-03-18 a second time/);
+plant('a first-shape dataset marked comparable', corpusOf((c) => { Object.assign(c.comparability[0], { comparable: true, reason: null, changes: [] }); }), /2026-03-18 is a version 1 dataset, measured with an instrument that has since changed, so it is not comparable/);
+plant('a first-shape dataset that does not name every change', corpusOf((c) => { c.comparability[0].changes = ['matchSet']; }), /comparability\[0\]\.changes is \["matchSet"\]\. A version 1 dataset differs in every component/);
+plant('a change code that is not one', corpusOf((c) => { c.comparability[0].changes = ['PLACEHOLDER']; }), /comparability\[0\]\.changes is \["PLACEHOLDER"\], not a list of distinct change codes/);
+plant('a dataset not comparable for no reason', corpusOf((c) => { c.comparability[0].reason = null; }), /comparability\[0\] is not comparable, so its reason is instrumentChanged/);
+plant('comparable that is not a yes or no', corpusOf((c) => { c.comparability[0].comparable = 'no'; }), /comparability\[0\]\.comparable is "no", not true or false/);
+plant('a DOI that is not one', corpusOf((c) => { c.comparability[0].doi = 'zenodo'; }), /comparability\[0\]\.doi is "zenodo", not a DOI or null/);
+plant('the manifest\'s comparability not a copy of the corpus\'s', manifestOf((m) => { m.comparability = [{ ...m.comparability[0], doi: '10.5281/zenodo.1' }]; }), /MANIFEST\.json: comparability is not the corpus's/);
+
+// MANIFEST.json against the files.
+plant('a manifest coverage that is not the files\'', manifestOf((m) => { m.coverage = { ...m.coverage, unresolved: 1 }; }), /MANIFEST\.json: coverage\.unresolved is 1; the eleven scan files sum to 0/);
+plant('a manifest coverage count that is not a count', manifestOf((m) => { m.coverage = { ...m.coverage, absent: null }; }), /MANIFEST\.json: coverage\.absent is null, not a whole count/);
+plant('a manifest registry whose sources are not the raw file\'s', manifestOf((m) => { m.ecosystems[2] = { ...m.ecosystems[2], sources: { enumeration: 'https://index.golang.org/index', manifests: 'https://proxy.golang.org' } }; }),
+  /MANIFEST\.json: ecosystems\[2\]\.sources is not the sources of scan-results-go\.json/);
+plant('a manifest registry listed twice', manifestOf((m) => { m.ecosystems[1] = m.ecosystems[0]; }), /MANIFEST\.json: ecosystems\[1\]\.ecosystem is "npm", not a registry listed once/);
+plant('a manifest without a registry', manifestOf((m) => { m.ecosystems.pop(); }), /MANIFEST\.json: ecosystems has no item for cocoapods/);
+plant('manifest registries that are not a list', manifestOf((m) => { m.ecosystems = {}; }), /MANIFEST\.json: ecosystems is \{\}, not a list/);
+
+// Fields left out of nested objects, and the remaining types.
+plant('unclassified counts that are not a list', corpusOf((c) => { npmRaw(c).excludedUnclassified.byEntry = {}; }), /raw\.excludedUnclassified\.byEntry is \{\}, not a list/);
+plant('an unclassified count that is not a count', corpusOf((c) => { npmRaw(c).excludedUnclassified.byEntry[0].matches = '2'; }), /excludedUnclassified\.byEntry\[0\] is .*, not an entry and a count/);
+plant('consolidation figures that are not counts', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation.unitsOut = null; }), /consolidated\.consolidation\.unitsOut is null, not a whole count/);
+plant('a comparable dataset that still gives a reason', corpusOf((c) => { c.comparability[0].comparable = true; }), /comparability\[0\] is comparable and still gives a reason or changes/);
+plant('a coverage total that is not a count', corpusOf((c) => { c.coverage.total.absent = -1; }), /coverage\.total\.absent is -1, not a whole count/);
+plant('a total without dev metadata where no registry reads from it', {
+  fixture: (f) => { f.packagist.method.readFrom = ['taggedRelease']; f.packagist.rows.find((r) => r.name === 'acme/cli').readFrom = 'taggedRelease'; },
+}, /total\.excludingDevMetadata is set, and no registry is read partly from dev metadata/);
+
+// Where a dataset sits.
+test('comparability missing an earlier directory is refused', async () => {
+  const result = await validate({
+    [EARLIER_V2]: [EARLIER_V2, {}],
+    [DATE]: [DATE, {}, [{ dataset: FIRST_SHAPE, version: 1 }]],
+  });
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(result.stderr, /2026-09-30: corpus-2026-09-30\.json: comparability does not name 2026-09-15\. Every earlier dataset is named/);
+});
+test('a later dataset marked comparable with an earlier one whose instrument differs is refused', async () => {
+  const result = await validate({
+    [EARLIER_V2]: [EARLIER_V2, { scans: (s) => { s.npm.method.versionSelection = 'distTagLatest'; } }],
+    [DATE]: [DATE, {}, [{ dataset: FIRST_SHAPE, version: 1 }, { dataset: EARLIER_V2, version: 2 }]],
+  });
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(result.stderr, /2026-09-15 is marked comparable, and its the npm scanner's method differ from this dataset's/);
+});
+test('a later dataset marked comparable with an earlier one that cannot be read is refused', async () => {
+  const result = await validate({
+    [EARLIER_V2]: [EARLIER_V2, {}],
+    [DATE]: [DATE, {}, [{ dataset: FIRST_SHAPE, version: 1 }, { dataset: EARLIER_V2, version: 2 }]],
+  }, (dir) => unlinkSync(join(dir, 'datasets', EARLIER_V2, 'catalog-2026-09-15.json')));
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(result.stderr, /2026-09-15 is marked comparable, and the files that would show it cannot be read/);
+});
+test('an earlier dataset whose manifest cannot be read is refused as a comparison', async () => {
+  const result = await validate({ [DATE]: [DATE, {}, [{ dataset: FIRST_SHAPE, version: 1 }, { dataset: '2026-09-01', version: 1 }]] },
+    (dir) => { mkdirSync(join(dir, 'datasets', '2026-09-01')); writeFileSync(join(dir, 'datasets', '2026-09-01', 'MANIFEST.json'), '{'); });
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(result.stderr, /comparability\[1\]: 2026-09-01 has no manifest these rules can read/);
+});
+
+// Each object is closed: a field the contract does not define fails, at every level.
+const closedInTheCorpus = [
+  ['a registry of the manifest', manifestOf((m) => { m.ecosystems[0].note = 'x'; }), /MANIFEST\.json: ecosystems\[0\] carries note/],
+  ['a known issue', manifestOf((m) => { m.knownIssues = [{ ...knownIssue(), note: 'x' }]; }), /MANIFEST\.json: knownIssues\[0\] carries note/],
+  ['the corpus', corpusOf((c) => { c.packagesScanned = 36; }), /corpus-2026-09-30\.json carries packagesScanned/],
+  ['the inputs', corpusOf((c) => { c.inputs.note = 'x'; }), /corpus-2026-09-30\.json: inputs carries note/],
+  ['an input scan', corpusOf((c) => { c.inputs.scans[0].note = 'x'; }), /inputs\.scans\[0\] carries note/],
+  ['the input catalogue', corpusOf((c) => { c.inputs.catalog.note = 'x'; }), /inputs\.catalog carries note/],
+  ['the input map', corpusOf((c) => { c.inputs.consolidation.note = 'x'; }), /inputs\.consolidation carries note/],
+  ['the definitions', corpusOf((c) => { c.definitions.note = 'x'; }), /: definitions carries note/],
+  ['a definition', corpusOf((c) => { c.definitions.raw.note = 'x'; }), /definitions\.raw carries note/],
+  ['the manifest-match definition', corpusOf((c) => { c.definitions.anyManifestMatch.note = 'x'; }), /definitions\.anyManifestMatch carries note/],
+  ['the direct definition', corpusOf((c) => { c.definitions.directUnconditional.note = 'x'; }), /definitions\.directUnconditional carries note/],
+  ['the class ids', corpusOf((c) => { c.definitions.classes.modern = 'x'; }), /definitions\.classes carries modern/],
+  ['a comparability record', corpusOf((c) => { c.comparability[0].note = 'x'; }), /comparability\[0\] carries note/],
+  ['a blocked row', corpusOf((c) => { c.blocked = [{ ecosystem: 'hex', reason: 'sourcesOffAllowlist', detail: 'x', note: 'x' }]; }), /blocked\[0\] carries note/],
+  ['the corpus coverage', corpusOf((c) => { c.coverage.note = 'x'; }), /corpus-2026-09-30\.json: coverage carries note/],
+  ['the coverage total', corpusOf((c) => { c.coverage.total.withCrypto = 1; }), /coverage\.total carries withCrypto/],
+  ['a registry\'s coverage', corpusOf((c) => { c.coverage.byEcosystem.hex.qc = 1; }), /coverage\.byEcosystem\.hex carries qc/],
+  ['a registry\'s row', corpusOf((c) => { c.byEcosystem.hex.qc = {}; }), /byEcosystem\.hex carries qc/],
+  ['the measurability', corpusOf((c) => { c.byEcosystem.hex.measurability.modern = {}; }), /measurability carries modern/],
+  ['one class\'s measurability', corpusOf((c) => { c.byEcosystem.npm.measurability.weak.note = 'x'; }), /measurability\.weak carries note/],
+  ['an exclusion', corpusOf((c) => { c.byEcosystem.npm.measurability.weak.excluded[0].note = 'x'; }), /measurability\.weak\.excluded\[0\] carries note/],
+  ['a figure block', corpusOf((c) => { npmRaw(c).modernOnly = { count: 1, k: 1, nullReason: null }; }), /anyManifestMatch\.raw carries modernOnly/],
+  ['a pair of blocks', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.qc = {}; }), /byEcosystem\.npm\.anyManifestMatch carries qc/],
+  ['a class cell', corpusOf((c) => { npmRaw(c).weak.note = 'x'; }), /anyManifestMatch\.raw\.weak carries note/],
+  ['a joint cell', corpusOf((c) => { npmRaw(c).weakAndPqc.k = 2; }), /anyManifestMatch\.raw\.weakAndPqc carries k/],
+  ['what was left out', corpusOf((c) => { npmRaw(c).excludedUnclassified.note = 'x'; }), /raw\.excludedUnclassified carries note/],
+  ['an unclassified entry\'s count', corpusOf((c) => { npmRaw(c).excludedUnclassified.byEntry[0].ecosystem = 'npm'; }), /excludedUnclassified\.byEntry\[0\] carries ecosystem/],
+  ['the consolidation figures', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation.note = 'x'; }), /consolidated\.consolidation carries note/],
+  ['the figures without dev metadata', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata.note = 'x'; }), /byEcosystem\.packagist\.excludingDevMetadata carries note/],
+  ['the total', corpusOf((c) => { c.total.coverage = c.coverage.total; }), /corpus-2026-09-30\.json: total carries coverage/],
+  ['a total cell', corpusOf((c) => { c.total.anyManifestMatch.raw.weak.note = 'x'; }), /total\.anyManifestMatch\.raw\.weak carries note/],
+  ['a joint total cell', corpusOf((c) => { c.total.anyManifestMatch.raw.weakAndPqc.measurableIn = ['npm']; }), /total\.anyManifestMatch\.raw\.weakAndPqc carries measurableIn/],
+  ['the total without dev metadata', corpusOf((c) => { c.total.excludingDevMetadata.note = 'x'; }), /total\.excludingDevMetadata carries note/],
+  ['a multi-purpose library', corpusOf((c) => { c.multiPurposeLibraries[0].total = 2; }), /multiPurposeLibraries\[0\] carries total/],
+  ['its dependents', corpusOf((c) => { c.multiPurposeLibraries[0].dependents.anyManifestMatch.total = 2; }), /dependents\.anyManifestMatch carries total/],
+];
+for (const [level, change, problem] of closedInTheCorpus) plant(`a field the contract does not define, in ${level}`, change, problem);
+
 // --- Running the planted defects -------------------------------------------------
 
 for (const [what, change, problem, prepare] of defects) {

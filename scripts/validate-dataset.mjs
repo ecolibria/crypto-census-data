@@ -2013,6 +2013,1010 @@ function checkConsolidationRule(byEco, scans, file, bad) {
   }
 }
 
+// --- The corpus ---------------------------------------------------------------
+//
+// Every figure in the corpus is a function of the other files, so each one is
+// recomputed from them and compared. Nothing a producer writes is taken on
+// trust: not a total, not a verdict, not a count a ledger can give.
+
+const MAVEN_DIRECT_SCOPES = ['compile', 'runtime', 'provided', 'system'];
+
+/**
+ * When the declarations of one name in one manifest count as declared
+ * directly and unconditionally (census.match.directUnconditional/1), by
+ * registry. Evaluated here from the declarations a scan recorded; never read
+ * from a stored flag.
+ */
+const DIRECT = {
+  npm: (ds) => (ds.some((d) => d.kind === 'dependencies') && !ds.some((d) => d.kind === 'optionalDependencies')) ||
+    ds.some((d) => d.kind === 'peerDependencies' && d.peerOptional === false),
+  pypi: (ds) => ds.some((d) => d.marker === 'none'),
+  go: (ds) => ds.some((d) => d.indirect === false),
+  maven: (ds) => ds.some((d) => d.kind === 'project' && (d.scope === null || MAVEN_DIRECT_SCOPES.includes(d.scope)) && d.optional === false),
+  crates: (ds) => ds.some((d) => d.kind === 'normal' && d.optional === false && d.target === null),
+  packagist: (ds) => ds.some((d) => d.kind === 'require'),
+  nuget: (ds, manifest) => manifest.dependencyGroups.every((group) => ds.some((d) => d.targetFramework === group)) ||
+    ds.some((d) => d.targetFramework === null),
+  rubygems: (ds) => ds.some((d) => d.kind === 'runtime'),
+  hex: (ds) => ds.some((d) => d.optional === false),
+  pub: (ds) => ds.some((d) => d.kind === 'dependencies'),
+  cocoapods: (ds, manifest) => ds.some((d) => d.kind === 'topLevel' ||
+    (d.kind === 'subspec' && (manifest.defaultSubspecs === null || manifest.defaultSubspecs.includes(d.subspec)))),
+};
+
+/** The kinds that count as a match under census.match.anyManifest/1: every kind recorded, except Maven managed and plugin and Packagist suggest. */
+const ANY_MANIFEST_KINDS = Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, DECLARATIONS[eco].kinds.filter((kind) =>
+  !(eco === 'maven' && (kind === 'managed' || kind === 'plugin')) && !(eco === 'packagist' && kind === 'suggest'))]));
+
+const CLASS_IDS = {
+  matched: 'census.class.classifiedEntry/1',
+  weak: 'census.class.weak/1',
+  brokenAlgorithm: 'census.class.brokenAlgorithm/1',
+  deprecatedLibrary: 'census.class.deprecatedLibrary/1',
+  pqc: 'census.class.pqcDedicated/1',
+};
+const JOINT = ['weakAndPqc', 'neitherWeakNorPqc'];
+const MATCH_DEFINITIONS = ['anyManifestMatch', 'directUnconditional'];
+const UNITS = ['raw', 'consolidated'];
+
+/** The codes for what changed in the instrument between two datasets. A version 1 dataset differs in all eleven. */
+const CHANGE_CODES = ['enumerationFrame', 'versionSelection', 'manifestReader', 'declarationKinds', 'matchRule', 'matchSet',
+  'coverageDefinition', 'matchDefinition', 'classDefinition', 'classification', 'consolidationRule'];
+
+const isDoi = (v) => typeof v === 'string' && /^10\.\d{4,9}\/\S+$/.test(v);
+const sameValue = (a, b) => canonical(a) === canonical(b);
+
+const EXCLUSIONS = ['unclassified', 'registryAbsent', 'unmatchable'];
+
+/** The same ceiling as a corpus writes it in its definitions. A corpus cannot set its own. */
+const UNRESOLVED_CEILING = 1 / ONE_IN;
+
+Object.assign(KEYS, {
+  manifestEcosystem: ['ecosystem', 'coverage', 'enumeration', 'sources'],
+  knownIssue: ['defect', 'summary', 'affects', 'direction', 'magnitude', 'correctedIn'],
+  corpus: ['schemaVersion', 'kind', 'collectedAt', 'generatedAt', 'inputs', 'definitions', 'comparability', 'blocked', 'coverage',
+    'byEcosystem', 'total', 'multiPurposeLibraries'],
+  inputs: ['scans', 'catalog', 'consolidation'],
+  inputScan: ['ecosystem', 'file', 'sha256'],
+  inputCatalog: ['file', 'sha256', 'matchSetSha256', 'classificationSha256'],
+  inputConsolidation: ['file', 'sha256'],
+  definitions: ['coverage', 'unresolvedCeiling', 'anyManifestMatch', 'directUnconditional', 'raw', 'consolidated', 'classes', 'multiPurposeLibrary'],
+  id: ['id'],
+  includes: ['id', 'includes'],
+  predicate: ['id', 'predicate'],
+  comparability: ['dataset', 'doi', 'comparable', 'reason', 'changes'],
+  blocked: ['ecosystem', 'reason', 'detail'],
+  corpusCoverage: ['total', 'byEcosystem'],
+  rowCoverage: [...COVERAGE_COUNTS, 'scannedByReadFrom', 'enumeration'],
+  row: ['measurability', 'anyManifestMatch', 'directUnconditional', 'excludingDevMetadata'],
+  total: ['anyManifestMatch', 'directUnconditional', 'excludingDevMetadata'],
+  pair: ['raw', 'consolidated'],
+  devRow: ['coverage', 'anyManifestMatch', 'directUnconditional'],
+  measure: ['k', 'entries', 'excluded'],
+  measureMatched: ['k', 'excluded'],
+  exclusion: ['entry', 'why'],
+  block: ['definitionId', ...CLASSES, ...JOINT, 'excludedUnclassified'],
+  consolidatedBlock: ['definitionId', ...CLASSES, ...JOINT, 'excludedUnclassified', 'consolidation'],
+  cell: ['count', 'k', 'nullReason'],
+  totalCell: ['count', 'k', 'nullReason', 'measurableIn', 'notMeasurableIn'],
+  jointCell: ['count', 'nullReason'],
+  excludedUnclassified: ['matches', 'unitsWithOnlyUnclassifiedMatches', 'byEntry'],
+  byEntry: ['entry', 'matches'],
+  consolidationStats: ['unitsIn', 'unitsOut', 'merged', 'removedByRule'],
+  multiPurposeLibrary: ['ecosystem', 'entry', 'definitionId', 'dependents'],
+  magnitude: ['value', 'of', 'unit'],
+});
+
+// --- The corpus: figures recomputed ---------------------------------------------
+
+/** The catalogue entries one package matched under one definition. */
+function countedEntries(p, eco, definition, includes) {
+  const entries = new Set();
+  for (const m of p.matches) {
+    const counts = definition === 'anyManifestMatch'
+      ? m.declarations.some((d) => includes.includes(d.kind))
+      : DIRECT[eco](m.declarations, p.manifest);
+    if (counts) entries.add(m.entry);
+  }
+  return entries;
+}
+
+/**
+ * The units of one figure block and the entries each matched: a package, or a
+ * consolidated unit, among the packages with a match that counts under the
+ * definition. A merged unit holds the union of its members' entries, so it
+ * carries the union of their flags.
+ */
+function unitsOf(packages, eco, definition, includes, map) {
+  const inBlock = [];
+  for (const p of packages) {
+    const entries = countedEntries(p, eco, definition, includes);
+    if (entries.size > 0) inBlock.push({ name: p.name, entries });
+  }
+  if (map === null) return { units: inBlock.map((unit) => unit.entries), stats: null };
+  const merged = new Map();
+  const removedByRule = {};
+  for (const { name, entries } of inBlock) {
+    const rule = map.removedBy.get(name);
+    if (rule !== undefined) {
+      removedByRule[rule] = (removedByRule[rule] ?? 0) + 1;
+      continue;
+    }
+    const unit = map.unitOf.get(name);
+    const key = unit === undefined ? `package\0${name}` : `unit\0${unit}`;
+    const union = merged.get(key) ?? new Set();
+    for (const entry of entries) union.add(entry);
+    merged.set(key, union);
+  }
+  const removed = sum(Object.values(removedByRule));
+  return {
+    units: [...merged.values()],
+    stats: { unitsIn: inBlock.length, unitsOut: merged.size, merged: inBlock.length - merged.size - removed, removedByRule },
+  };
+}
+
+/** One figure block as the files give it: a cell per class, the two joint cells, what was left out, and the consolidation. */
+function figureBlock({ units, stats }, registry, definitionId) {
+  const counts = Object.fromEntries([...CLASSES, ...JOINT].map((key) => [key, 0]));
+  const byEntry = new Map(registry.unclassified.map((name) => [name, 0]));
+  let onlyUnclassified = 0;
+  for (const entries of units) {
+    const flags = Object.fromEntries(CLASSES.map((cls) => [cls, false]));
+    let unclassified = false;
+    for (const name of entries) {
+      const entry = registry.byName.get(name);
+      if (entry.classified !== true) {
+        byEntry.set(name, byEntry.get(name) + 1);
+        unclassified = true;
+        continue;
+      }
+      for (const cls of CLASSES) if (IN_CLASS[cls](entry)) flags[cls] = true;
+    }
+    for (const cls of CLASSES) if (flags[cls]) counts[cls] += 1;
+    if (flags.weak && flags.pqc) counts.weakAndPqc += 1;
+    if (flags.matched && !flags.weak && !flags.pqc) counts.neitherWeakNorPqc += 1;
+    if (!flags.matched && unclassified) onlyUnclassified += 1;
+  }
+  const block = { definitionId };
+  for (const cls of CLASSES) {
+    const k = registry.measure[cls].k;
+    block[cls] = k === 0 ? { count: null, k: 0, nullReason: 'noCountableEntry' } : { count: counts[cls], k, nullReason: null };
+  }
+  const both = registry.measure.weak.k > 0 && registry.measure.pqc.k > 0;
+  for (const joint of JOINT) {
+    block[joint] = both ? { count: counts[joint], nullReason: null } : { count: null, nullReason: 'noCountableEntry' };
+  }
+  block.excludedUnclassified = {
+    matches: sum([...byEntry.values()]),
+    unitsWithOnlyUnclassifiedMatches: onlyUnclassified,
+    byEntry: [...byEntry].map(([entry, matches]) => ({ entry, matches })),
+  };
+  if (stats !== null) block.consolidation = stats;
+  return { block, population: units.length };
+}
+
+/** Everything one registry's row of the corpus should hold, computed from its scan file, its ledger, the snapshot and the map. */
+function expectedRow(eco, registry, scan, ledger, map, includes) {
+  const blocksOf = (packages) => {
+    const result = { blocks: {}, units: {}, populations: {} };
+    for (const definition of MATCH_DEFINITIONS) {
+      const raw = unitsOf(packages, eco, definition, includes, null);
+      const consolidated = unitsOf(packages, eco, definition, includes, map);
+      const rawBlock = figureBlock(raw, registry, `${DEFINITIONS[definition]}+${DEFINITIONS.raw}`);
+      const consolidatedBlock = figureBlock(consolidated, registry, `${DEFINITIONS[definition]}+${DEFINITIONS.consolidated}`);
+      result.blocks[definition] = { raw: rawBlock.block, consolidated: consolidatedBlock.block };
+      result.units[definition] = { raw: raw.units, consolidated: consolidated.units };
+      result.populations[definition] = { raw: rawBlock.population, consolidated: consolidatedBlock.population };
+    }
+    return result;
+  };
+  const all = blocksOf(scan.packages);
+  const measurability = {};
+  for (const cls of CLASSES) {
+    const m = registry.measure[cls];
+    measurability[cls] = cls === 'matched' ? { k: m.k, excluded: m.excluded } : { k: m.k, entries: m.entries, excluded: m.excluded };
+  }
+  const coverage = Object.fromEntries(COVERAGE_COUNTS.map((field) => [field, ledger.counts[field]]));
+  const row = { measurability, anyManifestMatch: all.blocks.anyManifestMatch, directUnconditional: all.blocks.directUnconditional, excludingDevMetadata: null };
+  let dev = null;
+  // Packagist's dev metadata: the same figures over the packages not read from it, so that they are published with and without them.
+  if (scan.method.readFrom.includes('devDefaultBranch')) {
+    const read = ledger.byReadFrom.devDefaultBranch ?? 0;
+    const hidden = ledger.hiddenByReadFrom.devDefaultBranch ?? 0;
+    dev = blocksOf(scan.packages.filter((p) => p.readFrom !== 'devDefaultBranch'));
+    dev.coverage = { ...coverage, listed: coverage.listed - read, scanned: coverage.scanned - read, dependenciesNotObservable: coverage.dependenciesNotObservable - hidden };
+    row.excludingDevMetadata = { coverage: dev.coverage, anyManifestMatch: dev.blocks.anyManifestMatch, directUnconditional: dev.blocks.directUnconditional };
+  }
+  return { row, coverage, units: all.units, populations: all.populations, dev };
+}
+
+/** A total: each class cell sums the rows where the class is measurable, and says which rows those are. */
+function totalOf(rows, consolidated) {
+  const total = { definitionId: rows[0].block.definitionId };
+  for (const cls of CLASSES) {
+    const measurable = rows.filter(({ block }) => block[cls].k > 0);
+    total[cls] = {
+      count: measurable.length === 0 ? null : sum(measurable.map(({ block }) => block[cls].count)),
+      k: sum(measurable.map(({ block }) => block[cls].k)),
+      nullReason: measurable.length === 0 ? 'noCountableEntry' : null,
+      measurableIn: measurable.map(({ eco }) => eco),
+      notMeasurableIn: rows.filter(({ block }) => block[cls].k === 0).map(({ eco }) => eco),
+    };
+  }
+  for (const joint of JOINT) {
+    const counted = rows.filter(({ block }) => block[joint].count !== null);
+    total[joint] = counted.length === 0
+      ? { count: null, nullReason: 'noCountableEntry' }
+      : { count: sum(counted.map(({ block }) => block[joint].count)), nullReason: null };
+  }
+  total.excludedUnclassified = {
+    matches: sum(rows.map(({ block }) => block.excludedUnclassified.matches)),
+    unitsWithOnlyUnclassifiedMatches: sum(rows.map(({ block }) => block.excludedUnclassified.unitsWithOnlyUnclassifiedMatches)),
+    byEntry: rows.flatMap(({ block }) => block.excludedUnclassified.byEntry),
+  };
+  if (consolidated) {
+    const removedByRule = {};
+    for (const { block } of rows) {
+      for (const [rule, n] of Object.entries(block.consolidation.removedByRule)) removedByRule[rule] = (removedByRule[rule] ?? 0) + n;
+    }
+    total.consolidation = {
+      unitsIn: sum(rows.map(({ block }) => block.consolidation.unitsIn)),
+      unitsOut: sum(rows.map(({ block }) => block.consolidation.unitsOut)),
+      merged: sum(rows.map(({ block }) => block.consolidation.merged)),
+      removedByRule,
+    };
+  }
+  return total;
+}
+
+function expectedTotal(rows) {
+  const pairOf = (pick) => Object.fromEntries(MATCH_DEFINITIONS.map((definition) => [definition, Object.fromEntries(UNITS.map((unit) => [
+    unit, totalOf(ECOSYSTEMS.map((eco) => ({ eco, block: pick(rows[eco])[definition][unit] })), unit === 'consolidated')]))]));
+  const total = { ...pairOf((r) => r.row), excludingDevMetadata: null };
+  if (ECOSYSTEMS.some((eco) => rows[eco].dev !== null)) {
+    total.excludingDevMetadata = {
+      coverage: Object.fromEntries(COVERAGE_COUNTS.map((field) => [field, sum(ECOSYSTEMS.map((eco) => (rows[eco].dev ?? rows[eco]).coverage[field]))])),
+      ...pairOf((r) => r.row.excludingDevMetadata ?? r.row),
+    };
+  }
+  return total;
+}
+
+// --- The corpus: comparison -----------------------------------------------------
+
+/** The rules a cell states about itself, then the cell against its recomputed value. */
+function compareCell(stored, expected, where, keys, ctx) {
+  if (!closed(stored, keys, where, ctx.bad)) return;
+  if (stored.count !== null && !isCount(stored.count)) {
+    ctx.bad(`${where}.count is ${describe(stored.count)}, not a whole count or null. No share is stored: a share is computed where it is shown.`);
+    return;
+  }
+  if (keys.includes('k') && !isCount(stored.k)) {
+    ctx.bad(`${where}.k is ${describe(stored.k)}, not a whole count`);
+    return;
+  }
+  if (stored.nullReason !== null && !['noCountableEntry', 'rowBlocked'].includes(stored.nullReason)) {
+    ctx.bad(`${where}.nullReason is ${describe(stored.nullReason)}, not noCountableEntry, rowBlocked or null`);
+    return;
+  }
+  if (keys.includes('k') && stored.k === 0 && stored.count !== null) {
+    ctx.bad(`${where} is ${describe(stored)}: count must be null when k is 0. No countable entry exists to be observed, and a 0 ` +
+      'would read as a measured absence.');
+    return;
+  }
+  if (keys.includes('k') && stored.k > 0 && stored.count === null && stored.nullReason !== 'rowBlocked') {
+    ctx.bad(`${where} is ${describe(stored)}: count is null while k is ${stored.k}. Null is kept for a figure that cannot be ` +
+      'measured, and this one can; a measured zero is 0.');
+    return;
+  }
+  if ((stored.count === null) !== (stored.nullReason !== null)) {
+    ctx.bad(`${where} is ${describe(stored)}: nullReason says why count is null, so it is set exactly when count is null`);
+    return;
+  }
+  let comparable = stored;
+  if (keys.includes('measurableIn')) {
+    for (const field of ['measurableIn', 'notMeasurableIn']) {
+      const list = stored[field];
+      if (!Array.isArray(list) || !list.every((eco) => ECOSYSTEMS.includes(eco)) || !isDistinct(list)) {
+        ctx.bad(`${where}.${field} is ${describe(list)}, not a list of distinct registries`);
+        return;
+      }
+    }
+    comparable = { ...stored, measurableIn: [...stored.measurableIn].sort(), notMeasurableIn: [...stored.notMeasurableIn].sort() };
+    expected = { ...expected, measurableIn: [...expected.measurableIn].sort(), notMeasurableIn: [...expected.notMeasurableIn].sort() };
+  }
+  if (!sameValue(comparable, expected)) {
+    ctx.figureBad(`${where} is ${describe(stored)}; recomputed from the files it is bound to, it is ${describe(expected)}. A ` +
+      'figure that does not follow from the scan files, the catalogue snapshot and the consolidation map is not a measurement.');
+  }
+}
+
+function compareExcluded(stored, expected, where, ctx) {
+  if (!closed(stored, KEYS.excludedUnclassified, where, ctx.bad)) return;
+  for (const field of ['matches', 'unitsWithOnlyUnclassifiedMatches']) {
+    if (!isCount(stored[field])) ctx.bad(`${where}.${field} is ${describe(stored[field])}, not a whole count`);
+    else if (stored[field] !== expected[field]) ctx.figureBad(`${where}.${field} is ${stored[field]}; recomputed it is ${expected[field]}`);
+  }
+  if (!Array.isArray(stored.byEntry)) {
+    ctx.bad(`${where}.byEntry is ${describe(stored.byEntry)}, not a list`);
+    return;
+  }
+  let shaped = true;
+  stored.byEntry.forEach((item, index) => {
+    if (!closed(item, KEYS.byEntry, `${where}.byEntry[${index}]`, ctx.bad)) shaped = false;
+    else if (!isText(item.entry) || !isCount(item.matches)) {
+      ctx.bad(`${where}.byEntry[${index}] is ${describe(item)}, not an entry and a count`);
+      shaped = false;
+    }
+  });
+  const items = (list) => list.map((item) => `${item.entry}\0${item.matches}`).sort();
+  if (shaped && !sameValue(items(stored.byEntry), items(expected.byEntry))) {
+    ctx.figureBad(`${where}.byEntry is ${describe(stored.byEntry)}; recomputed it is ${describe(expected.byEntry)}. It lists ` +
+      'every unclassified entry of the registry, each with the units that matched it.');
+  }
+}
+
+function compareConsolidationStats(stored, expected, where, ctx) {
+  if (!closed(stored, KEYS.consolidationStats, where, ctx.bad)) return;
+  let counted = true;
+  for (const field of ['unitsIn', 'unitsOut', 'merged']) {
+    if (!isCount(stored[field])) {
+      ctx.bad(`${where}.${field} is ${describe(stored[field])}, not a whole count`);
+      counted = false;
+    } else if (stored[field] !== expected[field]) {
+      ctx.figureBad(`${where}.${field} is ${stored[field]}; the consolidation map gives ${expected[field]}`);
+    }
+  }
+  if (!isObject(stored.removedByRule) || !Object.values(stored.removedByRule).every(isCount)) {
+    ctx.bad(`${where}.removedByRule is ${describe(stored.removedByRule)}, not an object of counts by rule`);
+    return;
+  }
+  for (const rule of Object.keys(stored.removedByRule)) {
+    if (!ctx.ruleIds.has(rule)) ctx.bad(`${where}.removedByRule names ${rule}, which is not a rule of the consolidation map`);
+  }
+  for (const rule of new Set([...Object.keys(stored.removedByRule), ...Object.keys(expected.removedByRule)])) {
+    const has = stored.removedByRule[rule] ?? 0;
+    const want = expected.removedByRule[rule] ?? 0;
+    if (has !== want) ctx.figureBad(`${where}.removedByRule.${rule} is ${has}; the consolidation map gives ${want}`);
+  }
+  const removed = sum(Object.values(stored.removedByRule));
+  if (counted && stored.unitsIn !== stored.unitsOut + stored.merged + removed) {
+    ctx.bad(`${where}: unitsIn (${stored.unitsIn}) is not unitsOut + merged + removed (${stored.unitsOut + stored.merged + removed}). ` +
+      'Every unit that goes in is kept, merged or removed, once.');
+  }
+}
+
+function compareBlock(stored, expected, where, ctx, total) {
+  const consolidated = Object.hasOwn(expected, 'consolidation');
+  if (!closed(stored, consolidated ? KEYS.consolidatedBlock : KEYS.block, where, ctx.bad)) return;
+  if (stored.definitionId !== expected.definitionId) {
+    ctx.bad(`${where}.definitionId is ${describe(stored.definitionId)}, not ${expected.definitionId}. A figure is cited with ` +
+      'the definitions it was counted under.');
+  }
+  for (const cls of CLASSES) compareCell(stored[cls], expected[cls], `${where}.${cls}`, total ? KEYS.totalCell : KEYS.cell, ctx);
+  for (const joint of JOINT) compareCell(stored[joint], expected[joint], `${where}.${joint}`, KEYS.jointCell, ctx);
+  compareExcluded(stored.excludedUnclassified, expected.excludedUnclassified, `${where}.excludedUnclassified`, ctx);
+  if (consolidated) compareConsolidationStats(stored.consolidation, expected.consolidation, `${where}.consolidation`, ctx);
+}
+
+function comparePair(stored, expected, where, ctx, total) {
+  if (!closed(stored, KEYS.pair, where, ctx.bad)) return;
+  for (const unit of UNITS) compareBlock(stored[unit], expected[unit], `${where}.${unit}`, ctx, total);
+}
+
+/** The identities the contract states for every block of a row, read from the stored figures. */
+function blockIdentities(block, where, population, coverage, ctx) {
+  if (!isObject(block)) return;
+  const n = (cell) => (isObject(cell) && isCount(cell.count) ? cell.count : null);
+  const [m, w, ba, dl, p, wp, nw] = [...CLASSES, ...JOINT].map((key) => n(block[key]));
+  if ([m, w, p, wp, nw].every((x) => x !== null) && m !== w + p - wp + nw) {
+    ctx.bad(`${where}: matched (${m}) is not weak (${w}) + pqc (${p}) - weakAndPqc (${wp}) + neitherWeakNorPqc (${nw}). The ` +
+      'flags overlap, and these four parts are how a reader sees by how much.');
+  }
+  if ([w, ba, dl].every((x) => x !== null) && (w > ba + dl || w < Math.max(ba, dl))) {
+    ctx.bad(`${where}: weak (${w}) is not between the larger of brokenAlgorithm (${ba}) and deprecatedLibrary (${dl}) and ` +
+      'their sum. weak is the union of the two classes.');
+  }
+  if ((w === null || p === null) && (n(block.weakAndPqc) !== null || n(block.neitherWeakNorPqc) !== null)) {
+    ctx.bad(`${where}: weakAndPqc or neitherWeakNorPqc is counted while weak or pqc is not measurable. Where post-quantum is ` +
+      'not measurable, "neither" would assert an absence nobody measured.');
+  }
+  const only = isObject(block.excludedUnclassified) ? block.excludedUnclassified.unitsWithOnlyUnclassifiedMatches : null;
+  if (m !== null && isCount(only) && m + only !== population) {
+    ctx.bad(`${where}: matched (${m}) and the units whose only matches are unclassified (${only}) make ${m + only}, and ` +
+      `${population} unit(s) have a match that counts under this definition. Every such unit is in one of the two.`);
+  }
+  if (m !== null && coverage && m > coverage.scanned - coverage.dependenciesNotObservable) {
+    ctx.bad(`${where}: matched (${m}) is more than the ${coverage.scanned - coverage.dependenciesNotObservable} packages read ` +
+      'whose dependencies could be observed');
+  }
+}
+
+/** A direct and unconditional declaration is also a manifest match, so no cell of that block exceeds the other's. */
+function monotone(row, expected, where, ctx) {
+  const n = (cell) => (isObject(cell) && isCount(cell.count) ? cell.count : null);
+  for (const unit of UNITS) {
+    const any = isObject(row.anyManifestMatch) ? row.anyManifestMatch[unit] : null;
+    const direct = isObject(row.directUnconditional) ? row.directUnconditional[unit] : null;
+    if (!isObject(any) || !isObject(direct)) continue;
+    for (const key of [...CLASSES, 'weakAndPqc']) {
+      const a = n(any[key]);
+      const d = n(direct[key]);
+      if (a !== null && d !== null && d > a) {
+        ctx.bad(`${where}: directUnconditional.${unit}.${key} (${d}) is more than anyManifestMatch.${unit}.${key} (${a}). A ` +
+          'declaration that counts as direct counts as a manifest match too.');
+      }
+    }
+  }
+}
+
+function compareMeasurability(stored, expected, registry, where, ctx) {
+  if (!closed(stored, CLASSES, where, ctx.bad)) return;
+  for (const cls of CLASSES) {
+    const at = `${where}.${cls}`;
+    const s = stored[cls];
+    const e = expected[cls];
+    if (!closed(s, cls === 'matched' ? KEYS.measureMatched : KEYS.measure, at, ctx.bad)) continue;
+    if (s.k !== e.k) {
+      ctx.figureBad(`${at}.k is ${describe(s.k)}; the catalogue snapshot has ${e.k} countable entries in this class. K ` +
+        'follows from the snapshot and nothing else.');
+    }
+    if (cls !== 'matched') {
+      if (!isTextList(s.entries) || !isDistinct(s.entries)) {
+        ctx.bad(`${at}.entries is ${describe(s.entries)}, not a list of distinct entry names`);
+      } else {
+        if (cls === 'pqc') {
+          for (const name of s.entries.filter((entry) => registry.multiPurpose.includes(entry))) {
+            ctx.bad(`${at}.entries names ${name}, a multi-purpose library. One that ships post-quantum algorithms among others ` +
+              'is listed apart and never counted as post-quantum.');
+          }
+        }
+        if (!sameSet(s.entries, e.entries)) {
+          ctx.figureBad(`${at}.entries is ${describe(s.entries)}; the countable entries of the snapshot are ${describe(e.entries)}`);
+        }
+      }
+    }
+    if (!Array.isArray(s.excluded) || !s.excluded.every((x, i) => closed(x, KEYS.exclusion, `${at}.excluded[${i}]`, ctx.bad) &&
+        isText(x.entry) && EXCLUSIONS.includes(x.why))) {
+      ctx.bad(`${at}.excluded is ${describe(s.excluded)}, not a list of { entry, why } with why one of: ${EXCLUSIONS.join(', ')}`);
+    } else {
+      const items = (list) => list.map((x) => `${x.entry}\0${x.why}`).sort();
+      if (!sameValue(items(s.excluded), items(e.excluded))) {
+        ctx.figureBad(`${at}.excluded is ${describe(s.excluded)}; the snapshot gives ${describe(e.excluded)}`);
+      }
+    }
+  }
+}
+
+function compareDevRow(stored, expected, where, ctx) {
+  if (expected === null) {
+    if (stored !== null) {
+      ctx.bad(`${where} is ${describe(stored)}. It is kept for a registry read partly from dev metadata, and is null for one ` +
+        'that reads from a single source.');
+    }
+    return;
+  }
+  if (!closed(stored, KEYS.devRow, where, ctx.bad)) return;
+  if (closed(stored.coverage, COVERAGE_COUNTS, `${where}.coverage`, ctx.bad)) {
+    for (const field of COVERAGE_COUNTS) {
+      if (!isCount(stored.coverage[field])) ctx.bad(`${where}.coverage.${field} is ${describe(stored.coverage[field])}, not a whole count`);
+      else if (stored.coverage[field] !== expected.coverage[field]) {
+        ctx.figureBad(`${where}.coverage.${field} is ${stored.coverage[field]}; the ledger gives ${expected.coverage[field]} ` +
+          'without the packages read from dev metadata');
+      }
+    }
+  }
+  for (const definition of MATCH_DEFINITIONS) comparePair(stored[definition], expected[definition], `${where}.${definition}`, ctx, false);
+}
+
+function compareMultiPurpose(stored, rows, catalog, file, ctx) {
+  if (!Array.isArray(stored)) {
+    ctx.bad(`${file}: multiPurposeLibraries is ${describe(stored)}, not a list`);
+    return;
+  }
+  const expected = new Map();
+  for (const eco of ECOSYSTEMS) {
+    for (const entry of catalog.byEco[eco].multiPurpose) {
+      const dependents = {};
+      for (const definition of MATCH_DEFINITIONS) {
+        dependents[definition] = {};
+        for (const unit of UNITS) dependents[definition][unit] = rows[eco].units[definition][unit].filter((set) => set.has(entry)).length;
+      }
+      expected.set(`${eco}\0${entry}`, { ecosystem: eco, entry, dependents });
+    }
+  }
+  const seen = new Set();
+  stored.forEach((item, index) => {
+    const where = `${file}: multiPurposeLibraries[${index}]`;
+    if (!closed(item, KEYS.multiPurposeLibrary, where, ctx.bad)) return;
+    const key = `${item.ecosystem}\0${item.entry}`;
+    if (!expected.has(key)) {
+      ctx.bad(`${where} names ${describe(item.ecosystem)}:${describe(item.entry)}, which is not a multi-purpose entry of the catalogue snapshot`);
+      return;
+    }
+    if (seen.has(key)) {
+      ctx.bad(`${where} names ${item.ecosystem}:${item.entry} a second time`);
+      return;
+    }
+    seen.add(key);
+    if (item.definitionId !== DEFINITIONS.multiPurposeLibrary) {
+      ctx.bad(`${where}.definitionId is ${describe(item.definitionId)}, not ${DEFINITIONS.multiPurposeLibrary}`);
+    }
+    const want = expected.get(key).dependents;
+    if (!closed(item.dependents, MATCH_DEFINITIONS, `${where}.dependents`, ctx.bad)) return;
+    for (const definition of MATCH_DEFINITIONS) {
+      if (!closed(item.dependents[definition], UNITS, `${where}.dependents.${definition}`, ctx.bad)) continue;
+      for (const unit of UNITS) {
+        const value = item.dependents[definition][unit];
+        if (!isCount(value)) ctx.bad(`${where}.dependents.${definition}.${unit} is ${describe(value)}, not a whole count`);
+        else if (value !== want[definition][unit]) {
+          ctx.figureBad(`${where}.dependents.${definition}.${unit} is ${value}; recomputed it is ${want[definition][unit]}`);
+        }
+      }
+    }
+  });
+  for (const [key, want] of expected) {
+    if (!seen.has(key)) {
+      ctx.bad(`${file}: multiPurposeLibraries has no row for ${want.ecosystem}:${want.entry}. Each multi-purpose library is ` +
+        'listed, apart from every post-quantum count.');
+    }
+  }
+}
+
+// --- The corpus: its other fields -----------------------------------------------
+
+function checkInputs(name, inputs, ctx, file, bad) {
+  const where = `${file}: inputs`;
+  if (!closed(inputs, KEYS.inputs, where, bad)) return;
+  const hashOf = (bound) => ctx.found.hashes.get(bound);
+  const binding = (value, keys, at, expectedFile) => {
+    if (!closed(value, keys, at, bad)) return false;
+    if (value.file !== expectedFile) {
+      bad(`${at}.file is ${describe(value.file)}, not ${expectedFile}`);
+      return false;
+    }
+    if (!isSha256(value.sha256)) {
+      bad(`${at}.sha256 is ${describe(value.sha256)}, not a SHA-256 digest`);
+    } else if (hashOf(expectedFile) !== undefined && value.sha256 !== hashOf(expectedFile)) {
+      bad(`${at}.sha256 is not the hash of ${expectedFile}. The corpus is bound to the bytes it was computed from, and these ` +
+        'are other bytes.');
+    }
+    return true;
+  };
+  if (!Array.isArray(inputs.scans)) {
+    bad(`${where}.scans is ${describe(inputs.scans)}, not a list`);
+  } else {
+    const seen = new Set();
+    inputs.scans.forEach((item, index) => {
+      const at = `${where}.scans[${index}]`;
+      if (!isObject(item) || !ECOSYSTEMS.includes(item.ecosystem)) {
+        bad(`${at} is ${describe(item)}, not the binding of one registry's scan file`);
+        return;
+      }
+      if (seen.has(item.ecosystem)) {
+        bad(`${at} binds ${item.ecosystem} a second time`);
+        return;
+      }
+      seen.add(item.ecosystem);
+      binding(item, KEYS.inputScan, at, fileNameFor('scan', item.ecosystem));
+    });
+    for (const eco of ECOSYSTEMS) if (!seen.has(eco)) bad(`${where}.scans does not bind the scan file of ${eco}; it binds all eleven`);
+  }
+  const catalogFile = fileNameFor('catalog', null, name);
+  if (binding(inputs.catalog, KEYS.inputCatalog, `${where}.catalog`, catalogFile) && ctx.catalog) {
+    for (const digest of ['matchSetSha256', 'classificationSha256']) {
+      if (inputs.catalog[digest] !== ctx.catalog.value[digest]) {
+        bad(`${where}.catalog.${digest} is not the catalogue snapshot's. The corpus names the classification it was computed with.`);
+      }
+    }
+    for (const eco of ECOSYSTEMS) {
+      const scan = ctx.scans[eco];
+      if (scan && isObject(scan.value.catalog) && isSha256(scan.value.catalog.matchSetSha256) &&
+          scan.value.catalog.matchSetSha256 !== inputs.catalog.matchSetSha256) {
+        bad(`${where}.catalog.matchSetSha256 is not the one ${scan.file} was matched with. Aggregation refuses scans matched ` +
+          'against another set of names.');
+      }
+    }
+  }
+  binding(inputs.consolidation, KEYS.inputConsolidation, `${where}.consolidation`, fileNameFor('consolidation', null, name));
+}
+
+/** The definitions a corpus is read with. Returns the kinds that count as a manifest match, or null if they cannot be used. */
+function checkDefinitions(d, file, bad) {
+  const where = `${file}: definitions`;
+  if (!closed(d, KEYS.definitions, where, bad)) return null;
+  for (const key of ['coverage', 'raw', 'consolidated', 'multiPurposeLibrary']) {
+    if (closed(d[key], KEYS.id, `${where}.${key}`, bad) && d[key].id !== DEFINITIONS[key]) {
+      bad(`${where}.${key}.id is ${describe(d[key].id)}, not ${DEFINITIONS[key]}. A definition that changes takes a new id, ` +
+        'and these rules know this one.');
+    }
+  }
+  if (d.unresolvedCeiling !== UNRESOLVED_CEILING) {
+    bad(`${where}.unresolvedCeiling is ${describe(d.unresolvedCeiling)}. The ceiling is ${UNRESOLVED_CEILING}, held here as ` +
+      'well, so that a corpus cannot set its own.');
+  }
+  if (closed(d.classes, CLASSES, `${where}.classes`, bad)) {
+    for (const cls of CLASSES) {
+      if (d.classes[cls] !== CLASS_IDS[cls]) bad(`${where}.classes.${cls} is ${describe(d.classes[cls])}, not ${CLASS_IDS[cls]}`);
+    }
+  }
+  if (closed(d.directUnconditional, KEYS.predicate, `${where}.directUnconditional`, bad)) {
+    if (d.directUnconditional.id !== DEFINITIONS.directUnconditional) {
+      bad(`${where}.directUnconditional.id is ${describe(d.directUnconditional.id)}, not ${DEFINITIONS.directUnconditional}`);
+    }
+    if (closed(d.directUnconditional.predicate, ECOSYSTEMS, `${where}.directUnconditional.predicate`, bad)) {
+      for (const eco of ECOSYSTEMS) {
+        if (!isText(d.directUnconditional.predicate[eco])) bad(`${where}.directUnconditional.predicate.${eco} is ${describe(d.directUnconditional.predicate[eco])}, not the rule in words`);
+      }
+    }
+  }
+  if (!closed(d.anyManifestMatch, KEYS.includes, `${where}.anyManifestMatch`, bad)) return null;
+  if (d.anyManifestMatch.id !== DEFINITIONS.anyManifestMatch) {
+    bad(`${where}.anyManifestMatch.id is ${describe(d.anyManifestMatch.id)}, not ${DEFINITIONS.anyManifestMatch}`);
+    return null;
+  }
+  if (!closed(d.anyManifestMatch.includes, ECOSYSTEMS, `${where}.anyManifestMatch.includes`, bad)) return null;
+  let usable = true;
+  for (const eco of ECOSYSTEMS) {
+    const kinds = d.anyManifestMatch.includes[eco];
+    if (!Array.isArray(kinds) || !isDistinct(kinds) || !kinds.every((kind) => DECLARATIONS[eco].kinds.includes(kind))) {
+      bad(`${where}.anyManifestMatch.includes.${eco} is ${describe(kinds)}, not a list of distinct ${eco} declaration kinds`);
+      usable = false;
+    } else if (!sameSet(kinds, ANY_MANIFEST_KINDS[eco])) {
+      bad(`${where}.anyManifestMatch.includes.${eco} is ${describe(kinds)}; under ${DEFINITIONS.anyManifestMatch} it is ` +
+        `${describe(ANY_MANIFEST_KINDS[eco])}: every kind recorded, except Maven managed and plugin and Packagist suggest. A ` +
+        'definition that changes takes a new id.');
+    }
+  }
+  return usable ? d.anyManifestMatch.includes : null;
+}
+
+/** The version of an earlier dataset, read from its manifest: 1 when it declares none. */
+function versionOf(dataset) {
+  try {
+    const manifest = JSON.parse(readFileSync(join(DATASETS, dataset, 'MANIFEST.json'), 'utf-8'));
+    if (!isObject(manifest)) return null;
+    if (!Object.hasOwn(manifest, 'schemaVersion')) return 1;
+    return manifest.schemaVersion === 2 ? 2 : null;
+  } catch {
+    return null;
+  }
+}
+
+const definitionIds = (d) => ({
+  coverage: d.coverage.id, anyManifestMatch: d.anyManifestMatch.id, directUnconditional: d.directUnconditional.id,
+  raw: d.raw.id, consolidated: d.consolidated.id, classes: d.classes, multiPurposeLibrary: d.multiPurposeLibrary.id,
+});
+
+/** What two version 2 datasets have to share to be comparable: the match set, the definition ids, and every scanner's method. */
+function instrumentOf(dataset) {
+  try {
+    const dir = join(DATASETS, dataset);
+    const manifest = JSON.parse(readFileSync(join(dir, 'MANIFEST.json'), 'utf-8'));
+    const read = (role, eco = null) => {
+      const file = fileNameFor(role, eco, dataset);
+      if (!manifest.files.some((entry) => entry.role === role && entry.ecosystem === eco && entry.file === file)) throw new Error(file);
+      if (!lstatSync(join(dir, file)).isFile()) throw new Error(file);
+      return JSON.parse(readFileSync(join(dir, file), 'utf-8'));
+    };
+    return {
+      matchSetSha256: read('catalog').matchSetSha256,
+      definitionIds: definitionIds(read('corpus').definitions),
+      methods: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, read('scan', eco).method])),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function checkComparability(name, list, corpus, ctx, file, bad) {
+  const where = `${file}: comparability`;
+  if (!Array.isArray(list) || list.length === 0) {
+    bad(`${where} is ${describe(list)}. It is required and names every earlier dataset, so that no surface draws a trend ` +
+      'across an instrument change unseen.');
+    return;
+  }
+  const earlier = readdirSync(DATASETS)
+    .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d) && d < name && lstatSync(join(DATASETS, d)).isDirectory()).sort();
+  const named = new Set();
+  list.forEach((item, index) => {
+    const at = `${where}[${index}]`;
+    if (!closed(item, KEYS.comparability, at, bad)) return;
+    if (!earlier.includes(item.dataset)) {
+      bad(`${at} names ${describe(item.dataset)}, which is not a dataset of this repository collected before ${name}`);
+      return;
+    }
+    if (named.has(item.dataset)) {
+      bad(`${at} names ${item.dataset} a second time`);
+      return;
+    }
+    named.add(item.dataset);
+    if (item.doi !== null && !isDoi(item.doi)) bad(`${at}.doi is ${describe(item.doi)}, not a DOI or null`);
+    if (typeof item.comparable !== 'boolean') {
+      bad(`${at}.comparable is ${describe(item.comparable)}, not true or false`);
+      return;
+    }
+    if (!Array.isArray(item.changes) || !isDistinct(item.changes) || !item.changes.every((code) => CHANGE_CODES.includes(code))) {
+      bad(`${at}.changes is ${describe(item.changes)}, not a list of distinct change codes (${CHANGE_CODES.join(', ')})`);
+      return;
+    }
+    if (item.comparable && (item.reason !== null || item.changes.length > 0)) {
+      bad(`${at} is comparable and still gives a reason or changes; a comparable dataset has reason null and no changes`);
+    }
+    if (!item.comparable && (item.reason !== 'instrumentChanged' || item.changes.length === 0)) {
+      bad(`${at} is not comparable, so its reason is instrumentChanged and changes names what changed`);
+    }
+    const version = versionOf(item.dataset);
+    if (version === 1) {
+      if (item.comparable) {
+        bad(`${at}: ${item.dataset} is a version 1 dataset, measured with an instrument that has since changed, so it is not ` +
+          'comparable, and no difference, ratio or trend may be drawn between the two.');
+      } else if (!sameSet(item.changes, CHANGE_CODES)) {
+        bad(`${at}.changes is ${describe(item.changes)}. A version 1 dataset differs in every component, so it names all ` +
+          `eleven codes (${CHANGE_CODES.join(', ')}).`);
+      }
+    } else if (version === 2 && item.comparable) {
+      // not checked yet: which change codes apply between two version 2
+      // datasets, beyond the conditions under which they are comparable.
+      const theirs = instrumentOf(item.dataset);
+      const ours = ctx.catalog && corpus && isObject(corpus.definitions) ? {
+        matchSetSha256: ctx.catalog.value.matchSetSha256,
+        definitionIds: definitionIds(corpus.definitions),
+        methods: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, ctx.scans[eco] ? ctx.scans[eco].value.method : null])),
+      } : null;
+      if (theirs === null || ours === null) {
+        bad(`${at}: ${item.dataset} is marked comparable, and the files that would show it cannot be read`);
+      } else {
+        const differ = ['matchSetSha256', 'definitionIds'].filter((key) => !sameValue(theirs[key], ours[key]));
+        for (const eco of ECOSYSTEMS) if (!sameValue(theirs.methods[eco], ours.methods[eco])) differ.push(`the ${eco} scanner's method`);
+        if (differ.length > 0) {
+          bad(`${at}: ${item.dataset} is marked comparable, and its ${differ.join(', ')} differ from this dataset's. Two datasets ` +
+            'are comparable only when the match set, the definition ids and every scanner\'s method are the same.');
+        }
+      }
+    } else if (version === null) {
+      bad(`${at}: ${item.dataset} has no manifest these rules can read, so whether it is comparable cannot be checked`);
+    }
+  });
+  for (const dataset of earlier) {
+    if (!named.has(dataset)) {
+      bad(`${where} does not name ${dataset}. Every earlier dataset is named, so that a reader holding two of them knows ` +
+        'whether the instrument changed between them.');
+    }
+  }
+}
+
+const BLOCK_REASONS = ['unresolvedShareAboveCeiling', 'catalogCheckMismatch', 'sourcesOffAllowlist'];
+
+/** True when the corpus blocks no row. A corpus that blocks one is not published, whatever its figures say. */
+function checkBlocked(list, file, bad) {
+  const where = `${file}: blocked`;
+  if (!Array.isArray(list)) {
+    bad(`${where} is ${describe(list)}, not a list`);
+    return false;
+  }
+  list.forEach((item, index) => {
+    const at = `${where}[${index}]`;
+    if (!closed(item, KEYS.blocked, at, bad)) return;
+    if (!ECOSYSTEMS.includes(item.ecosystem)) bad(`${at}.ecosystem is ${describe(item.ecosystem)}, not one of the eleven registries`);
+    if (!BLOCK_REASONS.includes(item.reason)) bad(`${at}.reason is ${describe(item.reason)}, not one of: ${BLOCK_REASONS.join(', ')}`);
+    if (!isText(item.detail)) bad(`${at}.detail is ${describe(item.detail)}, not text`);
+  });
+  if (list.length > 0) {
+    bad(`${where} names ${list.map((item) => (isObject(item) ? describe(item.ecosystem) : describe(item))).join(', ')}. A corpus ` +
+      'that blocks a row is not published: the row\'s figures and every total are withheld until it is measured again.');
+    return false;
+  }
+  return true;
+}
+
+function checkCorpusCoverage(coverage, ctx, file, bad) {
+  const where = `${file}: coverage`;
+  if (!closed(coverage, KEYS.corpusCoverage, where, bad)) return;
+  if (closed(coverage.byEcosystem, ECOSYSTEMS, `${where}.byEcosystem`, bad)) {
+    for (const eco of ECOSYSTEMS) {
+      const at = `${where}.byEcosystem.${eco}`;
+      if (!closed(coverage.byEcosystem[eco], KEYS.rowCoverage, at, bad)) continue;
+      const scan = ctx.scans[eco];
+      if (!scan || !scan.coverage) continue;
+      const { enumeration, ...counts } = coverage.byEcosystem[eco];
+      if (!sameValue(counts, scan.coverage) || !sameValue(enumeration, scan.value.enumeration)) {
+        bad(`${at} is not the coverage and enumeration of ${scan.file}. The corpus copies them from the raw file, and a copy ` +
+          'that differs is a second answer.');
+      }
+    }
+  }
+  if (closed(coverage.total, COVERAGE_COUNTS, `${where}.total`, bad)) {
+    const scans = ECOSYSTEMS.map((eco) => ctx.scans[eco]);
+    for (const field of COVERAGE_COUNTS) {
+      if (!isCount(coverage.total[field])) {
+        bad(`${where}.total.${field} is ${describe(coverage.total[field])}, not a whole count`);
+      } else if (scans.every((scan) => scan && scan.coverage)) {
+        const summed = sum(scans.map((scan) => scan.coverage[field]));
+        if (coverage.total[field] !== summed) bad(`${where}.total.${field} is ${coverage.total[field]}; the eleven scan files sum to ${summed}`);
+      }
+    }
+  }
+}
+
+function checkCorpus(name, record, ctx, bad) {
+  const file = record.file;
+  const c = record.value;
+  if (!closed(c, KEYS.corpus, file, bad)) return;
+  if (c.kind !== 'censusCorpus') bad(`${file}: kind is ${describe(c.kind)}, not "censusCorpus"`);
+  if (c.collectedAt !== name) {
+    bad(`${file}: collectedAt is ${describe(c.collectedAt)}, and the dataset is ${name}`);
+  } else {
+    const finished = ECOSYSTEMS.map((eco) => (ctx.scans[eco] ? ctx.scans[eco].value.finishedAt : null));
+    if (finished.every(isTime)) {
+      const latest = finished.map((time) => time.slice(0, 10)).sort().at(-1);
+      if (latest !== c.collectedAt) {
+        bad(`${file}: collectedAt is ${c.collectedAt}, and the last scan finished on ${latest}. A dataset is collected on the ` +
+          'day its last scan finished.');
+      }
+    }
+  }
+  if (!isTime(c.generatedAt)) bad(`${file}: generatedAt is ${describe(c.generatedAt)}, not an ISO 8601 UTC time`);
+  checkInputs(name, c.inputs, ctx, file, bad);
+  const includes = checkDefinitions(c.definitions, file, bad);
+  checkComparability(name, c.comparability, c, ctx, file, bad);
+  const publishable = checkBlocked(c.blocked, file, bad);
+  checkCorpusCoverage(c.coverage, ctx, file, bad);
+  const rowsShaped = closed(c.byEcosystem, ECOSYSTEMS, `${file}: byEcosystem`, bad);
+  const totalShaped = closed(c.total, KEYS.total, `${file}: total`, bad);
+
+  // The figures are recomputed only from files that passed their own checks:
+  // where one did not, it has been reported above, and the dataset fails.
+  const ready = publishable && includes !== null && ctx.catalog && ctx.catalog.sound && ctx.map &&
+    ECOSYSTEMS.every((eco) => ctx.scans[eco] && ctx.scans[eco].sound && ctx.ledgers[eco] && ctx.ledgers[eco].sound);
+  if (!ready) return;
+
+  let differing = 0;
+  const figureContext = {
+    bad,
+    ruleIds: ctx.map.ruleIds,
+    figureBad: (message) => {
+      differing += 1;
+      if (differing <= 40) bad(message);
+    },
+  };
+  const rows = {};
+  for (const eco of ECOSYSTEMS) {
+    rows[eco] = expectedRow(eco, ctx.catalog.byEco[eco], ctx.scans[eco], ctx.ledgers[eco], ctx.map.byEco[eco], includes[eco]);
+  }
+  if (rowsShaped) {
+    for (const eco of ECOSYSTEMS) {
+      const where = `${file}: byEcosystem.${eco}`;
+      const stored = c.byEcosystem[eco];
+      const expected = rows[eco];
+      if (!closed(stored, KEYS.row, where, bad)) continue;
+      compareMeasurability(stored.measurability, expected.row.measurability, ctx.catalog.byEco[eco], `${where}.measurability`, figureContext);
+      for (const definition of MATCH_DEFINITIONS) {
+        comparePair(stored[definition], expected.row[definition], `${where}.${definition}`, figureContext, false);
+        for (const unit of UNITS) {
+          if (isObject(stored[definition])) {
+            blockIdentities(stored[definition][unit], `${where}.${definition}.${unit}`, expected.populations[definition][unit], expected.coverage, figureContext);
+          }
+        }
+      }
+      monotone(stored, expected, where, figureContext);
+      compareDevRow(stored.excludingDevMetadata, expected.row.excludingDevMetadata, `${where}.excludingDevMetadata`, figureContext);
+      if (expected.dev !== null && isObject(stored.excludingDevMetadata)) {
+        for (const definition of MATCH_DEFINITIONS) {
+          for (const unit of UNITS) {
+            if (isObject(stored.excludingDevMetadata[definition])) {
+              blockIdentities(stored.excludingDevMetadata[definition][unit], `${where}.excludingDevMetadata.${definition}.${unit}`,
+                expected.dev.populations[definition][unit], expected.dev.coverage, figureContext);
+            }
+          }
+        }
+        monotone(stored.excludingDevMetadata, expected.dev, `${where}.excludingDevMetadata`, figureContext);
+      }
+    }
+  }
+  if (totalShaped) {
+    const total = expectedTotal(rows);
+    for (const definition of MATCH_DEFINITIONS) comparePair(c.total[definition], total[definition], `${file}: total.${definition}`, figureContext, true);
+    const where = `${file}: total.excludingDevMetadata`;
+    if (total.excludingDevMetadata === null) {
+      if (c.total.excludingDevMetadata !== null) bad(`${where} is set, and no registry is read partly from dev metadata; it is null then`);
+    } else if (closed(c.total.excludingDevMetadata, KEYS.devRow, where, bad)) {
+      const stored = c.total.excludingDevMetadata;
+      if (closed(stored.coverage, COVERAGE_COUNTS, `${where}.coverage`, bad)) {
+        for (const field of COVERAGE_COUNTS) {
+          if (stored.coverage[field] !== total.excludingDevMetadata.coverage[field]) {
+            figureContext.figureBad(`${where}.coverage.${field} is ${describe(stored.coverage[field])}; the ledgers give ${total.excludingDevMetadata.coverage[field]}`);
+          }
+        }
+      }
+      for (const definition of MATCH_DEFINITIONS) {
+        comparePair(stored[definition], total.excludingDevMetadata[definition], `${where}.${definition}`, figureContext, true);
+      }
+    }
+  }
+  compareMultiPurpose(c.multiPurposeLibraries, rows, ctx.catalog, file, figureContext);
+  if (differing > 40) bad(`${file}: ${differing - 40} more figure(s) differ from their recomputed values`);
+}
+
+// --- MANIFEST.json against the files --------------------------------------------
+
+function checkKnownIssues(list, corpus, bad) {
+  if (!Array.isArray(list)) return;
+  const defects = new Set();
+  list.forEach((issue, index) => {
+    const where = `MANIFEST.json: knownIssues[${index}]`;
+    if (!closed(issue, KEYS.knownIssue, where, bad)) return;
+    if (!isText(issue.defect) || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(issue.defect)) {
+      bad(`${where}.defect is ${describe(issue.defect)}, not an id of lower-case words joined by hyphens`);
+    } else if (defects.has(issue.defect)) {
+      bad(`${where} repeats the defect ${issue.defect}. A reader citing it could mean either.`);
+    }
+    defects.add(issue.defect);
+    for (const field of ['summary', 'correctedIn']) {
+      if (!isText(issue[field])) bad(`${where}.${field} is ${describe(issue[field])}, not text a reader can see`);
+    }
+    if (!DIRECTIONS.includes(issue.direction)) {
+      bad(`${where}.direction is ${describe(issue.direction)}, which tells a reader nothing about which way to read the figure`);
+    }
+    if (!Array.isArray(issue.affects) || issue.affects.length === 0 || !issue.affects.every(isText) || !isDistinct(issue.affects)) {
+      bad(`${where}.affects is ${describe(issue.affects)}, not a list of the figures the issue bears on`);
+    } else if (corpus) {
+      for (const path of issue.affects) {
+        if (resolvePath(corpus, path) === undefined) bad(`${where} affects ${path}, which is not a field of the corpus`);
+      }
+    }
+    const m = issue.magnitude;
+    if (m !== null && !(isObject(m) && hasExactly(m, KEYS.magnitude) && isCount(m.value) && isCount(m.of) && m.of > 0 &&
+        m.value <= m.of && isText(m.unit))) {
+      bad(`${where}.magnitude is ${describe(m)}, not null or { value, of, unit } with whole counts, value no more than of`);
+    }
+  });
+}
+
+function checkManifestAgainstFiles(manifest, found, scans, bad) {
+  const at = 'MANIFEST.json';
+  const corpus = found.corpus ? found.corpus.value : null;
+  if (closed(manifest.coverage, COVERAGE_COUNTS, `${at}: coverage`, bad)) {
+    const all = ECOSYSTEMS.map((eco) => scans[eco]);
+    for (const field of COVERAGE_COUNTS) {
+      if (!isCount(manifest.coverage[field])) {
+        bad(`${at}: coverage.${field} is ${describe(manifest.coverage[field])}, not a whole count`);
+      } else if (all.every((scan) => scan && scan.coverage)) {
+        const summed = sum(all.map((scan) => scan.coverage[field]));
+        if (manifest.coverage[field] !== summed) bad(`${at}: coverage.${field} is ${manifest.coverage[field]}; the eleven scan files sum to ${summed}`);
+      }
+    }
+  }
+  if (!Array.isArray(manifest.ecosystems)) {
+    bad(`${at}: ecosystems is ${describe(manifest.ecosystems)}, not a list`);
+  } else {
+    const seen = new Set();
+    manifest.ecosystems.forEach((item, index) => {
+      const where = `${at}: ecosystems[${index}]`;
+      if (!closed(item, KEYS.manifestEcosystem, where, bad)) return;
+      if (!ECOSYSTEMS.includes(item.ecosystem) || seen.has(item.ecosystem)) {
+        bad(`${where}.ecosystem is ${describe(item.ecosystem)}, not a registry listed once`);
+        return;
+      }
+      seen.add(item.ecosystem);
+      const scan = scans[item.ecosystem];
+      if (!scan) return;
+      for (const field of ['coverage', 'enumeration', 'sources']) {
+        if (!sameValue(item[field], scan.value[field])) {
+          bad(`${where}.${field} is not the ${field} of ${scan.file}. The manifest copies it from the raw header, and a copy ` +
+            'that differs is a second answer.');
+        }
+      }
+    });
+    for (const eco of ECOSYSTEMS) if (!seen.has(eco)) bad(`${at}: ecosystems has no item for ${eco}`);
+  }
+  if (corpus && !sameValue(manifest.comparability, corpus.comparability)) {
+    bad(`${at}: comparability is not the corpus's. It is a copy, so that the manifest alone tells a reader which datasets ` +
+      'may not be compared with this one.');
+  }
+  checkKnownIssues(manifest.knownIssues, corpus, bad);
+}
+
 /** Every rule of a version 2 dataset, in the order its files depend on each other. */
 function validateVersion2(name, dir) {
   const bad = (message) => fail(name, message);
@@ -2034,8 +3038,12 @@ function validateVersion2(name, dir) {
     if (ledger.sound) compareLedger(eco, ledger, scans[eco], bad);
     ledgers[eco] = ledger;
   }
-  if (found.consolidation) checkConsolidation(name, found.consolidation, scans, bad);
+  const map = found.consolidation ? checkConsolidation(name, found.consolidation, scans, bad) : null;
+  if (found.corpus) checkCorpus(name, found.corpus, { catalog, scans, ledgers, map, found }, bad);
+  checkManifestAgainstFiles(manifest, found, scans, bad);
 }
+
+
 
 // ---------------------------------------------------------------------------
 
