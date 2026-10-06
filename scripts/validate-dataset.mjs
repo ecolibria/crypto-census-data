@@ -1885,6 +1885,8 @@ function readLedger(eco, listing, scan, bad) {
   const byReadFrom = {};
   const hiddenByReadFrom = {};
   const matched = new Map();
+  // Maven's draw is of search pages: the distinct pages its rows were drawn from are the pages it read.
+  const pages = new Set();
   const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
   let problems = 0;
   const rowBad = (line, message) => {
@@ -1952,6 +1954,8 @@ function readLedger(eco, listing, scan, bad) {
     counts[disposition] += 1;
     if (eco === 'maven' && !/^(0|[1-9][0-9]{0,8})$/.test(extra)) {
       rowBad(line, `(${name}) has page ${describe(extra)}, not the search page it was drawn from, counted from 0`);
+    } else if (eco === 'maven') {
+      pages.add(Number(extra));
     }
     if (!scanned) {
       if ([version, source, observable, matches, ...(eco === 'packagist' ? [extra] : [])].some((field) => field !== '')) {
@@ -1979,7 +1983,7 @@ function readLedger(eco, listing, scan, bad) {
     return null;
   }
   if (problems > 5) bad(`${file}: ${problems - 5} more row(s) are malformed`);
-  return { file, counts, byReadFrom, hiddenByReadFrom, matched, sound: problems === 0 };
+  return { file, counts, byReadFrom, hiddenByReadFrom, matched, pages, sound: problems === 0 };
 }
 
 /** The scan file against its ledger: coverage is recomputed from the rows, and the matched rows are the packages listed. */
@@ -3145,6 +3149,106 @@ const WITHHELD_CODES = ['noScanFile', 'listingNotWhole', 'notUnderPopulationRule
   'unresolvedShareAboveCeiling'];
 
 /**
+ * The population rule: which packages a scan of each registry sets out to
+ * read. A literal copy of the instrument's POPULATION (lib/census/population.mjs
+ * at 56078ea, lines 59 to 71, its three constants written out), held here
+ * apart from the code that writes the files, as JSON text so that a reader
+ * that does not run this script can parse it and recompute its digest. Eight
+ * registries are read whole from their listing; npm, Go and Maven are seeded
+ * draws of `size` from the frame their listing names, Maven by pages of
+ * `pageRows` rows. `source` is the listing read, which the allowlist holds as
+ * the scan's enumeration source; `frameDays` bounds Go's frame, which no
+ * field of a scan records whole. Neither decides a withholding code here.
+ */
+const POPULATION_RULE_JSON = `{
+  "pypi": {"rule": "listing", "source": "https://pypi.org/simple/"},
+  "packagist": {"rule": "listing", "source": "https://packagist.org/packages/list.json"},
+  "rubygems": {"rule": "listing", "source": "https://index.rubygems.org/names"},
+  "nuget": {"rule": "listing", "source": "https://api.nuget.org/v3/catalog0/index.json"},
+  "hex": {"rule": "listing", "source": "https://hex.pm/api/packages"},
+  "pub": {"rule": "listing", "source": "https://pub.dev/api/package-names"},
+  "crates": {"rule": "listing", "source": "https://github.com/rust-lang/crates.io-index.git"},
+  "cocoapods": {"rule": "listing", "source": "https://cdn.cocoapods.org/all_pods.txt"},
+  "npm": {"rule": "sample", "source": "https://replicate.npmjs.com/_all_docs", "size": 385000, "draw": "package"},
+  "go": {"rule": "sample", "source": "https://index.golang.org/index", "size": 385000, "draw": "package", "frameDays": 365},
+  "maven": {"rule": "sample", "source": "https://search.maven.org/solrsearch/select", "size": 385000, "draw": "page", "pageRows": 200}
+}`;
+const POPULATION_RULE = Object.freeze(Object.fromEntries(Object.entries(JSON.parse(POPULATION_RULE_JSON))
+  .map(([eco, rule]) => [eco, Object.freeze(rule)])));
+
+/**
+ * The row the rule sets for a registry, in the fields a scan header writes: a
+ * row read whole samples by `all`, with no size, draw, page size or seed; a
+ * draw is a seeded shuffle of the rule's size, by its draw.
+ */
+const ruledRow = (eco) => {
+  const rule = POPULATION_RULE[eco];
+  return rule.rule === 'listing'
+    ? { method: 'all', requested: null, draw: null, pageRows: null }
+    : { method: 'seededShuffle', requested: rule.size, draw: rule.draw, pageRows: rule.draw === 'page' ? rule.pageRows : null };
+};
+
+/** A run of the instrument's workflow, and the id that ends it: the seed of every draw that run made. */
+const INSTRUMENT_RUN = /^https:\/\/github\.com\/opena2a-org\/crypto-census\/actions\/runs\/(\d+)$/;
+
+/**
+ * Every reason the files give to withhold a registry's row, each
+ * `{ code, why }`, recomputed from its scan file, its ledger and the rule
+ * above; null when they cannot be read far enough to say, which their own
+ * checks have already reported. A row not read under the rule is withheld for
+ * that alone; whether it was read whole, drawn to size or seeded with its run's
+ * id is asked only of a row that was. The ceiling is asked of every row.
+ */
+function withholdingReasons(eco, scan, ledger) {
+  if (!scan || !scan.coverage || !ledger || !ledger.sound) return null;
+  const e = scan.value.enumeration;
+  if (!isObject(e) || !isObject(e.sampling)) return null;
+  const s = e.sampling;
+  const listed = scan.coverage.listed;
+  const reasons = [];
+  const add = (code, why) => reasons.push({ code, why });
+  const ruled = ruledRow(eco);
+  const misfit = [];
+  for (const [field, value, want] of [['sampling.method', s.method, ruled.method], ['requested', e.requested, ruled.requested],
+    ['sampling.draw', s.draw, ruled.draw], ['sampling.pageRows', s.pageRows, ruled.pageRows]]) {
+    if (value !== want) misfit.push(`${field} is ${describe(value)}, and the rule's is ${describe(want)}`);
+  }
+  if (POPULATION_RULE[eco].rule === 'listing' && s.seed !== null) misfit.push(`a row read whole carries the seed ${describe(s.seed)}`);
+  if (!Number.isInteger(e.frameSize)) misfit.push(`frameSize is ${describe(e.frameSize)}, so the listing was not fetched whole`);
+  if (misfit.length > 0) {
+    add('notUnderPopulationRule', misfit.join('; '));
+  } else if (POPULATION_RULE[eco].rule === 'listing') {
+    if (e.truncated === true || listed !== e.frameSize) {
+      add('listingNotWhole', `listed ${listed} of the ${e.frameSize} its listing holds${e.truncated === true ? ', truncated' : ''}`);
+    }
+  } else {
+    if (s.draw === 'page') {
+      const read = ledger.pages.size;
+      const due = Math.min(Math.ceil(e.frameSize / s.pageRows), Math.ceil(e.requested / s.pageRows));
+      if (!(read === due || (e.truncated === true && read < due)) || listed > read * s.pageRows) {
+        add('sampleNotDrawnToSize', `read ${read} page(s) of ${s.pageRows} rows, ${due} due, and listed ${listed}${e.truncated === true ? ', truncated' : ''}`);
+      }
+    } else {
+      const due = Math.min(e.requested, e.frameSize);
+      if (!(listed === due || (e.truncated === true && listed < due))) {
+        add('sampleNotDrawnToSize', `listed ${listed} of ${due} due${e.truncated === true ? ', truncated' : ''}`);
+      }
+    }
+    // The seed is the id of the scan's own run, never the run that publishes it, so a re-aggregation keeps the row.
+    const run = isObject(scan.value.scanner) && typeof scan.value.scanner.workflowRun === 'string'
+      ? INSTRUMENT_RUN.exec(scan.value.scanner.workflowRun) : null;
+    if (run === null || s.seed !== run[1]) {
+      add('seedNotRunId', `the seed is ${describe(s.seed)}, and the scan's run ${describe(scan.value.scanner?.workflowRun)} ` +
+        `${run === null ? 'is not a run of the instrument' : `has the id ${run[1]}`}`);
+    }
+  }
+  if (aboveCeiling(scan.coverage)) {
+    add('unresolvedShareAboveCeiling', `${scan.coverage.unresolved} of ${listed} listed unresolved, above the ceiling of 1 in ${ONE_IN}`);
+  }
+  return reasons;
+}
+
+/**
  * A registry's coverage as the corpus holds it, published or withheld: the
  * raw header's coverage members, with its enumeration and sources, copied as
  * they are. One shape, so that a withheld row says why it is withheld.
@@ -3156,10 +3260,10 @@ const aboveCeiling = (coverage) => coverage.unresolved * ONE_IN > coverage.liste
 
 /**
  * The rows the corpus withholds, as a set of registries, or null when the list
- * cannot be read as one. Each says why. noScanFile is given exactly for the
- * registries whose scan file the manifest does not list; the ceiling is
- * recomputed both ways; the other reasons rest on the population rule, which
- * is not held here, and are taken as stated.
+ * cannot be read as one. Each reason is a verdict, so none is taken as stated:
+ * every row's reasons are recomputed from its files and the population rule,
+ * and the corpus must withhold exactly the rows, for exactly the codes, they
+ * give. A detail is words, and is not compared.
  */
 function checkWithheld(list, ctx, file, bad) {
   const where = `${file}: withheld`;
@@ -3168,6 +3272,7 @@ function checkWithheld(list, ctx, file, bad) {
     return null;
   }
   const withheld = new Set();
+  const stated = new Map();
   let sound = true;
   list.forEach((item, index) => {
     const at = `${where}[${index}]`;
@@ -3182,6 +3287,7 @@ function checkWithheld(list, ctx, file, bad) {
     }
     withheld.add(item.ecosystem);
     const scan = ctx.scans[item.ecosystem];
+    const holds = ctx.found.withScanFile.has(item.ecosystem);
     const codes = [];
     if (!Array.isArray(item.reasons) || item.reasons.length === 0) {
       bad(`${at}.reasons is ${describe(item.reasons)}, not a list with a reason in it. A row withheld for no stated reason reads ` +
@@ -3197,6 +3303,9 @@ function checkWithheld(list, ctx, file, bad) {
         if (!WITHHELD_CODES.includes(reason.code)) {
           bad(`${r}.code is ${describe(reason.code)}, not one of: ${WITHHELD_CODES.join(', ')}`);
           sound = false;
+        } else if (codes.includes(reason.code)) {
+          bad(`${r}.code gives ${reason.code} a second time. A row names each reason it is withheld for once.`);
+          sound = false;
         } else {
           codes.push(reason.code);
         }
@@ -3206,12 +3315,12 @@ function checkWithheld(list, ctx, file, bad) {
         }
       });
     }
-    if (codes.includes('noScanFile')) {
-      if (ctx.found.withScanFile.has(item.ecosystem)) {
-        bad(`${at} gives noScanFile for ${item.ecosystem}, and the dataset holds ${fileNameFor('scan', item.ecosystem)}. A row is ` +
-          'withheld for having no scan file only when the dataset holds none of it.');
-        sound = false;
-      } else if (item.coverage !== null) {
+    stated.set(item.ecosystem, { at, codes });
+    // The coverage a row would have held, or null for a row with no scan file. A noScanFile given beside the scan
+    // file is a reason the files do not give, reported below with the others.
+    if (codes.includes('noScanFile') && holds) return;
+    if (codes.includes('noScanFile') || !holds) {
+      if (item.coverage !== null) {
         bad(`${at}.coverage is ${describe(item.coverage)}. A row with no scan file has no coverage to copy, so it is null.`);
         sound = false;
       }
@@ -3226,29 +3335,28 @@ function checkWithheld(list, ctx, file, bad) {
     } else {
       sound = false;
     }
-    if (codes.includes('unresolvedShareAboveCeiling') && scan && scan.coverage && !aboveCeiling(scan.coverage)) {
-      bad(`${at} gives unresolvedShareAboveCeiling, and ${item.ecosystem} has ${scan.coverage.unresolved} of ${scan.coverage.listed} ` +
-        `listed packages unresolved, within the ceiling of 1 in ${ONE_IN}`);
-    }
   });
-  // A registry is left out of a dataset only as a row withheld for having no scan file; one missing for any other
-  // reason fails, so that it cannot read as a fall in a total.
+
+  // The reasons, recomputed for every registry and compared as sets with the ones stated.
+  const said = (reasons) => (reasons.length === 0 ? 'no reason' : reasons.map((r) => `${r.code} (${r.why})`).join(', '));
   for (const eco of ECOSYSTEMS) {
-    if (ctx.found.withScanFile.has(eco)) continue;
-    const item = list.find((x) => isObject(x) && x.ecosystem === eco);
-    if (!item || !Array.isArray(item.reasons) || !item.reasons.some((r) => isObject(r) && r.code === 'noScanFile')) {
+    const holds = ctx.found.withScanFile.has(eco);
+    const computed = holds
+      ? withholdingReasons(eco, ctx.scans[eco], ctx.ledgers[eco])
+      : [{ code: 'noScanFile', why: 'the dataset holds no scan file of it' }];
+    if (computed === null) continue;
+    const given = stated.get(eco);
+    if (sameSet(given ? given.codes : [], computed.map((r) => r.code))) continue;
+    const from = holds ? `${fileNameFor('scan', eco)} and the population rule` : `the files, which hold no scan file of ${eco}`;
+    if (!given && !holds) {
       bad(`${eco}: the dataset holds no scan file of ${eco}, and ${file} does not withhold the row for noScanFile. A registry is ` +
         'left out of a dataset only as a row withheld for having no scan file.');
-    }
-  }
-  // Every row above the ceiling is withheld for it.
-  for (const eco of ECOSYSTEMS) {
-    const scan = ctx.scans[eco];
-    if (!scan || !scan.coverage || !aboveCeiling(scan.coverage)) continue;
-    const item = list.find((x) => isObject(x) && x.ecosystem === eco);
-    if (!item || !Array.isArray(item.reasons) || !item.reasons.some((r) => isObject(r) && r.code === 'unresolvedShareAboveCeiling')) {
-      bad(`${eco}: ${scan.coverage.unresolved} of the ${scan.coverage.listed} packages listed are unresolved, above the ceiling of ` +
-        `1 in ${ONE_IN}, and ${file} does not withhold the row for it. A row above the ceiling is not published.`);
+    } else if (!given) {
+      bad(`${eco}: recomputed from ${from}, the row is withheld for ${said(computed)}, and ${file} does not withhold it. A row ` +
+        'withheld is not published, and no total sums it.');
+    } else if (given.codes.length > 0) {
+      bad(`${given.at} withholds ${eco} for ${given.codes.join(', ')}; recomputed from ${from}, it is withheld for ${said(computed)}. ` +
+        'Each reason is a verdict on the files, so the corpus gives exactly the ones they give.');
     }
   }
   return sound ? withheld : null;

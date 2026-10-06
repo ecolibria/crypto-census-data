@@ -1213,6 +1213,14 @@ test('these tests read from the admitted allowlist, read without running them', 
   assert.equal(digestOf(ADMITTED_SOURCES), ADMITTED_SOURCES_SHA256);
 });
 
+test('the validator holds the population rule, read without running it', () => {
+  const held = allowlistIn(readText(join(ROOT, 'scripts', 'validate-dataset.mjs')), 'POPULATION_RULE_JSON');
+  assert.equal(digestOf(held), RULED_POPULATION_SHA256);
+  assert.deepEqual(Object.keys(held).sort(), [...ECOSYSTEMS].sort());
+  const allowed = allowlistIn(readText(join(ROOT, 'scripts', 'validate-dataset.mjs')), 'ALLOWED_SOURCES_JSON');
+  for (const eco of ECOSYSTEMS) assert.equal(held[eco].source, allowed[eco].enumeration, eco);
+});
+
 test('these tests build every scan under the population rule, read without running them', () => {
   assert.equal(digestOf(allowlistIn(readText(fileURLToPath(import.meta.url)), 'RULED_POPULATION_JSON')), RULED_POPULATION_SHA256);
   assert.equal(digestOf(RULED_POPULATION), RULED_POPULATION_SHA256);
@@ -1500,8 +1508,9 @@ plant('a scan file with one matched package deleted', scanOf('npm', (s) => { s.p
 plant('a package read at another version than the ledger says', scanOf('hex', (s) => { s.packages[0].version = '2.0.0'; }), /acme_hex was read at "2\.0\.0", and listing-hex\.tsv\.gz says 1\.0\.0/);
 plant('a package read from another source than the ledger says', scanOf('packagist', (s) => { s.packages[0].readFrom = 'devDefaultBranch'; }), /acme\/api was read from "devDefaultBranch", and listing-packagist\.tsv\.gz says taggedRelease/);
 plant('a row over the ceiling that the corpus publishes', { fixture: fillers(90, unread('kappa', 'unresolved', 'timeout')) },
-  /npm: 1 of the 99 packages listed are unresolved, above the ceiling of 1 in 100, and corpus-2026-09-30\.json does not withhold the row for it/);
-plant('a deterministic non-read over the ceiling', { fixture: (f) => { f.hex.rows.push(unread('broken_pkg', 'unresolved', 'parseError')); } }, /hex: 1 of the 2 packages listed are unresolved, above the ceiling/);
+  /npm: recomputed from scan-results-npm\.json and the population rule, the row is withheld for unresolvedShareAboveCeiling \(1 of 99 listed unresolved, above the ceiling of 1 in 100\), and corpus-2026-09-30\.json does not withhold it/);
+plant('a deterministic non-read over the ceiling', { fixture: (f) => { f.hex.rows.push(unread('broken_pkg', 'unresolved', 'parseError')); } },
+  /hex: recomputed from scan-results-hex\.json and the population rule, the row is withheld for unresolvedShareAboveCeiling \(1 of 2 listed unresolved, above the ceiling/);
 
 // Where a dataset sits.
 test('a ledger that decompresses past the bound is refused, and the run ends', async () => {
@@ -1583,6 +1592,21 @@ const WITHHELD_TOTALS = {
     t.cells.directUnconditional = { raw: [14, 6, 2, 4, 2, 1, 1], consolidated: [11, 6, 2, 4, 2, 1, 0] };
     t.stats = { anyManifestMatch: [22, 17, 5], directUnconditional: [15, 12, 3] };
   },
+  // Maven leaves matched, weak and deprecatedLibrary: [2, 1, 1] and [1, 1, 1] in the any blocks, [1, 1, 1] in each
+  // direct one, K 2, 1 and 1, commons-codec's one unclassified match, and units 2 in and 1 out (any), 1 and 1 (direct).
+  maven: (t) => {
+    t.measurable.matched = ECOSYSTEMS.filter((eco) => eco !== 'maven');
+    t.measurable.weak = ['npm', 'pypi', 'go', 'crates', 'packagist', 'nuget', 'cocoapods'];
+    t.measurable.deprecatedLibrary = ['npm', 'pypi', 'go', 'crates', 'packagist', 'nuget', 'cocoapods'];
+    Object.assign(t.k, { matched: 21, weak: 9, deprecatedLibrary: 7 });
+    t.cells.anyManifestMatch = { raw: [18, 12, 4, 8, 3, 3, 0], consolidated: [14, 10, 3, 8, 3, 3, 0] };
+    t.cells.directUnconditional = { raw: [14, 5, 2, 3, 2, 1, 1], consolidated: [11, 5, 2, 3, 2, 1, 0] };
+    t.excluded.anyManifestMatch.excludedUnclassified = [[['npm', '@types/bcryptjs', 2], ['packagist', 'paragonie/random_compat', 1]], 2];
+    t.excluded.anyManifestMatch.excludedNotCountable = [[['npm', 'tripledes', 1], ['go', 'crypto/md5', 0]], 1];
+    t.excluded.directUnconditional.excludedUnclassified = [[['npm', '@types/bcryptjs', 1], ['packagist', 'paragonie/random_compat', 0]], 0];
+    t.excluded.directUnconditional.excludedNotCountable = [[['npm', 'tripledes', 1], ['go', 'crypto/md5', 0]], 1];
+    t.stats = { anyManifestMatch: [21, 17, 4], directUnconditional: [15, 12, 3] };
+  },
   pypi: (t) => {
     t.measurable.matched = ECOSYSTEMS.filter((eco) => eco !== 'pypi');
     t.measurable.weak = ['npm', 'go', 'maven', 'crates', 'packagist', 'nuget', 'cocoapods'];
@@ -1595,10 +1619,25 @@ const WITHHELD_TOTALS = {
   },
 };
 
-/** One row withheld for the reasons given, with the totals and the rest of the dataset as they then are. */
+/**
+ * A row read as a ranked head of its registry, as rows were before the
+ * population rule: a size of 1,000 in the registry's own order. Not under the
+ * rule, so its files withhold it for that.
+ */
+const readAsAHead = (eco) => ({ scans: (scans) => {
+  scans[eco].enumeration.requested = 1000;
+  scans[eco].enumeration.sampling = { method: 'registryOrder', seed: null, draw: 'package', pageRows: null };
+} });
+
+/**
+ * One row withheld for the reasons given, with the totals and the rest of the
+ * dataset as they then are. A row withheld as not under the rule is read as a
+ * ranked head, so that its files give the reason.
+ */
 const withholding = (eco, reasons, extra = {}) => ({
   withhold: [{ ecosystem: eco, reasons }],
   totalTables: WITHHELD_TOTALS[eco],
+  ...(reasons.some((r) => r.code === 'notUnderPopulationRule') ? readAsAHead(eco) : {}),
   ...extra,
 });
 const NOT_UNDER_RULE = [{ code: 'notUnderPopulationRule', detail: 'The row was not read under the population rule.' }];
@@ -2021,7 +2060,7 @@ plant('a withheld row whose figures are published', withholding('rubygems', NOT_
   /byEcosystem\.rubygems is set; rubygems is withheld, so its row is null and none of its figures is published/);
 plant('a withheld row whose coverage is published', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.coverage.byEcosystem.rubygems = structuredClone(c.coverage.byEcosystem.hex); })),
   /coverage\.byEcosystem\.rubygems is \{.*; rubygems is withheld, so it is null/);
-plant('a total that still sums a withheld row', { withhold: [{ ecosystem: 'rubygems', reasons: NOT_UNDER_RULE }] },
+plant('a total that still sums a withheld row', { withhold: [{ ecosystem: 'rubygems', reasons: NOT_UNDER_RULE }], ...readAsAHead('rubygems') },
   /total\.anyManifestMatch\.raw\.matched: measurableIn, notMeasurableIn and the withheld rows do not name the eleven registries once each \(named twice: rubygems\)/);
 plant('a coverage total that still counts a withheld row', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.coverage.total.listed += 1; c.coverage.total.scanned += 1; })),
   /coverage\.total\.listed is 36; the scan files of the 10 rows not withheld sum to 35/);
@@ -2036,7 +2075,7 @@ plant('a row withheld twice', withholding('rubygems', NOT_UNDER_RULE, corpusOf((
 plant('a registry withheld that is not one', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld.push({ ...structuredClone(c.withheld[0]), ecosystem: 'conda' }); })),
   /withheld\[1\]\.ecosystem is "conda", not one of the eleven registries withheld once/);
 plant('a row withheld for having no scan file, beside its scan file', withholding('rubygems', [{ code: 'noScanFile', detail: 'x' }]),
-  /withheld\[0\] gives noScanFile for rubygems, and the dataset holds scan-results-rubygems\.json/);
+  /withheld\[0\] withholds rubygems for noScanFile; recomputed from scan-results-rubygems\.json and the population rule, it is withheld for no reason\. Each reason is a verdict on the files/);
 plant('a withheld row without its counts', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].coverage = null; })),
   /withheld\[0\]\.coverage is null\. It is null only for a row with no scan file/);
 plant('a withheld row whose counts are not its scan file\'s', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].coverage.listed += 1; })),
@@ -2053,11 +2092,92 @@ plant('a withheld row whose enumeration is not its scan file\'s', withholding('r
 plant('a withheld row whose sources are not its scan file\'s', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].coverage.sources.manifests = 'https://rubygems.org/api/v2/gems'; })),
   /withheld\[0\]\.coverage is not the coverage, enumeration and sources of scan-results-rubygems\.json/);
 plant('a row withheld above the ceiling that is within it', withholding('rubygems', ABOVE_CEILING),
-  /withheld\[0\] gives unresolvedShareAboveCeiling, and rubygems has 0 of 1 listed packages unresolved, within the ceiling of 1 in 100/);
+  /withheld\[0\] withholds rubygems for unresolvedShareAboveCeiling; recomputed from scan-results-rubygems\.json and the population rule, it is withheld for no reason/);
 plant('withheld rows that are not a list', corpusOf((c) => { c.withheld = null; }), /corpus-2026-09-30\.json: withheld is null, not a list/);
 // A row withheld is recorded once, in the corpus: listing it as a check as well refuses it.
 plant('a withheld row listed as a check as well', withholding('rubygems', ABOVE_CEILING, { ...oneUnresolvedGem, ...manifestOf((m) => { m.checks.unresolvedAboveCeiling = ['rubygems']; }) }),
   /MANIFEST\.json: checks carries unresolvedAboveCeiling, which the schema version 2 contract does not define/);
+
+// --- Each withholding code, recomputed --------------------------------------------
+//
+// Every code is a verdict on the files: the validator recomputes all six from
+// the scan file, its ledger and its own copy of the population rule, and the
+// corpus must withhold exactly the rows, for exactly the codes, they give. The
+// detail is words and is never compared. A row not read under the rule is
+// withheld for that alone; the other three rule codes are asked of a row that
+// was, and the ceiling of every row.
+
+const reasonsFor = (...codes) => codes.map((code) => ({ code, detail: `Withheld for ${code}, in the aggregator's words.` }));
+const enumerationOf = (eco, fn) => scanOf(eco, (s) => fn(s.enumeration));
+const budget = (e) => { e.truncated = true; e.reason = 'budget'; };
+/** Two changes as one: where both change a stage, both run, in order. */
+const both = (a, b) => Object.fromEntries([...new Set([...Object.keys(a), ...Object.keys(b)])].map((key) => [key,
+  typeof a[key] === 'function' && typeof b[key] === 'function' ? (x) => { a[key](x); b[key](x); } : (b[key] ?? a[key])]));
+
+for (const [what, change] of [
+  ['a listing row whose read stopped part way, withheld as not whole', withholding('rubygems', reasonsFor('listingNotWhole'), enumerationOf('rubygems', budget))],
+  ['a listing row that listed fewer than its listing holds, withheld as not whole', withholding('rubygems', reasonsFor('listingNotWhole'), enumerationOf('rubygems', (e) => { e.frameSize += 1; }))],
+  ['a page draw that read fewer pages than are due without being stopped, withheld for it', withholding('maven', reasonsFor('sampleNotDrawnToSize'), enumerationOf('maven', (e) => { e.frameSize = 600; }))],
+  ['a draw seeded with another run\'s id, withheld for it', withholding('maven', reasonsFor('seedNotRunId'), enumerationOf('maven', (e) => { e.sampling.seed = '2'; }))],
+  ['a page draw of pages the rule does not size, withheld as not under the rule', withholding('maven', NOT_UNDER_RULE, enumerationOf('maven', (e) => { e.sampling.pageRows = 20; }))],
+  ['a row not under the rule and above the ceiling, withheld for both', withholding('rubygems', reasonsFor('notUnderPopulationRule', 'unresolvedShareAboveCeiling'), oneUnresolvedGem)],
+  ['a listing row with no frame size, withheld as not under the rule alone', withholding('rubygems', NOT_UNDER_RULE, enumerationOf('rubygems', (e) => { e.frameSize = null; }))],
+  ['a page draw a time budget stopped after two of three pages, published', enumerationOf('maven', (e) => { e.frameSize = 600; budget(e); })],
+  ['a package draw a time budget stopped short of its size, published', enumerationOf('npm', (e) => { e.frameSize += 5; budget(e); })],
+  ['a draw aggregated again by a later run, seeded with its own run\'s id, published', writtenByRun('maven', '2')],
+]) {
+  test(`${what} passes`, async () => {
+    const result = await validateOne(change);
+    assert.equal(result.code, 0, result.stderr);
+  });
+}
+
+const notWithheld = (eco, code, why) => new RegExp(`${eco}: recomputed from scan-results-${eco}\\.json and the population rule, the row is withheld for ${code} \\(${why}`);
+const POPULATION_FILLERS = { fixture: (f) => {
+  f.maven.rows.find((row) => row.name === 'org.example:gone').page = 0;
+  for (let i = 0; i < 200; i += 1) f.maven.rows.push({ ...unread(`org.filler:p${String(i).padStart(3, '0')}`, 'absent', 'http404'), page: 0 });
+} };
+// A row the files withhold, published.
+plant('a draw seeded with something other than its run\'s id', enumerationOf('npm', (e) => { e.sampling.seed = 'example-seed'; }),
+  notWithheld('npm', 'seedNotRunId', 'the seed is "example-seed", and the scan\'s run "https:\\/\\/github\\.com\\/opena2a-org\\/crypto-census\\/actions\\/runs\\/1" has the id 1\\)'));
+plant('a draw whose run is not a run of the instrument', scanOf('npm', (s) => { s.scanner.workflowRun = 'https://ci.example/runs/1'; }),
+  notWithheld('npm', 'seedNotRunId', 'the seed is "1", and the scan\'s run "https:\\/\\/ci\\.example\\/runs\\/1" is not a run of the instrument\\)'));
+plant('a draw whose run names an attempt', scanOf('npm', (s) => { s.scanner.workflowRun = `${RUN_URL}/attempts/1`; }),
+  notWithheld('npm', 'seedNotRunId', 'the seed is "1", .* is not a run of the instrument\\)'));
+plant('a draw seeded with the id of the run that publishes it, not its own', scanOf('npm', (s) => { s.scanner.workflowRun = runUrl('2'); }),
+  notWithheld('npm', 'seedNotRunId', 'the seed is "1", .* has the id 2\\)'));
+plant('a draw of another size', enumerationOf('npm', (e) => { e.requested = 1000; }), notWithheld('npm', 'notUnderPopulationRule', 'requested is 1000, and the rule\'s is 385000\\)'));
+plant('a package draw made by pages', enumerationOf('npm', (e) => { e.sampling.draw = 'page'; e.sampling.pageRows = 200; }),
+  notWithheld('npm', 'notUnderPopulationRule', 'sampling\\.draw is "page", and the rule\'s is "package"; sampling\\.pageRows is 200, and the rule\'s is null\\)'));
+plant('a draw ranked before it was shuffled', enumerationOf('go', (e) => { e.sampling.method = 'rankedThenSeededShuffle'; }),
+  notWithheld('go', 'notUnderPopulationRule', 'sampling\\.method is "rankedThenSeededShuffle", and the rule\'s is "seededShuffle"\\)'));
+plant('a registry read whole drawn as a sample', enumerationOf('hex', (e) => {
+  e.requested = 385000;
+  e.sampling = { method: 'seededShuffle', seed: RUN_ID, draw: 'package', pageRows: null };
+}), notWithheld('hex', 'notUnderPopulationRule', 'sampling\\.method is "seededShuffle", and the rule\'s is "all"; requested is 385000, and the rule\'s is null; sampling\\.draw is "package", and the rule\'s is null; a row read whole carries the seed "1"\\)'));
+plant('a listing with no frame size', enumerationOf('hex', (e) => { e.frameSize = null; }), notWithheld('hex', 'notUnderPopulationRule', 'frameSize is null, so the listing was not fetched whole\\)'));
+plant('a listing whose read stopped part way', enumerationOf('hex', budget), notWithheld('hex', 'listingNotWhole', 'listed 1 of the 1 its listing holds, truncated\\)'));
+plant('a listing that listed fewer than it holds', enumerationOf('hex', (e) => { e.frameSize += 1; }), notWithheld('hex', 'listingNotWhole', 'listed 1 of the 2 its listing holds\\)'));
+plant('a package draw short of its size, not stopped', enumerationOf('npm', (e) => { e.frameSize += 1; }), notWithheld('npm', 'sampleNotDrawnToSize', 'listed 8 of 9 due\\)'));
+plant('a package draw beyond its frame', enumerationOf('npm', (e) => { e.frameSize -= 1; }), notWithheld('npm', 'sampleNotDrawnToSize', 'listed 8 of 7 due\\)'));
+plant('a package draw beyond its frame, stopped', enumerationOf('npm', (e) => { e.frameSize -= 1; budget(e); }), notWithheld('npm', 'sampleNotDrawnToSize', 'listed 8 of 7 due, truncated\\)'));
+plant('a page draw that read more pages than are due', enumerationOf('maven', (e) => { e.frameSize = 200; }),
+  notWithheld('maven', 'sampleNotDrawnToSize', 'read 2 page\\(s\\) of 200 rows, 1 due, and listed 4\\)'));
+plant('a page draw that read more pages than are due, stopped', enumerationOf('maven', (e) => { e.frameSize = 200; budget(e); }),
+  notWithheld('maven', 'sampleNotDrawnToSize', 'read 2 page\\(s\\) of 200 rows, 1 due, and listed 4, truncated\\)'));
+plant('a page draw that lists more packages than its pages hold', both(POPULATION_FILLERS, enumerationOf('maven', (e) => { e.frameSize = 200; })),
+  notWithheld('maven', 'sampleNotDrawnToSize', 'read 1 page\\(s\\) of 200 rows, 1 due, and listed 204\\)'));
+// A code the files do not give, or one they give left out.
+plant('a listing row withheld for its seed', withholding('rubygems', reasonsFor('seedNotRunId')),
+  /withheld\[0\] withholds rubygems for seedNotRunId; recomputed from scan-results-rubygems\.json and the population rule, it is withheld for no reason/);
+plant('a draw withheld for its seed, seeded with its run\'s id', withholding('maven', reasonsFor('seedNotRunId')),
+  /withheld\[0\] withholds maven for seedNotRunId; recomputed from scan-results-maven\.json and the population rule, it is withheld for no reason/);
+plant('a row withheld for one of the two reasons its files give', withholding('rubygems', NOT_UNDER_RULE, oneUnresolvedGem),
+  /withheld\[0\] withholds rubygems for notUnderPopulationRule; recomputed .*, it is withheld for notUnderPopulationRule \(.*\), unresolvedShareAboveCeiling \(1 of 2 listed unresolved/);
+plant('a row not under the rule withheld as not whole as well', withholding('rubygems', reasonsFor('notUnderPopulationRule', 'listingNotWhole'), enumerationOf('rubygems', (e) => { e.frameSize = null; })),
+  /withheld\[0\] withholds rubygems for notUnderPopulationRule, listingNotWhole; recomputed .*, it is withheld for notUnderPopulationRule \(frameSize is null/);
+plant('a reason given twice', withholding('rubygems', [...NOT_UNDER_RULE, ...NOT_UNDER_RULE]),
+  /withheld\[0\]\.reasons\[1\]\.code gives notUnderPopulationRule a second time/);
 
 // --- A registry with no scan file -----------------------------------------------
 //
@@ -2082,7 +2202,7 @@ for (const eco of ['rubygems', 'pypi']) {
 plant('a registry with no scan file that the corpus does not withhold', withoutScanFile('rubygems', corpusOf((c) => { c.withheld = []; })),
   /rubygems: the dataset holds no scan file of rubygems, and corpus-2026-09-30\.json does not withhold the row for noScanFile\. A registry is left out of a dataset only as a row withheld for having no scan file/);
 plant('a registry with no scan file withheld for another reason', withoutScanFile('rubygems', corpusOf((c) => { c.withheld[0].reasons = structuredClone(NOT_UNDER_RULE); })),
-  /withheld\[0\]\.coverage is null\. It is null only for a row with no scan file/);
+  /withheld\[0\] withholds rubygems for notUnderPopulationRule; recomputed from the files, which hold no scan file of rubygems, it is withheld for noScanFile/);
 plant('a row with no scan file that carries coverage', withoutScanFile('rubygems', corpusOf((c) => { c.withheld[0].coverage = structuredClone(c.coverage.byEcosystem.hex); })),
   /withheld\[0\]\.coverage is \{.*\. A row with no scan file has no coverage to copy, so it is null/);
 plant('a corpus that binds a scan file the dataset does not hold', withoutScanFile('rubygems', corpusOf((c) => {
