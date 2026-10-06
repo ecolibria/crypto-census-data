@@ -8,10 +8,12 @@
  * to, and every temporary directory is removed.
  *
  * The dataset has all eleven registries and 36 listed packages. Every figure
- * of the corpus is written out by hand below, beside the packages it comes
- * from, small enough to be checked by eye. The coverage counts, the ledger's
- * match counts and the totals are computed by the small code in this file
- * from what is listed here, never by the validator's code.
+ * of each registry's row is written out by hand below, beside the packages it
+ * comes from, small enough to be checked by eye. The coverage counts, the
+ * ledger's match counts and the totals are computed by the small code in this
+ * file from what is listed here, never by the validator's code; the totals'
+ * code sums the rows the way the contract says, so it is a second statement
+ * of that rule, not an independent one.
  *
  *   node --test scripts/check-validator-v2.mjs
  */
@@ -689,6 +691,15 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
   return files;
 }
 
+/**
+ * The first problem a failed run prints for the dataset under test: a planted
+ * defect's own rule is reported before anything it sets off. A dataset
+ * validated before it reports its own problems first, so they are skipped.
+ */
+function firstProblem(stderr, dataset = DATE) {
+  return stderr.split('\n').find((line) => line.startsWith(`  ${dataset}: `)) ?? '';
+}
+
 const run = (args, options) => new Promise((done) => {
   execFile(process.execPath, args, { ...options, maxBuffer: 64 * 1024 * 1024 },
     (error, stdout, stderr) => done({ code: error ? error.code : 0, stdout, stderr }));
@@ -852,12 +863,12 @@ plant('an oversize manifest', {}, /MANIFEST\.json is 95,\d{3},\d{3} bytes, over 
 test('a version 2 manifest in a published first-shape directory is refused', async () => {
   const result = await validate({ '2026-08-03': ['2026-08-03', {}] });
   assert.equal(result.code, 1, result.stdout);
-  assert.match(result.stderr, /2026-08-03: schemaVersion is 2, and 2026-08-03 is one of the datasets published in the first file shape/);
+  assert.match(firstProblem(result.stderr, '2026-08-03'), /2026-08-03: schemaVersion is 2, and 2026-08-03 is one of the datasets published in the first file shape/, result.stderr);
 });
 test('a first-shape manifest under a version 2 date is refused', async () => {
   const result = await validate({}, (dir) => cpSync(join(ROOT, 'datasets', FIRST_SHAPE), join(dir, 'datasets', DATE), { recursive: true }));
   assert.equal(result.code, 1, result.stdout);
-  assert.match(result.stderr, /2026-09-30: MANIFEST\.json declares no schemaVersion\. The first file shape is accepted only for 2026-03-18 and 2026-08-03/);
+  assert.match(firstProblem(result.stderr), /2026-09-30: MANIFEST\.json declares no schemaVersion\. The first file shape is accepted only for 2026-03-18 and 2026-08-03/, result.stderr);
 });
 
 // --- Catalogue snapshot and raw scan files ---------------------------------------
@@ -1115,8 +1126,7 @@ plant('a scanned row with no version', ledgerOf('hex', (lines) => [lines[0], lin
 plant('a row read from a source the method does not name', ledgerOf('hex', (lines) => [lines[0], lines[1].replace('\trelease\t', '\tmirror\t')]), /\(acme_hex\) is read from "mirror", not one of method\.readFrom/);
 plant('an observation that is not 1 or 0', ledgerOf('hex', (lines) => [lines[0], lines[1].replace('\trelease\t1\t', '\trelease\tyes\t')]), /\(acme_hex\) has observable "yes", not 1 or 0/);
 plant('a match count that is not a count', ledgerOf('hex', (lines) => [lines[0], lines[1].replace(/\t1$/, '\tone')]), /\(acme_hex\) has matches "one", not a whole count/);
-plant('more malformed rows than are listed one by one', ledgerOf('npm', (lines) => lines.map((line, i) => (i === 0 ? line : line.replace(/^([^\t]+)\t/, '$1\tgone\t')))), /listing-npm\.tsv\.gz: 3 more row\(s\) are malformed/);
-plant('a count that is not what the ledger gives', scanOf('npm', (s) => { s.coverage.scanned = 6; s.coverage.absent = 2; }), /scan-results-npm\.json: coverage\.scanned is 6, and listing-npm\.tsv\.gz gives 7\. Coverage is recomputed from the ledger/);
+plant('a count that is not what the ledger gives', scanOf('npm', (s) => { s.coverage.scanned = 6; s.coverage.absent = 2; s.coverage.scannedByReadFrom.release = 6; }), /scan-results-npm\.json: coverage\.scanned is 6, and listing-npm\.tsv\.gz gives 7\. Coverage is recomputed from the ledger/);
 plant('a ledger that reads an unread package as read', ledgerOf('npm', (lines) => lines.map((line) => line.replace(/^eta\tabsent\thttp404\t\t\t\t$/, 'eta\tscanned\t\t1.0.0\trelease\t1\t0'))),
   /scan-results-npm\.json: coverage\.scanned is 7, and listing-npm\.tsv\.gz gives 8/);
 plant('counts by source that the ledger does not give', { fixture: (f) => { f.packagist.rows.find((r) => r.name === 'acme/cli').readFrom = 'taggedRelease'; }, scans: (s) => { s.packagist.coverage.scannedByReadFrom = { taggedRelease: 2, devDefaultBranch: 1 }; } },
@@ -1145,7 +1155,7 @@ test('a ledger that decompresses past the bound is refused, and the run ends', a
   await ended;
   const result = await validateOne({ ledgers: (l) => { l.hex = Buffer.concat(chunks); } });
   assert.equal(result.code, 1, result.stdout);
-  assert.match(result.stderr, /listing-hex\.tsv\.gz decompresses to more than 1,073,741,824 bytes, the most a ledger may hold/);
+  assert.match(firstProblem(result.stderr), /listing-hex\.tsv\.gz decompresses to more than 1,073,741,824 bytes, the most a ledger may hold/, result.stderr);
 });
 
 // --- Consolidation map ---------------------------------------------------------
@@ -1256,8 +1266,10 @@ plant('a stored share in a figure block', corpusOf((c) => { npmRaw(c).pqcRate = 
 plant('a share stored where a count goes', corpusOf((c) => { npmRaw(c).weak.count = 0.5; }), /anyManifestMatch\.raw\.weak\.count is 0\.5, not a whole count or null/);
 
 // The consolidation map, and the rule it is held to.
-plant('a consolidation map that does not produce the consolidated figures', mapOf((m) => { m.byEcosystem.go.units = []; }),
-  /byEcosystem\.go\.anyManifestMatch\.consolidated\.matched is \{"count":2,"k":3,"nullReason":null\}; recomputed from the files it is bound to, it is \{"count":3/);
+plant('consolidated figures that are not what the consolidation map produces', corpusOf((c) => {
+  // The go figures as if nothing were merged: each consistent with the others, none with the map.
+  Object.assign(c.byEcosystem.go.anyManifestMatch.consolidated, { matched: { count: 3, k: 3, nullReason: null }, consolidation: { unitsIn: 3, unitsOut: 3, merged: 0, removedByRule: {} } });
+}), /byEcosystem\.go\.anyManifestMatch\.consolidated\.matched is \{"count":3,"k":3,"nullReason":null\}; recomputed from the files it is bound to, it is \{"count":2/);
 
 // The corpus: its own fields.
 plant('a corpus of another kind', corpusOf((c) => { c.kind = 'corpus'; }), /corpus-2026-09-30\.json: kind is "corpus", not "censusCorpus"/);
@@ -1274,7 +1286,7 @@ plant('a scan binding that is not a digest', corpusOf((c) => { c.inputs.scans[2]
 plant('a corpus bound to other snapshot bytes', corpusOf((c) => { c.inputs.catalog.sha256 = sha256('other'); }), /inputs\.catalog\.sha256 is not the hash of catalog-2026-09-30\.json/);
 plant('a corpus bound to other map bytes', corpusOf((c) => { c.inputs.consolidation.sha256 = sha256('other'); }), /inputs\.consolidation\.sha256 is not the hash of consolidation-2026-09-30\.json/);
 plant('a corpus naming another classification', corpusOf((c) => { c.inputs.catalog.classificationSha256 = sha256('other'); }), /inputs\.catalog\.classificationSha256 is not the catalogue snapshot's/);
-plant('a corpus naming another match set', corpusOf((c) => { c.inputs.catalog.matchSetSha256 = sha256('other'); }), /inputs\.catalog\.matchSetSha256 is not the one scan-results-npm\.json was matched with\. Aggregation refuses/);
+plant('a corpus naming another match set', corpusOf((c) => { c.inputs.catalog.matchSetSha256 = sha256('other'); }), /inputs\.catalog\.matchSetSha256 is not the catalogue snapshot's/);
 plant('a definition under another id', corpusOf((c) => { c.definitions.coverage.id = 'census.coverage/2'; }), /definitions\.coverage\.id is "census\.coverage\/2", not census\.coverage\/1/);
 plant('a corpus that sets its own ceiling', corpusOf((c) => { c.definitions.unresolvedCeiling = 0.05; }), /definitions\.unresolvedCeiling is 0\.05\. The ceiling is 0\.01, held here as well/);
 plant('a class under another id', corpusOf((c) => { c.definitions.classes.pqc = 'census.class.pqc/1'; }), /definitions\.classes\.pqc is "census\.class\.pqc\/1", not census\.class\.pqcDedicated\/1/);
@@ -1303,11 +1315,23 @@ plant('an exclusion for a reason that is not one', corpusOf((c) => { c.byEcosyst
 plant('entries that are not names', corpusOf((c) => { c.byEcosystem.npm.measurability.weak.entries = 'crypto-js'; }), /measurability\.weak\.entries is "crypto-js", not a list of distinct entry names/);
 plant('a multi-purpose library among the post-quantum entries', corpusOf((c) => { c.byEcosystem.go.measurability.pqc.entries = ['github.com/cloudflare/circl']; }),
   /go\.measurability\.pqc\.entries names github\.com\/cloudflare\/circl, a multi-purpose library/);
-for (const [i, cell] of [...CLASSES, ...JOINT].entries()) {
-  plant(`the ${cell} cell off by one`, corpusOf((c) => { npmRaw(c)[cell].count += 1; }),
-    new RegExp(`byEcosystem\\.npm\\.anyManifestMatch\\.raw\\.${cell} is \\{"count":${[5, 5, 4, 1, 2, 2, 0][i] + 1}[,}].*recomputed from the files it is bound to`));
+// Each cell off by one, with whatever else it takes to keep the block's identities, so that the
+// figure is caught as not following from the files rather than as one that breaks an identity.
+// neitherWeakNorPqc cannot move alone without breaking the first identity, so its test is that one.
+const offByOne = [
+  ['matched', 'anyManifestMatch', { matched: 1, neitherWeakNorPqc: 1 }, 6],
+  ['weak', 'directUnconditional', { weak: 1, brokenAlgorithm: 1, neitherWeakNorPqc: -1 }, 4],
+  ['brokenAlgorithm', 'anyManifestMatch', { brokenAlgorithm: 1 }, 5],
+  ['deprecatedLibrary', 'anyManifestMatch', { deprecatedLibrary: 1 }, 2],
+  ['pqc', 'anyManifestMatch', { pqc: 1, weakAndPqc: 1 }, 3],
+  ['weakAndPqc', 'anyManifestMatch', { weakAndPqc: 1, neitherWeakNorPqc: 1 }, 3],
+];
+for (const [cell, definition, moves, count] of offByOne) {
+  plant(`the ${cell} cell off by one`, corpusOf((c) => {
+    for (const [moved, by] of Object.entries(moves)) c.byEcosystem.npm[definition].raw[moved].count += by;
+  }), new RegExp(`byEcosystem\\.npm\\.${definition}\\.raw\\.${cell} is \\{"count":${count}[,}].*recomputed from the files it is bound to`));
 }
-plant('a consolidated cell off by one', corpusOf((c) => { c.byEcosystem.maven.directUnconditional.consolidated.matched.count += 1; }), /maven\.directUnconditional\.consolidated\.matched is \{"count":2.*recomputed/);
+plant('a consolidated cell off by one', corpusOf((c) => { c.byEcosystem.maven.anyManifestMatch.consolidated.matched.count += 1; }), /maven\.anyManifestMatch\.consolidated\.matched is \{"count":2.*recomputed/);
 plant('a total cell off by one', corpusOf((c) => { c.total.anyManifestMatch.raw.matched.count += 1; }), /total\.anyManifestMatch\.raw\.matched is \{"count":22.*recomputed/);
 plant('a count where K is 0', corpusOf((c) => { c.byEcosystem.go.anyManifestMatch.raw.pqc = { count: 0, k: 0, nullReason: null }; }), /go\.anyManifestMatch\.raw\.pqc is \{"count":0,"k":0,"nullReason":null\}: count must be null when k is 0/);
 plant('null where K is not 0', corpusOf((c) => { c.byEcosystem.pypi.directUnconditional.raw.weak = { count: null, k: 2, nullReason: 'noCountableEntry' }; }), /pypi\.directUnconditional\.raw\.weak is .*: count is null while k is 2/);
@@ -1323,17 +1347,19 @@ plant('unclassified matches off by one', corpusOf((c) => { npmRaw(c).excludedUnc
 plant('units with only unclassified matches off by one', corpusOf((c) => { npmRaw(c).excludedUnclassified.unitsWithOnlyUnclassifiedMatches = 2; }), /unitsWithOnlyUnclassifiedMatches is 2; recomputed it is 1/);
 plant('an unclassified entry\'s count off by one', corpusOf((c) => { npmRaw(c).excludedUnclassified.byEntry[0].matches = 3; }), /raw\.excludedUnclassified\.byEntry is .*; recomputed it is .*It lists every unclassified entry/);
 plant('an unclassified entry left out because nothing matched it', corpusOf((c) => { c.byEcosystem.packagist.directUnconditional.raw.excludedUnclassified.byEntry = []; }), /packagist\.directUnconditional\.raw\.excludedUnclassified\.byEntry is \[\]; recomputed it is/);
-plant('a merged count off by one', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation.merged = 1; }), /consolidated\.consolidation\.merged is 1; the consolidation map gives 2/);
+plant('consolidation figures off by one that still add up', corpusOf((c) => { Object.assign(c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation, { unitsIn: 7, unitsOut: 5 }); }),
+  /consolidated\.consolidation\.unitsIn is 7; the consolidation map gives 6/);
 plant('consolidation figures that do not add up', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation.unitsIn = 7; }), /consolidated\.consolidation: unitsIn \(7\) is not unitsOut \+ merged \+ removed \(6\)/);
-plant('a removal count the map does not give', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation.removedByRule = { sharedNamespace: 1 }; }), /removedByRule\.sharedNamespace is 1; the consolidation map gives 0/);
+plant('a removal count the map does not give', corpusOf((c) => { Object.assign(c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation, { removedByRule: { sharedNamespace: 1 }, merged: 1 }); }),
+  /removedByRule\.sharedNamespace is 1; the consolidation map gives 0/);
 plant('a removal count under a rule the map does not have', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation.removedByRule = { nameTooShort: 0 }; }), /removedByRule names nameTooShort, which is not a rule of the consolidation map/);
 plant('removals that are not counts', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation.removedByRule = { sharedNamespace: '1' }; }), /removedByRule is .*, not an object of counts by rule/);
 plant('flags whose parts do not make the matched count', corpusOf((c) => { npmRaw(c).neitherWeakNorPqc.count = 1; }), /anyManifestMatch\.raw: matched \(5\) is not weak \(5\) \+ pqc \(2\) - weakAndPqc \(2\) \+ neitherWeakNorPqc \(1\)/);
-plant('weak outside its two classes', corpusOf((c) => { npmRaw(c).weak.count = 6; }), /anyManifestMatch\.raw: weak \(6\) is not between the larger of brokenAlgorithm \(4\) and deprecatedLibrary \(1\) and their sum/);
+plant('weak outside its two classes', corpusOf((c) => { npmRaw(c).deprecatedLibrary.count = 0; }), /anyManifestMatch\.raw: weak \(5\) is not between the larger of brokenAlgorithm \(4\) and deprecatedLibrary \(0\) and their sum/);
 plant('"neither" counted where post-quantum is not measurable', corpusOf((c) => { c.byEcosystem.go.anyManifestMatch.raw.neitherWeakNorPqc = { count: 2, nullReason: null }; }), /go\.anyManifestMatch\.raw: weakAndPqc or neitherWeakNorPqc is counted while weak or pqc is not measurable/);
-plant('matched and the unclassified-only units that do not make the units with a match', corpusOf((c) => { c.byEcosystem.maven.anyManifestMatch.raw.matched.count = 3; }), /maven\.anyManifestMatch\.raw: matched \(3\) and the units whose only matches are unclassified \(0\) make 3, and 2 unit\(s\) have a match/);
 plant('more matched than packages read with observable dependencies', corpusOf((c) => { c.byEcosystem.go.anyManifestMatch.raw.matched.count = 5; }), /go\.anyManifestMatch\.raw: matched \(5\) is more than the 4 packages read whose dependencies could be observed/);
-plant('a direct figure above the manifest-match one', corpusOf((c) => { c.byEcosystem.hex.directUnconditional.raw.matched.count = 2; }), /byEcosystem\.hex: directUnconditional\.raw\.matched \(2\) is more than anyManifestMatch\.raw\.matched \(1\)/);
+plant('a direct figure above the manifest-match one', corpusOf((c) => { c.byEcosystem.npm.directUnconditional.raw.deprecatedLibrary.count = 2; }),
+  /byEcosystem\.npm: directUnconditional\.raw\.deprecatedLibrary \(2\) is more than anyManifestMatch\.raw\.deprecatedLibrary \(1\)/);
 plant('figures without dev metadata for a registry that has none', corpusOf((c) => { c.byEcosystem.npm.excludingDevMetadata = c.byEcosystem.packagist.excludingDevMetadata; }), /byEcosystem\.npm\.excludingDevMetadata is .*\. It is kept for a registry read partly from dev metadata/);
 plant('no figures without dev metadata for Packagist', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata = null; }), /byEcosystem\.packagist\.excludingDevMetadata is null, not an object/);
 plant('coverage without dev metadata off by one', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata.coverage.scanned = 3; }), /excludingDevMetadata\.coverage\.scanned is 3; the ledger gives 2 without the packages read from dev metadata/);
@@ -1353,7 +1379,6 @@ plant('multi-purpose libraries that are not a list', corpusOf((c) => { c.multiPu
 
 // Comparability with every earlier dataset.
 plant('an empty comparability', corpusOf((c) => { c.comparability = []; }), /comparability is \[\]\. It is required and names every earlier dataset/);
-plant('comparability that does not name an earlier directory', corpusOf((c) => { c.comparability[0].dataset = '2026-01-01'; }), /comparability does not name 2026-03-18\. Every earlier dataset is named/);
 plant('comparability naming a dataset that is not here', corpusOf((c) => { c.comparability.push({ ...c.comparability[0], dataset: '2026-08-03' }); }), /comparability\[1\] names "2026-08-03", which is not a dataset of this repository collected before 2026-09-30/);
 plant('comparability naming a dataset twice', corpusOf((c) => { c.comparability.push({ ...c.comparability[0] }); }), /comparability\[1\] names 2026-03-18 a second time/);
 plant('a first-shape dataset marked comparable', corpusOf((c) => { Object.assign(c.comparability[0], { comparable: true, reason: null, changes: [] }); }), /2026-03-18 is a version 1 dataset, measured with an instrument that has since changed, so it is not comparable/);
@@ -1381,6 +1406,7 @@ plant('a comparable dataset that still gives a reason', corpusOf((c) => { c.comp
 plant('a coverage total that is not a count', corpusOf((c) => { c.coverage.total.absent = -1; }), /coverage\.total\.absent is -1, not a whole count/);
 plant('a total without dev metadata where no registry reads from it', {
   fixture: (f) => { f.packagist.method.readFrom = ['taggedRelease']; f.packagist.rows.find((r) => r.name === 'acme/cli').readFrom = 'taggedRelease'; },
+  corpus: (c) => { c.byEcosystem.packagist.excludingDevMetadata = null; },
 }, /total\.excludingDevMetadata is set, and no registry is read partly from dev metadata/);
 
 // Where a dataset sits.
@@ -1390,7 +1416,7 @@ test('comparability missing an earlier directory is refused', async () => {
     [DATE]: [DATE, {}, [{ dataset: FIRST_SHAPE, version: 1 }]],
   });
   assert.equal(result.code, 1, result.stdout);
-  assert.match(result.stderr, /2026-09-30: corpus-2026-09-30\.json: comparability does not name 2026-09-15\. Every earlier dataset is named/);
+  assert.match(firstProblem(result.stderr), /2026-09-30: corpus-2026-09-30\.json: comparability does not name 2026-09-15\. Every earlier dataset is named/, result.stderr);
 });
 test('a later dataset marked comparable with an earlier one whose instrument differs is refused', async () => {
   const result = await validate({
@@ -1398,7 +1424,7 @@ test('a later dataset marked comparable with an earlier one whose instrument dif
     [DATE]: [DATE, {}, [{ dataset: FIRST_SHAPE, version: 1 }, { dataset: EARLIER_V2, version: 2 }]],
   });
   assert.equal(result.code, 1, result.stdout);
-  assert.match(result.stderr, /2026-09-15 is marked comparable, and its the npm scanner's method differ from this dataset's/);
+  assert.match(firstProblem(result.stderr), /2026-09-15 is marked comparable, and these differ between the two datasets: the npm scanner's method\. Two datasets are comparable only when/, result.stderr);
 });
 test('a later dataset marked comparable with an earlier one that cannot be read is refused', async () => {
   const result = await validate({
@@ -1406,13 +1432,13 @@ test('a later dataset marked comparable with an earlier one that cannot be read 
     [DATE]: [DATE, {}, [{ dataset: FIRST_SHAPE, version: 1 }, { dataset: EARLIER_V2, version: 2 }]],
   }, (dir) => unlinkSync(join(dir, 'datasets', EARLIER_V2, 'catalog-2026-09-15.json')));
   assert.equal(result.code, 1, result.stdout);
-  assert.match(result.stderr, /2026-09-15 is marked comparable, and the files that would show it cannot be read/);
+  assert.match(firstProblem(result.stderr), /2026-09-15 is marked comparable, and the files that would show it cannot be read/, result.stderr);
 });
 test('an earlier dataset whose manifest cannot be read is refused as a comparison', async () => {
   const result = await validate({ [DATE]: [DATE, {}, [{ dataset: FIRST_SHAPE, version: 1 }, { dataset: '2026-09-01', version: 1 }]] },
     (dir) => { mkdirSync(join(dir, 'datasets', '2026-09-01')); writeFileSync(join(dir, 'datasets', '2026-09-01', 'MANIFEST.json'), '{'); });
   assert.equal(result.code, 1, result.stdout);
-  assert.match(result.stderr, /comparability\[1\]: 2026-09-01 has no manifest these rules can read/);
+  assert.match(firstProblem(result.stderr), /comparability\[1\]: 2026-09-01 has no manifest these rules can read/, result.stderr);
 });
 
 // Each object is closed: a field the contract does not define fails, at every level.
@@ -1455,13 +1481,21 @@ const closedInTheCorpus = [
 ];
 for (const [level, change, problem] of closedInTheCorpus) plant(`a field the contract does not define, in ${level}`, change, problem);
 
+test('more malformed rows than are listed one by one are counted after the first five', async () => {
+  const result = await validateOne(ledgerOf('npm', (lines) => lines.map((line, i) => (i === 0 ? line : line.replace(/^([^\t]+)\t/, '$1\tgone\t')))));
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(firstProblem(result.stderr), /listing-npm\.tsv\.gz: row 2 has the disposition "gone"/, result.stderr);
+  assert.equal(result.stderr.split('\n').filter((line) => / listing-npm\.tsv\.gz: row \d+ /.test(line)).length, 5, result.stderr);
+  assert.match(result.stderr, /listing-npm\.tsv\.gz: 3 more row\(s\) are malformed/);
+});
+
 // --- Running the planted defects -------------------------------------------------
 
 for (const [what, change, problem, prepare] of defects) {
   test(`${what} is refused`, async () => {
     const result = await validateOne(change, prepare);
     assert.equal(result.code, 1, `expected a failure, got:\n${result.stdout}${result.stderr}`);
-    assert.match(result.stderr, problem);
+    assert.match(firstProblem(result.stderr), problem, result.stderr);
   });
 }
 

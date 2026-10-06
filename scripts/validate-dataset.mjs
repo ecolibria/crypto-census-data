@@ -2283,130 +2283,165 @@ function expectedTotal(rows) {
 }
 
 // --- The corpus: comparison -----------------------------------------------------
+//
+// A block is read in three passes: its shape and the rules each cell states
+// about itself; then the identities between its figures; then every figure
+// against the value recomputed from the files. A figure that breaks an
+// identity is reported as that before it is reported as one that does not
+// follow from the files.
 
-/** The rules a cell states about itself, then the cell against its recomputed value. */
-function compareCell(stored, expected, where, keys, ctx) {
-  if (!closed(stored, keys, where, ctx.bad)) return;
+/** The rules a cell states about itself. True when the cell can be compared with its recomputed value. */
+function cellRules(stored, where, keys, ctx) {
+  if (!closed(stored, keys, where, ctx.bad)) return false;
   if (stored.count !== null && !isCount(stored.count)) {
     ctx.bad(`${where}.count is ${describe(stored.count)}, not a whole count or null. No share is stored: a share is computed where it is shown.`);
-    return;
+    return false;
   }
   if (keys.includes('k') && !isCount(stored.k)) {
     ctx.bad(`${where}.k is ${describe(stored.k)}, not a whole count`);
-    return;
+    return false;
   }
   if (stored.nullReason !== null && !['noCountableEntry', 'rowBlocked'].includes(stored.nullReason)) {
     ctx.bad(`${where}.nullReason is ${describe(stored.nullReason)}, not noCountableEntry, rowBlocked or null`);
-    return;
+    return false;
   }
   if (keys.includes('k') && stored.k === 0 && stored.count !== null) {
     ctx.bad(`${where} is ${describe(stored)}: count must be null when k is 0. No countable entry exists to be observed, and a 0 ` +
       'would read as a measured absence.');
-    return;
+    return false;
   }
   if (keys.includes('k') && stored.k > 0 && stored.count === null && stored.nullReason !== 'rowBlocked') {
     ctx.bad(`${where} is ${describe(stored)}: count is null while k is ${stored.k}. Null is kept for a figure that cannot be ` +
       'measured, and this one can; a measured zero is 0.');
-    return;
+    return false;
   }
   if ((stored.count === null) !== (stored.nullReason !== null)) {
     ctx.bad(`${where} is ${describe(stored)}: nullReason says why count is null, so it is set exactly when count is null`);
-    return;
+    return false;
   }
-  let comparable = stored;
   if (keys.includes('measurableIn')) {
     for (const field of ['measurableIn', 'notMeasurableIn']) {
       const list = stored[field];
       if (!Array.isArray(list) || !list.every((eco) => ECOSYSTEMS.includes(eco)) || !isDistinct(list)) {
         ctx.bad(`${where}.${field} is ${describe(list)}, not a list of distinct registries`);
-        return;
+        return false;
       }
     }
-    comparable = { ...stored, measurableIn: [...stored.measurableIn].sort(), notMeasurableIn: [...stored.notMeasurableIn].sort() };
-    expected = { ...expected, measurableIn: [...expected.measurableIn].sort(), notMeasurableIn: [...expected.notMeasurableIn].sort() };
   }
-  if (!sameValue(comparable, expected)) {
+  return true;
+}
+
+function cellValue(stored, expected, where, keys, ctx) {
+  const ordered = (cell) => (keys.includes('measurableIn')
+    ? { ...cell, measurableIn: [...cell.measurableIn].sort(), notMeasurableIn: [...cell.notMeasurableIn].sort() } : cell);
+  if (!sameValue(ordered(stored), ordered(expected))) {
     ctx.figureBad(`${where} is ${describe(stored)}; recomputed from the files it is bound to, it is ${describe(expected)}. A ` +
       'figure that does not follow from the scan files, the catalogue snapshot and the consolidation map is not a measurement.');
   }
 }
 
-function compareExcluded(stored, expected, where, ctx) {
-  if (!closed(stored, KEYS.excludedUnclassified, where, ctx.bad)) return;
+function excludedRules(stored, where, ctx) {
+  if (!closed(stored, KEYS.excludedUnclassified, where, ctx.bad)) return false;
+  let ok = true;
   for (const field of ['matches', 'unitsWithOnlyUnclassifiedMatches']) {
-    if (!isCount(stored[field])) ctx.bad(`${where}.${field} is ${describe(stored[field])}, not a whole count`);
-    else if (stored[field] !== expected[field]) ctx.figureBad(`${where}.${field} is ${stored[field]}; recomputed it is ${expected[field]}`);
+    if (!isCount(stored[field])) {
+      ctx.bad(`${where}.${field} is ${describe(stored[field])}, not a whole count`);
+      ok = false;
+    }
   }
   if (!Array.isArray(stored.byEntry)) {
     ctx.bad(`${where}.byEntry is ${describe(stored.byEntry)}, not a list`);
-    return;
+    return false;
   }
-  let shaped = true;
   stored.byEntry.forEach((item, index) => {
-    if (!closed(item, KEYS.byEntry, `${where}.byEntry[${index}]`, ctx.bad)) shaped = false;
+    if (!closed(item, KEYS.byEntry, `${where}.byEntry[${index}]`, ctx.bad)) ok = false;
     else if (!isText(item.entry) || !isCount(item.matches)) {
       ctx.bad(`${where}.byEntry[${index}] is ${describe(item)}, not an entry and a count`);
-      shaped = false;
+      ok = false;
     }
   });
+  return ok;
+}
+
+function excludedValue(stored, expected, where, ctx) {
+  for (const field of ['matches', 'unitsWithOnlyUnclassifiedMatches']) {
+    if (stored[field] !== expected[field]) ctx.figureBad(`${where}.${field} is ${stored[field]}; recomputed it is ${expected[field]}`);
+  }
   const items = (list) => list.map((item) => `${item.entry}\0${item.matches}`).sort();
-  if (shaped && !sameValue(items(stored.byEntry), items(expected.byEntry))) {
+  if (!sameValue(items(stored.byEntry), items(expected.byEntry))) {
     ctx.figureBad(`${where}.byEntry is ${describe(stored.byEntry)}; recomputed it is ${describe(expected.byEntry)}. It lists ` +
       'every unclassified entry of the registry, each with the units that matched it.');
   }
 }
 
-function compareConsolidationStats(stored, expected, where, ctx) {
-  if (!closed(stored, KEYS.consolidationStats, where, ctx.bad)) return;
-  let counted = true;
+function statsRules(stored, where, ctx) {
+  if (!closed(stored, KEYS.consolidationStats, where, ctx.bad)) return false;
+  let ok = true;
   for (const field of ['unitsIn', 'unitsOut', 'merged']) {
     if (!isCount(stored[field])) {
       ctx.bad(`${where}.${field} is ${describe(stored[field])}, not a whole count`);
-      counted = false;
-    } else if (stored[field] !== expected[field]) {
-      ctx.figureBad(`${where}.${field} is ${stored[field]}; the consolidation map gives ${expected[field]}`);
+      ok = false;
     }
   }
   if (!isObject(stored.removedByRule) || !Object.values(stored.removedByRule).every(isCount)) {
     ctx.bad(`${where}.removedByRule is ${describe(stored.removedByRule)}, not an object of counts by rule`);
-    return;
+    return false;
   }
   for (const rule of Object.keys(stored.removedByRule)) {
     if (!ctx.ruleIds.has(rule)) ctx.bad(`${where}.removedByRule names ${rule}, which is not a rule of the consolidation map`);
+  }
+  return ok;
+}
+
+function statsIdentity(stored, where, ctx) {
+  const removed = sum(Object.values(stored.removedByRule));
+  if (stored.unitsIn !== stored.unitsOut + stored.merged + removed) {
+    ctx.bad(`${where}: unitsIn (${stored.unitsIn}) is not unitsOut + merged + removed (${stored.unitsOut + stored.merged + removed}). ` +
+      'Every unit that goes in is kept, merged or removed, once.');
+  }
+}
+
+function statsValue(stored, expected, where, ctx) {
+  for (const field of ['unitsIn', 'unitsOut']) {
+    if (stored[field] !== expected[field]) ctx.figureBad(`${where}.${field} is ${stored[field]}; the consolidation map gives ${expected[field]}`);
   }
   for (const rule of new Set([...Object.keys(stored.removedByRule), ...Object.keys(expected.removedByRule)])) {
     const has = stored.removedByRule[rule] ?? 0;
     const want = expected.removedByRule[rule] ?? 0;
     if (has !== want) ctx.figureBad(`${where}.removedByRule.${rule} is ${has}; the consolidation map gives ${want}`);
   }
-  const removed = sum(Object.values(stored.removedByRule));
-  if (counted && stored.unitsIn !== stored.unitsOut + stored.merged + removed) {
-    ctx.bad(`${where}: unitsIn (${stored.unitsIn}) is not unitsOut + merged + removed (${stored.unitsOut + stored.merged + removed}). ` +
-      'Every unit that goes in is kept, merged or removed, once.');
-  }
+  if (stored.merged !== expected.merged) ctx.figureBad(`${where}.merged is ${stored.merged}; the consolidation map gives ${expected.merged}`);
 }
 
-function compareBlock(stored, expected, where, ctx, total) {
-  const consolidated = Object.hasOwn(expected, 'consolidation');
-  if (!closed(stored, consolidated ? KEYS.consolidatedBlock : KEYS.block, where, ctx.bad)) return;
+/** A block's shape and the rules its cells state about themselves. True when all of it can be read further. */
+function blockRules(stored, consolidated, where, ctx, total) {
+  if (!closed(stored, consolidated ? KEYS.consolidatedBlock : KEYS.block, where, ctx.bad)) return false;
+  let ok = true;
+  for (const cls of CLASSES) ok = cellRules(stored[cls], `${where}.${cls}`, total ? KEYS.totalCell : KEYS.cell, ctx) && ok;
+  for (const joint of JOINT) ok = cellRules(stored[joint], `${where}.${joint}`, KEYS.jointCell, ctx) && ok;
+  ok = excludedRules(stored.excludedUnclassified, `${where}.excludedUnclassified`, ctx) && ok;
+  if (consolidated) ok = statsRules(stored.consolidation, `${where}.consolidation`, ctx) && ok;
+  return ok;
+}
+
+/** Every figure of a block against its recomputed value. */
+function blockValues(stored, expected, where, ctx, total) {
   if (stored.definitionId !== expected.definitionId) {
     ctx.bad(`${where}.definitionId is ${describe(stored.definitionId)}, not ${expected.definitionId}. A figure is cited with ` +
       'the definitions it was counted under.');
   }
-  for (const cls of CLASSES) compareCell(stored[cls], expected[cls], `${where}.${cls}`, total ? KEYS.totalCell : KEYS.cell, ctx);
-  for (const joint of JOINT) compareCell(stored[joint], expected[joint], `${where}.${joint}`, KEYS.jointCell, ctx);
-  compareExcluded(stored.excludedUnclassified, expected.excludedUnclassified, `${where}.excludedUnclassified`, ctx);
-  if (consolidated) compareConsolidationStats(stored.consolidation, expected.consolidation, `${where}.consolidation`, ctx);
+  for (const cls of CLASSES) cellValue(stored[cls], expected[cls], `${where}.${cls}`, total ? KEYS.totalCell : KEYS.cell, ctx);
+  for (const joint of JOINT) cellValue(stored[joint], expected[joint], `${where}.${joint}`, KEYS.jointCell, ctx);
+  excludedValue(stored.excludedUnclassified, expected.excludedUnclassified, `${where}.excludedUnclassified`, ctx);
+  if (Object.hasOwn(expected, 'consolidation')) statsValue(stored.consolidation, expected.consolidation, `${where}.consolidation`, ctx);
 }
 
-function comparePair(stored, expected, where, ctx, total) {
-  if (!closed(stored, KEYS.pair, where, ctx.bad)) return;
-  for (const unit of UNITS) compareBlock(stored[unit], expected[unit], `${where}.${unit}`, ctx, total);
-}
-
-/** The identities the contract states for every block of a row, read from the stored figures. */
-function blockIdentities(block, where, population, coverage, ctx) {
-  if (!isObject(block)) return;
+/**
+ * The identities the contract states for every block of a row, read from the
+ * stored figures. That matched and the excluded units make every unit with a
+ * match follows from recomputing each of them, so it is not checked apart.
+ */
+function blockIdentities(block, where, coverage, ctx) {
   const n = (cell) => (isObject(cell) && isCount(cell.count) ? cell.count : null);
   const [m, w, ba, dl, p, wp, nw] = [...CLASSES, ...JOINT].map((key) => n(block[key]));
   if ([m, w, p, wp, nw].every((x) => x !== null) && m !== w + p - wp + nw) {
@@ -2417,14 +2452,9 @@ function blockIdentities(block, where, population, coverage, ctx) {
     ctx.bad(`${where}: weak (${w}) is not between the larger of brokenAlgorithm (${ba}) and deprecatedLibrary (${dl}) and ` +
       'their sum. weak is the union of the two classes.');
   }
-  if ((w === null || p === null) && (n(block.weakAndPqc) !== null || n(block.neitherWeakNorPqc) !== null)) {
+  if ((w === null || p === null) && (wp !== null || nw !== null)) {
     ctx.bad(`${where}: weakAndPqc or neitherWeakNorPqc is counted while weak or pqc is not measurable. Where post-quantum is ` +
       'not measurable, "neither" would assert an absence nobody measured.');
-  }
-  const only = isObject(block.excludedUnclassified) ? block.excludedUnclassified.unitsWithOnlyUnclassifiedMatches : null;
-  if (m !== null && isCount(only) && m + only !== population) {
-    ctx.bad(`${where}: matched (${m}) and the units whose only matches are unclassified (${only}) make ${m + only}, and ` +
-      `${population} unit(s) have a match that counts under this definition. Every such unit is in one of the two.`);
   }
   if (m !== null && coverage && m > coverage.scanned - coverage.dependenciesNotObservable) {
     ctx.bad(`${where}: matched (${m}) is more than the ${coverage.scanned - coverage.dependenciesNotObservable} packages read ` +
@@ -2433,21 +2463,33 @@ function blockIdentities(block, where, population, coverage, ctx) {
 }
 
 /** A direct and unconditional declaration is also a manifest match, so no cell of that block exceeds the other's. */
-function monotone(row, expected, where, ctx) {
+function monotone(row, where, ctx) {
   const n = (cell) => (isObject(cell) && isCount(cell.count) ? cell.count : null);
   for (const unit of UNITS) {
     const any = isObject(row.anyManifestMatch) ? row.anyManifestMatch[unit] : null;
     const direct = isObject(row.directUnconditional) ? row.directUnconditional[unit] : null;
     if (!isObject(any) || !isObject(direct)) continue;
     for (const key of [...CLASSES, 'weakAndPqc']) {
-      const a = n(any[key]);
+      const x = n(any[key]);
       const d = n(direct[key]);
-      if (a !== null && d !== null && d > a) {
-        ctx.bad(`${where}: directUnconditional.${unit}.${key} (${d}) is more than anyManifestMatch.${unit}.${key} (${a}). A ` +
+      if (x !== null && d !== null && d > x) {
+        ctx.bad(`${where}: directUnconditional.${unit}.${key} (${d}) is more than anyManifestMatch.${unit}.${key} (${x}). A ` +
           'declaration that counts as direct counts as a manifest match too.');
       }
     }
   }
+}
+
+/** The blocks of a row, or of its figures without dev metadata, in the order they are read. */
+function blocksOf(holder, expected, where, coverage, ctx) {
+  const items = [];
+  for (const definition of MATCH_DEFINITIONS) {
+    if (!closed(holder[definition], KEYS.pair, `${where}.${definition}`, ctx.bad)) continue;
+    for (const unit of UNITS) {
+      items.push({ stored: holder[definition][unit], expected: expected[definition][unit], where: `${where}.${definition}.${unit}`, coverage, consolidated: unit === 'consolidated' });
+    }
+  }
+  return items;
 }
 
 function compareMeasurability(stored, expected, registry, where, ctx) {
@@ -2486,27 +2528,6 @@ function compareMeasurability(stored, expected, registry, where, ctx) {
       }
     }
   }
-}
-
-function compareDevRow(stored, expected, where, ctx) {
-  if (expected === null) {
-    if (stored !== null) {
-      ctx.bad(`${where} is ${describe(stored)}. It is kept for a registry read partly from dev metadata, and is null for one ` +
-        'that reads from a single source.');
-    }
-    return;
-  }
-  if (!closed(stored, KEYS.devRow, where, ctx.bad)) return;
-  if (closed(stored.coverage, COVERAGE_COUNTS, `${where}.coverage`, ctx.bad)) {
-    for (const field of COVERAGE_COUNTS) {
-      if (!isCount(stored.coverage[field])) ctx.bad(`${where}.coverage.${field} is ${describe(stored.coverage[field])}, not a whole count`);
-      else if (stored.coverage[field] !== expected.coverage[field]) {
-        ctx.figureBad(`${where}.coverage.${field} is ${stored.coverage[field]}; the ledger gives ${expected.coverage[field]} ` +
-          'without the packages read from dev metadata');
-      }
-    }
-  }
-  for (const definition of MATCH_DEFINITIONS) comparePair(stored[definition], expected[definition], `${where}.${definition}`, ctx, false);
 }
 
 function compareMultiPurpose(stored, rows, catalog, file, ctx) {
@@ -2607,14 +2628,6 @@ function checkInputs(name, inputs, ctx, file, bad) {
     for (const digest of ['matchSetSha256', 'classificationSha256']) {
       if (inputs.catalog[digest] !== ctx.catalog.value[digest]) {
         bad(`${where}.catalog.${digest} is not the catalogue snapshot's. The corpus names the classification it was computed with.`);
-      }
-    }
-    for (const eco of ECOSYSTEMS) {
-      const scan = ctx.scans[eco];
-      if (scan && isObject(scan.value.catalog) && isSha256(scan.value.catalog.matchSetSha256) &&
-          scan.value.catalog.matchSetSha256 !== inputs.catalog.matchSetSha256) {
-        bad(`${where}.catalog.matchSetSha256 is not the one ${scan.file} was matched with. Aggregation refuses scans matched ` +
-          'against another set of names.');
       }
     }
   }
@@ -2767,11 +2780,13 @@ function checkComparability(name, list, corpus, ctx, file, bad) {
       if (theirs === null || ours === null) {
         bad(`${at}: ${item.dataset} is marked comparable, and the files that would show it cannot be read`);
       } else {
-        const differ = ['matchSetSha256', 'definitionIds'].filter((key) => !sameValue(theirs[key], ours[key]));
+        const differ = [];
+        if (!sameValue(theirs.matchSetSha256, ours.matchSetSha256)) differ.push('the match set');
+        if (!sameValue(theirs.definitionIds, ours.definitionIds)) differ.push('the definition ids');
         for (const eco of ECOSYSTEMS) if (!sameValue(theirs.methods[eco], ours.methods[eco])) differ.push(`the ${eco} scanner's method`);
         if (differ.length > 0) {
-          bad(`${at}: ${item.dataset} is marked comparable, and its ${differ.join(', ')} differ from this dataset's. Two datasets ` +
-            'are comparable only when the match set, the definition ids and every scanner\'s method are the same.');
+          bad(`${at}: ${item.dataset} is marked comparable, and these differ between the two datasets: ${differ.join(', ')}. Two ` +
+            'datasets are comparable only when the match set, the definition ids and every scanner\'s method are the same.');
         }
       }
     } else if (version === null) {
@@ -2891,48 +2906,65 @@ function checkCorpus(name, record, ctx, bad) {
       const expected = rows[eco];
       if (!closed(stored, KEYS.row, where, bad)) continue;
       compareMeasurability(stored.measurability, expected.row.measurability, ctx.catalog.byEco[eco], `${where}.measurability`, figureContext);
-      for (const definition of MATCH_DEFINITIONS) {
-        comparePair(stored[definition], expected.row[definition], `${where}.${definition}`, figureContext, false);
-        for (const unit of UNITS) {
-          if (isObject(stored[definition])) {
-            blockIdentities(stored[definition][unit], `${where}.${definition}.${unit}`, expected.populations[definition][unit], expected.coverage, figureContext);
-          }
+      const items = blocksOf(stored, expected.row, where, expected.coverage, figureContext);
+      const devWhere = `${where}.excludingDevMetadata`;
+      let devCoverage = null;
+      if (expected.row.excludingDevMetadata === null) {
+        if (stored.excludingDevMetadata !== null) {
+          bad(`${devWhere} is ${describe(stored.excludingDevMetadata)}. It is kept for a registry read partly from dev metadata, and is ` +
+            'null for one that reads from a single source.');
         }
-      }
-      monotone(stored, expected, where, figureContext);
-      compareDevRow(stored.excludingDevMetadata, expected.row.excludingDevMetadata, `${where}.excludingDevMetadata`, figureContext);
-      if (expected.dev !== null && isObject(stored.excludingDevMetadata)) {
-        for (const definition of MATCH_DEFINITIONS) {
-          for (const unit of UNITS) {
-            if (isObject(stored.excludingDevMetadata[definition])) {
-              blockIdentities(stored.excludingDevMetadata[definition][unit], `${where}.excludingDevMetadata.${definition}.${unit}`,
-                expected.dev.populations[definition][unit], expected.dev.coverage, figureContext);
+      } else if (closed(stored.excludingDevMetadata, KEYS.devRow, devWhere, bad)) {
+        const dev = stored.excludingDevMetadata;
+        if (closed(dev.coverage, COVERAGE_COUNTS, `${devWhere}.coverage`, bad)) {
+          devCoverage = dev.coverage;
+          for (const field of COVERAGE_COUNTS) {
+            if (!isCount(dev.coverage[field])) {
+              bad(`${devWhere}.coverage.${field} is ${describe(dev.coverage[field])}, not a whole count`);
+              devCoverage = null;
             }
           }
         }
-        monotone(stored.excludingDevMetadata, expected.dev, `${where}.excludingDevMetadata`, figureContext);
+        items.push(...blocksOf(dev, expected.row.excludingDevMetadata, devWhere, expected.dev.coverage, figureContext));
       }
+      const ready = items.filter((item) => blockRules(item.stored, item.consolidated, item.where, figureContext, false));
+      for (const item of ready) {
+        blockIdentities(item.stored, item.where, item.coverage, figureContext);
+        if (item.consolidated) statsIdentity(item.stored.consolidation, `${item.where}.consolidation`, figureContext);
+      }
+      monotone(stored, where, figureContext);
+      if (expected.dev !== null && isObject(stored.excludingDevMetadata)) monotone(stored.excludingDevMetadata, devWhere, figureContext);
+      if (devCoverage) {
+        for (const field of COVERAGE_COUNTS) {
+          if (devCoverage[field] !== expected.dev.coverage[field]) {
+            figureContext.figureBad(`${devWhere}.coverage.${field} is ${devCoverage[field]}; the ledger gives ` +
+              `${expected.dev.coverage[field]} without the packages read from dev metadata`);
+          }
+        }
+      }
+      for (const item of ready) blockValues(item.stored, item.expected, item.where, figureContext, false);
     }
   }
   if (totalShaped) {
     const total = expectedTotal(rows);
-    for (const definition of MATCH_DEFINITIONS) comparePair(c.total[definition], total[definition], `${file}: total.${definition}`, figureContext, true);
+    const items = blocksOf(c.total, total, `${file}: total`, null, figureContext);
     const where = `${file}: total.excludingDevMetadata`;
+    let devCoverage = null;
     if (total.excludingDevMetadata === null) {
       if (c.total.excludingDevMetadata !== null) bad(`${where} is set, and no registry is read partly from dev metadata; it is null then`);
     } else if (closed(c.total.excludingDevMetadata, KEYS.devRow, where, bad)) {
-      const stored = c.total.excludingDevMetadata;
-      if (closed(stored.coverage, COVERAGE_COUNTS, `${where}.coverage`, bad)) {
-        for (const field of COVERAGE_COUNTS) {
-          if (stored.coverage[field] !== total.excludingDevMetadata.coverage[field]) {
-            figureContext.figureBad(`${where}.coverage.${field} is ${describe(stored.coverage[field])}; the ledgers give ${total.excludingDevMetadata.coverage[field]}`);
-          }
+      if (closed(c.total.excludingDevMetadata.coverage, COVERAGE_COUNTS, `${where}.coverage`, bad)) devCoverage = c.total.excludingDevMetadata.coverage;
+      items.push(...blocksOf(c.total.excludingDevMetadata, total.excludingDevMetadata, where, null, figureContext));
+    }
+    const ready = items.filter((item) => blockRules(item.stored, item.consolidated, item.where, figureContext, true));
+    if (devCoverage) {
+      for (const field of COVERAGE_COUNTS) {
+        if (devCoverage[field] !== total.excludingDevMetadata.coverage[field]) {
+          figureContext.figureBad(`${where}.coverage.${field} is ${describe(devCoverage[field])}; the ledgers give ${total.excludingDevMetadata.coverage[field]}`);
         }
       }
-      for (const definition of MATCH_DEFINITIONS) {
-        comparePair(stored[definition], total.excludingDevMetadata[definition], `${where}.${definition}`, figureContext, true);
-      }
     }
+    for (const item of ready) blockValues(item.stored, item.expected, item.where, figureContext, true);
   }
   compareMultiPurpose(c.multiPurposeLibraries, rows, ctx.catalog, file, figureContext);
   if (differing > 40) bad(`${file}: ${differing - 40} more figure(s) differ from their recomputed values`);
