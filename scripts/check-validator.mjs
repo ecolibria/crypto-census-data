@@ -14,7 +14,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -74,3 +74,58 @@ for (const declared of [1, 2, '2', null]) {
     assert.match(result.stderr, /2026-10-05: schemaVersion is /);
   });
 }
+
+/** Copy the published dataset under its own name, change its files in place, and run a copy of the validator over it. */
+async function validateChanged(prepare) {
+  const dir = mkdtempSync(join(tmpdir(), 'census-data-'));
+  try {
+    mkdirSync(join(dir, 'scripts'));
+    cpSync(join(ROOT, 'scripts', 'validate-dataset.mjs'), join(dir, 'scripts', 'validate-dataset.mjs'));
+    cpSync(join(ROOT, 'datasets', PUBLISHED), join(dir, 'datasets', PUBLISHED), { recursive: true });
+    prepare(join(dir, 'datasets', PUBLISHED));
+    return await new Promise((done) => {
+      execFile(process.execPath, [join(dir, 'scripts', 'validate-dataset.mjs')], { env: {} },
+        (error, stdout, stderr) => done({ code: error ? error.code : 0, stdout, stderr }));
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('an aggregate that does not parse is reported, not thrown', async () => {
+  const result = await validateChanged((dir) => writeFileSync(join(dir, 'corpus-2026-03-18.json'), '{'));
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /2026-03-18: corpus-2026-03-18\.json does not parse/);
+  assert.doesNotMatch(result.stderr, /could not be checked to the end|\n\s+at /);
+});
+
+test('a listed file that is a link is refused before it is read', async () => {
+  const result = await validateChanged((dir) => {
+    rmSync(join(dir, 'corpus-2026-03-18.json'));
+    symlinkSync('/dev/zero', join(dir, 'corpus-2026-03-18.json'));
+  });
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /2026-03-18: corpus-2026-03-18\.json is not a regular file/);
+});
+
+test('a manifest entry that names a path outside the dataset is refused, and the file there is not read', async () => {
+  const result = await validateChanged((dir) => {
+    const manifest = JSON.parse(readFileSync(join(dir, 'MANIFEST.json'), 'utf-8'));
+    writeFileSync(join(dir, '..', '..', 'outside.json'), readFileSync(join(dir, manifest.corpus.file)));
+    manifest.corpus.file = '../../outside.json';
+    writeFileSync(join(dir, 'MANIFEST.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  });
+  assert.equal(result.code, 1);
+  const first = result.stderr.split('\n').find((line) => line.startsWith('  2026-03-18: '));
+  assert.match(first, /a manifest entry names "\.\.\/\.\.\/outside\.json", which is not the name of a file in the dataset's own directory/, result.stderr);
+  assert.doesNotMatch(result.stderr, /outside\.json (does not match|is \d+ bytes|does not parse)|could not be checked to the end/);
+});
+
+test('a manifest that is a link is refused before it is read', async () => {
+  const result = await validateChanged((dir) => {
+    rmSync(join(dir, 'MANIFEST.json'));
+    symlinkSync('/dev/zero', join(dir, 'MANIFEST.json'));
+  });
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /2026-03-18: MANIFEST\.json is not a regular file/);
+});

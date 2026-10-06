@@ -42,6 +42,11 @@ jobs:
       - name: Check the errata rules
         run: node --test scripts/check-errata.mjs
 
+      # The version 2 rules, run against a small version 2 dataset built in a
+      # temporary directory, with one defect planted per test.
+      - name: Check the version 2 rules
+        run: node --test scripts/check-validator-v2.mjs
+
   immutable:
     name: No published dataset is rewritten
     runs-on: ubuntu-latest
