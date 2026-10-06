@@ -63,12 +63,32 @@ const KINDS = {
 const INCLUDES = Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, KINDS[eco].filter((kind) =>
   !(eco === 'maven' && ['managed', 'plugin'].includes(kind)) && !(eco === 'packagist' && kind === 'suggest'))]));
 
-// Example values. The commit id and the two digests have the right form and
-// name nothing; the URLs are in reserved example domains, except Go's two
-// sources, which are the ones on the validator's allowlist.
+// Example values. The commit id has the right form and names nothing; the URLs
+// are in reserved example domains, except Go's two sources, which are the ones
+// on the validator's allowlist.
 const COMMIT = '0123456789abcdef0123456789abcdef01234567';
-const MATCH_SET = createHash('sha256').update('example match set').digest('hex');
-const CLASSIFICATION = createHash('sha256').update('example classification').digest('hex');
+
+/**
+ * The snapshot's two digests, computed here from its entries: JSON with keys
+ * sorted and no whitespace, written with a replacer rather than the
+ * validator's code, over the fields each digest covers.
+ */
+const canonicalJson = (value) => JSON.stringify(value, (key, v) => (v !== null && typeof v === 'object' && !Array.isArray(v)
+  ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, v[k]])) : v));
+const digestsOf = (catalog) => {
+  const entries = [...catalog.entries].sort((a, b) => byteOrder(a.ecosystem, b.ecosystem) || byteOrder(a.name, b.name));
+  const hash = (value) => createHash('sha256').update(canonicalJson(value)).digest('hex');
+  return {
+    matchSetSha256: hash({
+      entries: entries.map((e) => ({ ecosystem: e.ecosystem, name: e.name, aliases: e.aliases.map((a) => a.name).sort(byteOrder), unmatchable: e.unmatchable !== null })),
+      matchRules: catalog.matchRules,
+    }),
+    classificationSha256: hash({
+      entries: entries.map((e) => ({ ecosystem: e.ecosystem, name: e.name, tier: e.tier, weakClass: e.weakClass, classified: e.classified,
+        multiPurpose: e.multiPurpose !== null, registryAbsent: e.registryAbsent !== null, unmatchable: e.unmatchable !== null })),
+    }),
+  };
+};
 const CHECKED = '2026-09-28T12:00:00Z';
 const evidence = (path) => `https://evidence.example/${path}`;
 const ABSENT = { checkedAt: '2026-09-28', note: null };
@@ -530,12 +550,25 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
     .sort((a, b) => byteOrder(a.ecosystem, b.ecosystem) || byteOrder(a.name, b.name));
   const catalog = {
     schemaVersion: 2, kind: 'censusCatalog', collectedAt: date, sourceCommit: COMMIT,
-    matchSetSha256: MATCH_SET, classificationSha256: CLASSIFICATION,
+    matchSetSha256: null, classificationSha256: null,
     matchRules: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, `${eco}Name/1`])),
+    categories: ['encryption', 'general', 'hashing'],
     entries,
   };
   change.catalog?.(catalog);
+  // A digest a change left alone is computed from the entries as they now are; catalogAfterDigests changes them after.
+  // Entries a change has made unreadable get digests of the right form, which the validator does not recompute.
+  let digests;
+  try {
+    digests = digestsOf(catalog);
+  } catch {
+    digests = { matchSetSha256: sha256('unreadable entries'), classificationSha256: sha256('unreadable entries') };
+  }
+  for (const field of ['matchSetSha256', 'classificationSha256']) if (catalog[field] === null) catalog[field] = digests[field];
+  change.catalogAfterDigests?.(catalog);
   files[fileName.catalog(date)] = json(catalog);
+  const MATCH_SET = catalog.matchSetSha256;
+  const CLASSIFICATION = catalog.classificationSha256;
 
   const ledgers = {};
   for (const eco of ECOSYSTEMS) {
@@ -918,6 +951,21 @@ plant('a snapshot of another date', catalogOf((c) => { c.collectedAt = '2026-09-
 plant('a snapshot with no source commit', catalogOf((c) => { c.sourceCommit = null; }), /sourceCommit is null, not the commit/);
 plant('a digest that is not one', catalogOf((c) => { c.classificationSha256 = 'PLACEHOLDER'; }), /classificationSha256 is "PLACEHOLDER", not a SHA-256 digest/);
 plant('a registry with no match rule', catalogOf((c) => { delete c.matchRules.hex; }), /matchRules is missing hex/);
+plant('a match set digest that is not the entries\'', catalogOf((c) => { c.matchSetSha256 = sha256('another match set'); }),
+  /catalog-2026-09-30\.json: matchSetSha256 is not the digest of the entries it covers/);
+plant('a classification digest that is not the entries\'', catalogOf((c) => { c.classificationSha256 = sha256('another classification'); }),
+  /catalog-2026-09-30\.json: classificationSha256 is not the digest of the entries it covers/);
+plant('a re-tag that leaves the classification digest as it was', { catalogAfterDigests: (c) => {
+  c.entries.find((e) => e.ecosystem === 'npm' && e.name === 'node-forge').multiPurpose = { version: '1.4.0', url: evidence('npm/node-forge/archive'), checkedAt: CHECKED };
+} }, /catalog-2026-09-30\.json: classificationSha256 is not the digest of the entries it covers/);
+plant('an alias added that leaves the match set digest as it was', { catalogAfterDigests: (c) => {
+  c.entries.find((e) => e.ecosystem === 'npm' && e.name === 'md5').aliases.push(alias('md5-legacy'));
+} }, /catalog-2026-09-30\.json: matchSetSha256 is not the digest of the entries it covers/);
+plant('a match rule changed that leaves the match set digest as it was', { catalogAfterDigests: (c) => { c.matchRules.hex = 'hexName/2'; } },
+  /catalog-2026-09-30\.json: matchSetSha256 is not the digest of the entries it covers/);
+plant('a category the snapshot does not list', entryOf('npm', 'md5', (e) => { e.category = 'tls'; }), /\(npm:md5\): category is "tls", which is not one of the snapshot's categories/);
+plant('categories that are not a list of names', catalogOf((c) => { c.categories = 'general'; }), /catalog-2026-09-30\.json: categories is "general", not the closed list of distinct categories/);
+plant('a category listed twice', catalogOf((c) => { c.categories.push('general'); }), /catalog-2026-09-30\.json: categories is .*, not the closed list of distinct categories/);
 plant('entries that are not a list', catalogOf((c) => { c.entries = {}; }), /catalog-2026-09-30\.json: entries is \{\}, not a list/);
 plant('entries out of order', catalogOf((c) => { c.entries.reverse(); }), /does not follow .*Entries are sorted by registry and then by name/);
 plant('an entry listed twice', catalogOf((c) => { c.entries.splice(1, 0, structuredClone(c.entries[1])); }), /does not follow .*each appears once/);

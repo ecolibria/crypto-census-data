@@ -1047,7 +1047,7 @@ const CLASSES = ['matched', 'weak', 'brokenAlgorithm', 'deprecatedLibrary', 'pqc
 const BROKEN_ALGORITHMS = ['MD2', 'MD4', 'MD5', 'SHA-1', 'DES', 'RC4', '3DES', 'RC2', 'Blowfish', 'CAST5', 'IDEA', 'TEA', 'GOST 28147-89'];
 
 Object.assign(KEYS, {
-  catalog: ['schemaVersion', 'kind', 'collectedAt', 'sourceCommit', 'matchSetSha256', 'classificationSha256', 'matchRules', 'entries'],
+  catalog: ['schemaVersion', 'kind', 'collectedAt', 'sourceCommit', 'matchSetSha256', 'classificationSha256', 'matchRules', 'categories', 'entries'],
   entry: ['ecosystem', 'name', 'tier', 'weakClass', 'classEvidence', 'classified', 'unclassifiedReason', 'endOfLifeReview',
     'multiPurpose', 'unmatchable', 'registryAbsent', 'aliases', 'lastRelease', 'algorithms', 'category'],
   classEvidence: ['basis', 'limb', 'url', 'checkedAt', 'additionalUrls'],
@@ -1160,8 +1160,6 @@ function checkEntry(e, where, bad) {
     if (!isTime(l.checkedAt)) wrong(`lastRelease.checkedAt is ${describe(l.checkedAt)}, not a time`);
   });
   if (!isTextList(e.algorithms)) wrong(`algorithms is ${describe(e.algorithms)}, not a list of names`);
-  // not checked yet: category against the catalogue's closed list of
-  // categories, which the schema version 2 contract names but does not give.
   if (!isText(e.category)) wrong(`category is ${describe(e.category)}, not a category`);
   if (!sound) return false;
 
@@ -1215,10 +1213,6 @@ function checkCatalog(name, record, bad) {
   if (c.kind !== 'censusCatalog') bad(`${file}: kind is ${describe(c.kind)}, not "censusCatalog"`);
   if (c.collectedAt !== name) bad(`${file}: collectedAt is ${describe(c.collectedAt)}, not the dataset's date ${name}`);
   if (!isText(c.sourceCommit)) bad(`${file}: sourceCommit is ${describe(c.sourceCommit)}, not the commit the catalogue was taken from`);
-  // not checked yet: matchSetSha256 and classificationSha256 recomputed from
-  // the entries; the schema version 2 contract names what each covers but not
-  // the exact value that is hashed. They are checked for form here, and for
-  // agreement with every file that repeats them.
   for (const digest of ['matchSetSha256', 'classificationSha256']) {
     if (!isSha256(c[digest])) bad(`${file}: ${digest} is ${describe(c[digest])}, not a SHA-256 digest in lower-case hex`);
   }
@@ -1227,6 +1221,8 @@ function checkCatalog(name, record, bad) {
       if (!isText(c.matchRules[eco])) bad(`${file}: matchRules.${eco} is ${describe(c.matchRules[eco])}, not a rule id`);
     }
   }
+  const categories = isTextList(c.categories) && c.categories.length > 0 && isDistinct(c.categories) ? c.categories : null;
+  if (categories === null) bad(`${file}: categories is ${describe(c.categories)}, not the closed list of distinct categories entries are held to`);
   if (!Array.isArray(c.entries)) {
     bad(`${file}: entries is ${describe(c.entries)}, not a list`);
     return null;
@@ -1240,6 +1236,9 @@ function checkCatalog(name, record, bad) {
     if (!checkEntry(entry, where, bad)) {
       sound = false;
       return;
+    }
+    if (categories !== null && !categories.includes(entry.category)) {
+      bad(`${where}: category is ${describe(entry.category)}, which is not one of the snapshot's categories`);
     }
     if (previous !== null && (byteOrder(previous.ecosystem, entry.ecosystem) || byteOrder(previous.name, entry.name)) >= 0) {
       bad(`${where} does not follow ${previous.ecosystem}:${previous.name}. Entries are sorted by registry and then by name, ` +
@@ -1265,6 +1264,32 @@ function checkCatalog(name, record, bad) {
       }
     }
     measure(registry);
+  }
+  // The two digests, recomputed: the canonical JSON of the entries, sorted by
+  // registry and then name, with their aliases sorted, in byte order; the
+  // match set with every registry's match rule. A re-tag or a name added
+  // shows as a changed digest, and a digest that does not follow hides it.
+  if (sound && isObject(c.matchRules) && ECOSYSTEMS.every((eco) => isText(c.matchRules[eco]))) {
+    const entries = [...c.entries].sort((x, y) => byteOrder(x.ecosystem, y.ecosystem) || byteOrder(x.name, y.name));
+    const digest = (value) => createHash('sha256').update(canonical(value), 'utf-8').digest('hex');
+    const recomputed = {
+      matchSetSha256: digest({
+        entries: entries.map((e) => ({ ecosystem: e.ecosystem, name: e.name, aliases: e.aliases.map((a) => a.name).sort(byteOrder), unmatchable: e.unmatchable !== null })),
+        matchRules: c.matchRules,
+      }),
+      classificationSha256: digest({
+        entries: entries.map((e) => ({
+          ecosystem: e.ecosystem, name: e.name, tier: e.tier, weakClass: e.weakClass, classified: e.classified,
+          multiPurpose: e.multiPurpose !== null, registryAbsent: e.registryAbsent !== null, unmatchable: e.unmatchable !== null,
+        })),
+      }),
+    };
+    for (const field of ['matchSetSha256', 'classificationSha256']) {
+      if (isSha256(c[field]) && c[field] !== recomputed[field]) {
+        bad(`${file}: ${field} is not the digest of the entries it covers (recomputed: ${recomputed[field]}). A digest that ` +
+          'does not follow from the entries hides the change it exists to show.');
+      }
+    }
   }
   return { value: c, byEco, sound };
 }
