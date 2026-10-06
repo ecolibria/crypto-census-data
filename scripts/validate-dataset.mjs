@@ -683,6 +683,11 @@ const ECOSYSTEMS = ['npm', 'pypi', 'go', 'maven', 'crates', 'packagist', 'nuget'
 
 /** The largest file a dataset may hold. The host refuses a file of 100 MB. */
 const MAX_FILE_BYTES = 95_000_000;
+const FILE_LIMIT = {
+  bytes: MAX_FILE_BYTES,
+  what: 'a dataset file',
+  why: 'The host refuses a file of 100 MB, so this one could not be published beside the others.',
+};
 
 const MANIFEST_CHECKS = ['missingEcosystems', 'belowPlausibleMinimum', 'withoutPlausibleMinimum', 'noMatches', 'unresolvedAboveCeiling',
   'sourcesOffAllowlist', 'catalogCheckMismatches', 'inputHashMismatches', 'identityFailures'];
@@ -807,8 +812,8 @@ function parseVersion2(buffer, file, bad) {
   return value;
 }
 
-/** A file of the dataset as bytes: a regular file, never a link, and no larger than the host accepts. */
-function readDatasetFile(dir, file, bad) {
+/** A file of the dataset as bytes: a regular file, never a link, and no larger than its kind of file may be. */
+function readDatasetFile(dir, file, bad, limit = FILE_LIMIT) {
   const path = join(dir, file);
   const stat = lstatSync(path, { throwIfNoEntry: false });
   if (!stat) {
@@ -819,9 +824,9 @@ function readDatasetFile(dir, file, bad) {
     bad(`${file} is not a regular file. A link would keep its bytes somewhere these checks and the immutability check do not look.`);
     return null;
   }
-  if (stat.size > MAX_FILE_BYTES) {
-    bad(`${file} is ${stat.size.toLocaleString('en-US')} bytes, over the ${MAX_FILE_BYTES.toLocaleString('en-US')} a dataset file ` +
-      'may hold. The host refuses a file of 100 MB, so this one could not be published beside the others.');
+  if (stat.size > limit.bytes) {
+    bad(`${file} is ${stat.size.toLocaleString('en-US')} bytes, over the ${limit.bytes.toLocaleString('en-US')} ${limit.what} may hold. ` +
+      `${limit.why}`);
     return null;
   }
   return readFileSync(path);
@@ -931,6 +936,7 @@ function readListedFiles(name, dir, manifest, bad) {
   }
   const found = { scans: {}, listings: {}, corpus: null, catalog: null, consolidation: null, hashes: new Map() };
   const listed = new Set();
+  let ledgerBytes = 0;
   const roles = new Set();
   manifest.files.forEach((entry, index) => {
     const where = `MANIFEST.json: files[${index}]`;
@@ -966,7 +972,11 @@ function readListedFiles(name, dir, manifest, bad) {
     if (!isCount(entry.bytes)) bad(`${where}.bytes is ${describe(entry.bytes)}, not a size in bytes`);
     if (!isSha256(entry.sha256)) bad(`${where}.sha256 is ${describe(entry.sha256)}, not a SHA-256 digest in lower-case hex`);
 
-    const buffer = readDatasetFile(dir, entry.file, bad);
+    if (entry.role === 'listing') {
+      const stat = lstatSync(join(dir, entry.file), { throwIfNoEntry: false });
+      if (stat && stat.isFile()) ledgerBytes += stat.size;
+    }
+    const buffer = readDatasetFile(dir, entry.file, bad, entry.role === 'listing' ? LEDGER_LIMIT : FILE_LIMIT);
     if (buffer === null) return;
     const actual = createHash('sha256').update(buffer).digest('hex');
     if (isSha256(entry.sha256) && actual !== entry.sha256) {
@@ -987,6 +997,10 @@ function readListedFiles(name, dir, manifest, bad) {
     else found[entry.role] = record;
   });
 
+  if (ledgerBytes > MAX_LEDGERS_BYTES) {
+    bad(`listing ledgers: together they are ${ledgerBytes.toLocaleString('en-US')} bytes, over the ` +
+      `${MAX_LEDGERS_BYTES.toLocaleString('en-US')} the eleven may hold. Every copy of this repository carries them.`);
+  }
   for (const role of ['corpus', 'catalog', 'consolidation']) {
     if (!roles.has(role)) bad(`MANIFEST.json lists no ${role} file, and a version 2 dataset has one`);
   }
@@ -1708,6 +1722,34 @@ const ONE_IN = 100;
 const MAX_LEDGER_BYTES = 1024 * 1024 * 1024;
 
 const LEDGER_COLUMNS = ['name', 'disposition', 'reason', 'version', 'readFrom', 'observable', 'matches'];
+
+/**
+ * The columns a registry's ledger adds after the seven, held exactly: for
+ * Packagist the type of the version read, registry text that is empty unless
+ * the package was read; for Maven the search page the package was drawn from,
+ * counted from 0, on every row. The other nine registries keep the seven.
+ */
+const LEDGER_EXTRA_COLUMNS = { packagist: ['type'], maven: ['page'] };
+const ledgerColumns = (eco) => [...LEDGER_COLUMNS, ...(LEDGER_EXTRA_COLUMNS[eco] ?? [])];
+
+/**
+ * What no field of a ledger row may hold: the C0 and C1 controls, DEL, and the
+ * characters that change the direction text is shown in. A name that carries
+ * one can display as another, in a file read by people as well as by code.
+ */
+const LEDGER_FORBIDDEN = /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u;
+
+/**
+ * The most one listing ledger may hold on disk, and the eleven together: every
+ * copy of this repository carries them. Each limit is held once, here.
+ */
+const MAX_LEDGER_FILE_BYTES = 45_000_000;
+const MAX_LEDGERS_BYTES = 100_000_000;
+const LEDGER_LIMIT = {
+  bytes: MAX_LEDGER_FILE_BYTES,
+  what: 'a listing ledger',
+  why: 'Every copy of this repository carries the ledgers, so each is bounded.',
+};
 const LEDGER_REASONS = {
   scanned: [''],
   absent: ['http404', 'http410'],
@@ -1716,8 +1758,9 @@ const LEDGER_REASONS = {
 };
 
 /** Read one ledger: decompressed within the bound, one row per listed package, sorted by name in byte order. */
-function readLedger(listing, scan, bad) {
+function readLedger(eco, listing, scan, bad) {
   const file = listing.file;
+  const columns = ledgerColumns(eco);
   let data;
   try {
     data = gunzipSync(listing.buffer, { maxOutputLength: MAX_LEDGER_BYTES });
@@ -1756,8 +1799,8 @@ function readLedger(listing, scan, bad) {
       continue;
     }
     if (line === 1) {
-      if (text !== LEDGER_COLUMNS.join('\t')) {
-        bad(`${file} does not begin with the header row (${LEDGER_COLUMNS.join(', ')}, tab-separated). Without it no column ` +
+      if (text !== columns.join('\t')) {
+        bad(`${file} does not begin with the header row (${columns.join(', ')}, tab-separated). Without it no column ` +
           'can be read as what it says.');
         return null;
       }
@@ -1765,14 +1808,21 @@ function readLedger(listing, scan, bad) {
     }
     counts.listed += 1;
     const fields = text.split('\t');
+    const forbidden = fields.findIndex((field) => LEDGER_FORBIDDEN.test(field));
+    if (forbidden >= 0) {
+      rowBad(line, `has a control or direction character in its ${columns[forbidden] ?? `column ${forbidden + 1}`} column. A name ` +
+        'that carries one can display as another.');
+      continue;
+    }
+    if (fields.length !== columns.length) {
+      rowBad(line, `has ${fields.length} columns. Every row of the ${eco} ledger has all ${columns.length} of its header's columns.`);
+      continue;
+    }
     const [name, disposition, reason, version, source, observable, matches] = fields;
+    const extra = fields[7];
     const scanned = disposition === 'scanned';
     if (!Object.hasOwn(LEDGER_REASONS, disposition)) {
       rowBad(line, `has the disposition ${describe(disposition)}, not scanned, absent, unresolved or unversioned`);
-      continue;
-    }
-    if (!(fields.length === 7 || (!scanned && fields.length === 3))) {
-      rowBad(line, `has ${fields.length} columns. A row has seven, or three (name, disposition, reason) for a package that was not read.`);
       continue;
     }
     if (name === '') {
@@ -1791,12 +1841,16 @@ function readLedger(listing, scan, bad) {
       continue;
     }
     counts[disposition] += 1;
+    if (eco === 'maven' && !/^(0|[1-9][0-9]{0,8})$/.test(extra)) {
+      rowBad(line, `(${name}) has page ${describe(extra)}, not the search page it was drawn from, counted from 0`);
+    }
     if (!scanned) {
-      if (fields.length === 7 && [version, source, observable, matches].some((field) => field !== '')) {
-        rowBad(line, `(${name}) records a version, a source, an observation or matches for a package that was not read`);
+      if ([version, source, observable, matches, ...(eco === 'packagist' ? [extra] : [])].some((field) => field !== '')) {
+        rowBad(line, `(${name}) records a version, a source, an observation, matches or a type for a package that was not read`);
       }
       continue;
     }
+    if (eco === 'packagist' && extra === '') rowBad(line, `(${name}) is scanned with no type of the version read`);
     if (version === '') rowBad(line, `(${name}) is scanned with no version read`);
     if (readFrom !== null && !readFrom.includes(source)) rowBad(line, `(${name}) is read from ${describe(source)}, not one of method.readFrom`);
     if (observable !== '0' && observable !== '1') rowBad(line, `(${name}) has observable ${describe(observable)}, not 1 or 0`);
@@ -3139,7 +3193,7 @@ function validateVersion2Files(name, dir, bad) {
   const ledgers = {};
   for (const eco of ECOSYSTEMS) {
     if (!found.listings[eco] || !scans[eco]) continue;
-    const ledger = readLedger(found.listings[eco], scans[eco], bad);
+    const ledger = readLedger(eco, found.listings[eco], scans[eco], bad);
     if (ledger === null) continue;
     if (ledger.sound) compareLedger(eco, ledger, scans[eco], bad);
     ledgers[eco] = ledger;

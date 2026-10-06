@@ -42,6 +42,8 @@ const CHANGE_CODES = ['enumerationFrame', 'versionSelection', 'manifestReader', 
 const CHECKS = ['missingEcosystems', 'belowPlausibleMinimum', 'withoutPlausibleMinimum', 'noMatches', 'unresolvedAboveCeiling',
   'sourcesOffAllowlist', 'catalogCheckMismatches', 'inputHashMismatches', 'identityFailures'];
 const COVERAGE = ['listed', 'scanned', 'absent', 'unresolved', 'unversioned', 'dependenciesNotObservable'];
+/** The columns two registries' ledgers add after the seven. */
+const LEDGER_EXTRA = { packagist: ['type'], maven: ['page'] };
 
 /** The declaration kinds a scan of each registry records. */
 const KINDS = {
@@ -259,7 +261,7 @@ function registries() {
           match('org.bouncycastle:bcprov-jdk18on', maven('project', 'test')),
           match('org.bouncycastle:bcprov-jdk15on', maven('plugin', null)),
         ], { manifest: { hasParent: false, propertyCoordinates: 0 } }),
-        unread('org.example:gone', 'absent', 'http404'),
+        { ...unread('org.example:gone', 'absent', 'http404'), page: 1 },
       ],
       units: [{ unit: 'com.example', members: ['com.example:app', 'com.example:lib', 'com.example:tool'] }],
       measurability: {
@@ -537,9 +539,12 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
 
   const ledgers = {};
   for (const eco of ECOSYSTEMS) {
-    ledgers[eco] = ['name\tdisposition\treason\tversion\treadFrom\tobservable\tmatches', ...fixture[eco].rows.map((row) => (scannedRow(row)
-      ? [row.name, 'scanned', '', '1.0.0', row.readFrom, String(row.observable), String(row.matches.length)]
-      : [row.name, row.disposition, row.reason, '', '', '', '']).join('\t'))];
+    // Packagist adds the type of the version read, Maven the search page a package was drawn from.
+    const extra = (row) => (eco === 'packagist' ? [scannedRow(row) ? 'library' : ''] : eco === 'maven' ? [String(row.page ?? 0)] : []);
+    ledgers[eco] = [['name', 'disposition', 'reason', 'version', 'readFrom', 'observable', 'matches', ...(LEDGER_EXTRA[eco] ?? [])].join('\t'),
+      ...fixture[eco].rows.map((row) => [...(scannedRow(row)
+        ? [row.name, 'scanned', '', '1.0.0', row.readFrom, String(row.observable), String(row.matches.length)]
+        : [row.name, row.disposition, row.reason, '', '', '', '']), ...extra(row)].join('\t'))];
   }
   change.ledgers?.(ledgers);
   for (const eco of ECOSYSTEMS) {
@@ -812,8 +817,8 @@ plant('a directory in place of a file', {}, /listing-hex\.tsv\.gz is not a regul
   unlinkSync(join(datasetDir(dir), 'listing-hex.tsv.gz'));
   mkdirSync(join(datasetDir(dir), 'listing-hex.tsv.gz'));
 });
-plant('an oversize file', {}, /listing-crates\.tsv\.gz is 95,000,001 bytes, over the 95,000,000 a dataset file may hold/,
-  (dir) => truncateSync(join(datasetDir(dir), 'listing-crates.tsv.gz'), 95_000_001));
+plant('an oversize file', {}, /scan-results-crates\.json is 95,000,001 bytes, over the 95,000,000 a dataset file may hold/,
+  (dir) => truncateSync(join(datasetDir(dir), 'scan-results-crates.json'), 95_000_001));
 plant('a role that is not one', manifestOf((m) => { fileEntry(m, 'listing-pub.tsv.gz').role = 'notes'; }), /files\[\d+\]\.role is "notes", not one of: corpus, scan, listing, catalog, consolidation/);
 plant('a scan file for a registry that is not one', manifestOf((m) => { fileEntry(m, 'scan-results-pub.json').ecosystem = 'conda'; }), /files\[\d+\]\.ecosystem is "conda", not one of the eleven registries/);
 plant('a corpus that names a registry', manifestOf((m) => { fileEntry(m, 'corpus-2026-09-30.json').ecosystem = 'npm'; }), /files\[0\]\.ecosystem is "npm"; the corpus file covers every registry, so it is null/);
@@ -1087,14 +1092,61 @@ plant('a ledger row count that is not a count', scanOf('hex', (s) => { s.listing
 
 const ledgerOf = (eco, fn) => ({ ledgers: (ledgers) => { ledgers[eco] = fn(ledgers[eco]); } });
 
-test('a ledger that leaves out the empty columns of an unread row passes', async () => {
-  // The contract's own example writes such a row as name, disposition and reason.
-  const result = await validateOne({
-    ledgers: (ledgers) => {
-      for (const eco of ECOSYSTEMS) ledgers[eco] = ledgers[eco].map((line) => line.replace(/^([^\t]+\t(?:absent|unversioned)\t[^\t]+)\t\t\t\t$/, '$1'));
-    },
-  });
-  assert.equal(result.code, 0, result.stderr);
+plant('an unread row that leaves out its empty columns', ledgerOf('npm', (lines) => lines.map((line) => line.replace(/^(eta\tabsent\thttp404)\t\t\t\t$/, '$1'))),
+  /listing-npm\.tsv\.gz: row \d+ has 3 columns\. Every row of the npm ledger has all 7 of its header's columns/);
+
+// Every field of every row is free of control and direction characters.
+const inRow = (eco, name, from, to) => ledgerOf(eco, (lines) => lines.map((line) => (line.startsWith(`${name}\t`) ? line.replace(from, to) : line)));
+plant('a name with a direction override in it', inRow('npm', 'eta', /^eta\t/, 'eta\u202e\t'), /listing-npm\.tsv\.gz: row \d+ has a control or direction character in its name column/);
+plant('a name with an isolate in it', inRow('npm', 'eta', /^eta\t/, 'eta\u2066\t'), /listing-npm\.tsv\.gz: row \d+ has a control or direction character in its name column/);
+plant('a version with a control character in it', inRow('hex', 'acme_hex', '\t1.0.0\t', '\t1.0\u0007\t'), /listing-hex\.tsv\.gz: row 2 has a control or direction character in its version column/);
+plant('a reason with a C1 control in it', inRow('npm', 'eta', '\thttp404\t', '\thttp404\u0085\t'), /listing-npm\.tsv\.gz: row \d+ has a control or direction character in its reason column/);
+plant('a source with DEL in it', inRow('hex', 'acme_hex', '\trelease\t', '\trelease\u007f\t'), /listing-hex\.tsv\.gz: row 2 has a control or direction character in its readFrom column/);
+plant('a row that ends in a carriage return', inRow('hex', 'acme_hex', /$/, '\r'), /listing-hex\.tsv\.gz: row 2 has a control or direction character in its matches column/);
+
+// The columns two registries add.
+plant('a Maven ledger without its page column', ledgerOf('maven', (lines) => lines.map((line) => line.replace(/\t[^\t]*$/, ''))),
+  /listing-maven\.tsv\.gz does not begin with the header row \(name, disposition, reason, version, readFrom, observable, matches, page,/);
+plant('a Packagist ledger without its type column', ledgerOf('packagist', (lines) => lines.map((line) => line.replace(/\t[^\t]*$/, ''))),
+  /listing-packagist\.tsv\.gz does not begin with the header row \(name, disposition, reason, version, readFrom, observable, matches, type,/);
+plant('a Maven row whose page is not a count', inRow('maven', 'com.example:app', /\t0$/, '\tfirst'), /\(com\.example:app\) has page "first", not the search page it was drawn from/);
+plant('a scanned Packagist row with no type', inRow('packagist', 'acme/api', /\tlibrary$/, '\t'), /\(acme\/api\) is scanned with no type of the version read/);
+plant('an unread Packagist row with a type', inRow('packagist', 'zeta/none', /\t$/, '\tlibrary'),
+  /\(zeta\/none\) records a version, a source, an observation, matches or a type for a package that was not read/);
+
+// The size of the ledgers on disk: one at most 45,000,000 bytes, the eleven at most 100,000,000.
+/** Make listed files the given sizes, as sparse files, and record their hashes and sizes in the manifest. */
+const resized = (sizes) => (dir) => {
+  const manifestPath = join(datasetDir(dir), 'MANIFEST.json');
+  const m = JSON.parse(readText(manifestPath));
+  for (const [file, size] of Object.entries(typeof sizes === 'function' ? sizes(m) : sizes)) {
+    const path = join(datasetDir(dir), file);
+    truncateSync(path, size);
+    Object.assign(m.files.find((f) => f.file === file), { bytes: size, sha256: sha256(readFileSync(path)) });
+  }
+  writeFileSync(manifestPath, json(m));
+};
+/** Sizes for three ledgers that bring the eleven to the total given. */
+const toTotal = (total) => (m) => {
+  const others = sum(m.files.filter((f) => f.role === 'listing' && !['listing-npm.tsv.gz', 'listing-pypi.tsv.gz', 'listing-go.tsv.gz'].includes(f.file)).map((f) => f.bytes));
+  return { 'listing-npm.tsv.gz': 45_000_000, 'listing-pypi.tsv.gz': 45_000_000, 'listing-go.tsv.gz': total - 90_000_000 - others };
+};
+plant('a listing ledger over 45,000,000 bytes', {}, /listing-crates\.tsv\.gz is 45,000,001 bytes, over the 45,000,000 a listing ledger may hold/,
+  resized({ 'listing-crates.tsv.gz': 45_000_001 }));
+plant('listing ledgers over 100,000,000 bytes together', {}, /listing ledgers: together they are 100,000,001 bytes, over the 100,000,000 the eleven may hold/,
+  resized(toTotal(100_000_001)));
+
+test('a listing ledger of exactly 45,000,000 bytes is not refused for its size', async () => {
+  const result = await validateOne({}, resized({ 'listing-crates.tsv.gz': 45_000_000 }));
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(firstProblem(result.stderr), /scan-results-crates\.json: listing\.sha256 does not match listing-crates\.tsv\.gz/, result.stderr);
+  assert.doesNotMatch(result.stderr, /over the 45,000,000/);
+});
+
+test('listing ledgers of exactly 100,000,000 bytes together are not refused for their size', async () => {
+  const result = await validateOne({}, resized(toTotal(100_000_000)));
+  assert.equal(result.code, 1, result.stdout);
+  assert.doesNotMatch(result.stderr, /together they are/);
 });
 
 const fillers = (count, extra) => (f) => {
@@ -1116,12 +1168,12 @@ plant('a ledger row that is not UTF-8', { ledgers: (l) => { l.hex = gzipSync(Buf
 plant('rows out of order', ledgerOf('npm', (lines) => swap(lines, 1, 2)), /listing-npm\.tsv\.gz: row 3 \(@acme\/alpha\) does not follow the row above it/);
 plant('a package listed twice in the ledger', ledgerOf('hex', (lines) => [...lines, lines[1]]), /listing-hex\.tsv\.gz: row 3 \(acme_hex\) does not follow the row above it/);
 plant('a disposition that is not one', ledgerOf('npm', (lines) => lines.map((line) => line.replace('\tabsent\t', '\tgone\t'))), /has the disposition "gone", not scanned, absent, unresolved or unversioned/);
-plant('a row with five columns', ledgerOf('hex', (lines) => [lines[0], lines[1].split('\t').slice(0, 5).join('\t')]), /listing-hex\.tsv\.gz: row 2 has 5 columns\. A row has seven, or three/);
+plant('a row with five columns', ledgerOf('hex', (lines) => [lines[0], lines[1].split('\t').slice(0, 5).join('\t')]), /listing-hex\.tsv\.gz: row 2 has 5 columns\. Every row of the hex ledger has all 7 of its header's columns/);
 plant('a scanned row with three columns', ledgerOf('hex', (lines) => [lines[0], lines[1].split('\t').slice(0, 3).join('\t')]), /row 2 has 3 columns/);
 plant('a row with no name', ledgerOf('hex', (lines) => [lines[0], lines[1].replace(/^[^\t]+/, '')]), /listing-hex\.tsv\.gz: row 2 has no name/);
 plant('a scanned row that gives a reason', ledgerOf('hex', (lines) => [lines[0], lines[1].replace('\tscanned\t\t', '\tscanned\ttimeout\t')]), /gives the reason "timeout" for scanned/);
 plant('an absent row with a reason for an unresolved one', ledgerOf('npm', (lines) => lines.map((line) => line.replace('\tabsent\thttp404', '\tabsent\ttimeout'))), /gives the reason "timeout" for absent; it is one of: http404, http410/);
-plant('an unread row that records a version', ledgerOf('npm', (lines) => lines.map((line) => line.replace('\tabsent\thttp404\t', '\tabsent\thttp404\t1.0.0'))), /records a version, a source, an observation or matches for a package that was not read/);
+plant('an unread row that records a version', ledgerOf('npm', (lines) => lines.map((line) => line.replace('\tabsent\thttp404\t', '\tabsent\thttp404\t1.0.0'))), /records a version, a source, an observation, matches or a type for a package that was not read/);
 plant('a scanned row with no version', ledgerOf('hex', (lines) => [lines[0], lines[1].replace('\t1.0.0\t', '\t\t')]), /\(acme_hex\) is scanned with no version read/);
 plant('a row read from a source the method does not name', ledgerOf('hex', (lines) => [lines[0], lines[1].replace('\trelease\t', '\tmirror\t')]), /\(acme_hex\) is read from "mirror", not one of method\.readFrom/);
 plant('an observation that is not 1 or 0', ledgerOf('hex', (lines) => [lines[0], lines[1].replace('\trelease\t1\t', '\trelease\tyes\t')]), /\(acme_hex\) has observable "yes", not 1 or 0/);
@@ -1482,7 +1534,7 @@ const closedInTheCorpus = [
 for (const [level, change, problem] of closedInTheCorpus) plant(`a field the contract does not define, in ${level}`, change, problem);
 
 test('more malformed rows than are listed one by one are counted after the first five', async () => {
-  const result = await validateOne(ledgerOf('npm', (lines) => lines.map((line, i) => (i === 0 ? line : line.replace(/^([^\t]+)\t/, '$1\tgone\t')))));
+  const result = await validateOne(ledgerOf('npm', (lines) => lines.map((line, i) => (i === 0 ? line : line.replace(/^([^\t]+)\t[^\t]+\t/, '$1\tgone\t')))));
   assert.equal(result.code, 1, result.stdout);
   assert.match(firstProblem(result.stderr), /listing-npm\.tsv\.gz: row 2 has the disposition "gone"/, result.stderr);
   assert.equal(result.stderr.split('\n').filter((line) => / listing-npm\.tsv\.gz: row \d+ /.test(line)).length, 5, result.stderr);
