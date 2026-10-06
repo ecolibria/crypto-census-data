@@ -387,6 +387,105 @@
       },
       "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
       "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "packages-whose-names-match-once-normalized-counted-as-one",
+      "summary": "Before counting, de-duplication kept one package per registry and normalized name (lower case, _ and . as -, npm scope and fifteen suffixes such as -js dropped), dropping 13,081 of the 84,973 that matched (qcReport.filters.deduplication inputCount less outputCount; its totalRemoved also counts 1,207 it kept). packagesWithCrypto understates by 13,081 on this account; whether each is a separate project is not verified.",
+      "affects": [
+        "packagesWithCrypto"
+      ],
+      "direction": "understates",
+      "magnitude": {
+        "value": 13081,
+        "of": 84973,
+        "unit": "matched packages the de-duplication step dropped"
+      },
+      "correctedIn": "Only a new scan can correct this.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "removed-matched-packages-counted-as-using-no-cryptography",
+      "summary": "withNoCrypto, packagesScanned less packagesWithCrypto, counts as using no cryptography the 19,287 matched packages that packages-whose-names-match-once-normalized-counted-as-one, packages-removed-by-a-name-pattern and packages-sharing-a-namespace-and-class-counted-as-one removed, so overstates by 19,287 on this account.",
+      "affects": [
+        "withNoCrypto"
+      ],
+      "direction": "overstates",
+      "magnitude": {
+        "value": 19287,
+        "of": 2105308,
+        "unit": "matched packages the three steps removed, counted as using no cryptography"
+      },
+      "correctedIn": "Only a new scan can correct this.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "packages-removed-by-a-name-pattern",
+      "summary": "After de-duplication, a step removed by name alone 439 of the 84,973 that matched (qcReport.filters.spamRemoval): names under three characters or with one of 20 prefixes, 16 suffixes or 6 substrings such as -test. packagesWithCrypto understates by 439 on this account.",
+      "affects": [
+        "packagesWithCrypto"
+      ],
+      "direction": "understates",
+      "magnitude": {
+        "value": 439,
+        "of": 84973,
+        "unit": "matched packages the name-pattern step removed"
+      },
+      "correctedIn": "Only a new scan can correct this.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "packages-sharing-a-namespace-and-class-counted-as-one",
+      "summary": "Of each three or more packages in a registry sharing a class and a namespace (npm scope, Maven groupId, Go path prefix: the 13 modules under github.com/hashicorp became one) one was kept, dropping 5,767 of the 84,973 that matched (qcReport.filters.namespaceConsolidation). packagesWithCrypto understates by 5,767 on this account.",
+      "affects": [
+        "packagesWithCrypto"
+      ],
+      "direction": "understates",
+      "magnitude": {
+        "value": 5767,
+        "of": 84973,
+        "unit": "matched packages the namespace step dropped"
+      },
+      "correctedIn": "Only a new scan can correct this.",
+      "issuedAt": "2026-10-06"
+    }
+  ],
+  "regenerations": [
+    {
+      "issuedAt": "2026-10-06",
+      "namedRun": "https://github.com/opena2a-org/crypto-census/actions/runs/30839067824",
+      "runOutputSha256": "55ccfee44ac50c300c5cb66da6a16843de51cc133f907a0cc7ed8d2a719f20d5",
+      "writtenBy": [
+        {
+          "repository": "opena2a-org/crypto-census",
+          "pullRequest": 24,
+          "commit": "47a6409cb4ce8ae536342bc4b5427d1da25be47f"
+        },
+        {
+          "repository": "opena2a-org/crypto-census",
+          "pullRequest": 23,
+          "commit": "fb8471348679de3098ac64ca104787c08703393d"
+        }
+      ],
+      "beforeSteps": {
+        "fields": [
+          "summary.noCrypto",
+          "summary.weakExposureRate",
+          "summary.pqcAdoptionRate"
+        ],
+        "ecosystems": [
+          "npm",
+          "pypi",
+          "go",
+          "maven",
+          "crates",
+          "packagist",
+          "nuget",
+          "rubygems",
+          "hex",
+          "pub"
+        ]
+      },
+      "summary": "This dataset's files were written after the run the manifest's provenance names (namedRun), from its raw output, by code from the pull requests in writtenBy; the run's output (runOutputSha256) and the source repository are not public. The run's aggregate gave ecosystem class counts from before the processing steps; the published one gives them from after, like its totals. Fields listed in beforeSteps still hold values from before the steps. No aggregate figure is wrong on this account."
     }
   ]
 }
