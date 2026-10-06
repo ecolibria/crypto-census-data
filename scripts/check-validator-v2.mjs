@@ -39,8 +39,8 @@ const DEFINITIONS = ['anyManifestMatch', 'directUnconditional'];
 const UNITS = ['raw', 'consolidated'];
 const CHANGE_CODES = ['enumerationFrame', 'versionSelection', 'manifestReader', 'declarationKinds', 'matchRule', 'matchSet',
   'coverageDefinition', 'matchDefinition', 'classDefinition', 'classification', 'consolidationRule'];
-const CHECKS = ['missingEcosystems', 'belowPlausibleMinimum', 'withoutPlausibleMinimum', 'noMatches', 'unresolvedAboveCeiling',
-  'sourcesOffAllowlist', 'catalogCheckMismatches', 'inputHashMismatches', 'identityFailures'];
+const CHECKS = ['missingEcosystems', 'noMatches', 'unresolvedAboveCeiling', 'sourcesOffAllowlist', 'catalogCheckMismatches',
+  'inputHashMismatches', 'identityFailures'];
 const COVERAGE = ['listed', 'scanned', 'absent', 'unresolved', 'unversioned', 'dependenciesNotObservable'];
 /** The columns two registries' ledgers add after the seven. */
 const LEDGER_EXTRA = { packagist: ['type'], maven: ['page'] };
@@ -153,7 +153,7 @@ function registries() {
   return {
     npm: {
       method: { readFrom: ['release'], notObservableWhen: [], limits: [] },
-      sampling: { method: 'seededShuffle', seed: 'example-seed' },
+      sampling: { method: 'seededShuffle', seed: 'example-seed', draw: 'package', pageRows: null },
       entries: [
         pqc('npm', '@noble/post-quantum'),
         unclassified('npm', '@types/bcryptjs', 'noCryptographicCode'),
@@ -264,6 +264,7 @@ function registries() {
     },
     maven: {
       method: { readFrom: ['release'], notObservableWhen: [], limits: ['parentPomNotFollowed'] },
+      sampling: { method: 'seededShuffle', seed: 'example-page-seed', draw: 'page', pageRows: 20 },
       entries: [
         unclassified('maven', 'commons-codec:commons-codec', 'primaryFunctionNotCryptography'),
         pqc('maven', 'org.bouncycastle:bcpqc-jdk18on', { registryAbsent: { ...ABSENT } }),
@@ -397,6 +398,7 @@ function registries() {
     },
     hex: {
       method: { readFrom: ['release'], notObservableWhen: [], limits: [] },
+      sampling: { method: 'all', seed: null, draw: null, pageRows: null },
       entries: [entry('hex', 'enacl')],
       rows: [scanned('acme_hex', [match('enacl', { kind: 'requirement', optional: true })])],
       units: [],
@@ -613,7 +615,7 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
       method: { versionSelection: 'latest', readFrom: r.method.readFrom, declarationKinds: [...KINDS[eco]], notObservableWhen: r.method.notObservableWhen, limits: r.method.limits },
       enumeration: {
         requested: 1000, listed: coverage.listed, truncated: false, reason: null, unit: 'packages', budgetMinutes: null,
-        elapsedMinutes: 1.5, frameSize: null, sampling: r.sampling ?? { method: 'registryOrder', seed: null },
+        elapsedMinutes: 1.5, frameSize: null, sampling: r.sampling ?? { method: 'registryOrder', seed: null, draw: 'package', pageRows: null },
         indexWindow: eco === 'go' ? { since: '2026-09-01T00:00:00Z', until: `${date}T00:00:00Z` } : null,
       },
       versionYears: eco === 'go' ? { 2024: 2, 2025: 3 } : null,
@@ -718,7 +720,6 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
     ecosystems: ECOSYSTEMS.map((eco) => structuredClone({ ecosystem: eco, coverage: scans[eco].coverage, enumeration: scans[eco].enumeration, sources: scans[eco].sources })),
     comparability: structuredClone(corpus.comparability),
     checks: Object.fromEntries(CHECKS.map((check) => [check, []])),
-    complete: true,
     knownIssues: [],
   };
   change.manifest?.(manifest);
@@ -836,7 +837,8 @@ plant('another licence', manifestOf((m) => { m.license = 'CC0-1.0'; }), /MANIFES
 plant('a run that is not named', manifestOf((m) => { m.provenance.workflowRun = null; }), /MANIFEST\.json: provenance\.workflowRun is null\. A published dataset that cannot say which run/);
 plant('a check the generator found failing', manifestOf((m) => { m.checks.noMatches = ['hex']; }), /MANIFEST\.json: checks\.noMatches lists \["hex"\]\. The generator found the dataset incomplete/);
 plant('a check that is not a list', manifestOf((m) => { m.checks.identityFailures = null; }), /MANIFEST\.json: checks\.identityFailures is null, not a list/);
-plant('a manifest that says it is not complete', manifestOf((m) => { m.complete = false; }), /MANIFEST\.json: complete is false/);
+plant('a manifest that carries a verdict of its own', manifestOf((m) => { m.complete = true; }), /MANIFEST\.json is not a version 2 manifest: it carries complete/);
+plant('a plausible-minimum check, which a manifest no longer carries', manifestOf((m) => { m.checks.belowPlausibleMinimum = []; }), /MANIFEST\.json: checks carries belowPlausibleMinimum/);
 plant('known issues that are not a list', manifestOf((m) => { m.knownIssues = {}; }), /MANIFEST\.json: knownIssues is \{\}, not a list/);
 
 // The files the manifest lists, and the ones it does not.
@@ -1070,7 +1072,11 @@ plant('an elapsed time left out', scanOf('hex', (s) => { s.enumeration.elapsedMi
 plant('a frame size that is not a count', scanOf('hex', (s) => { s.enumeration.frameSize = 2.5; }), /enumeration\.frameSize is 2\.5, not a whole count or null/);
 plant('a sampling method that is not one', scanOf('hex', (s) => { s.enumeration.sampling.method = 'random'; }), /enumeration\.sampling\.method is "random"/);
 plant('a shuffled sample with no seed', scanOf('npm', (s) => { s.enumeration.sampling.seed = null; }), /enumeration\.sampling\.seed is null\. A shuffled sample names its seed/);
-plant('a seed for a sample that shuffles nothing', scanOf('hex', (s) => { s.enumeration.sampling.seed = 'abc'; }), /enumeration\.sampling\.seed is "abc" for registryOrder, which shuffles nothing/);
+plant('a seed for a sample that shuffles nothing', scanOf('pub', (s) => { s.enumeration.sampling.seed = 'abc'; }), /enumeration\.sampling\.seed is "abc" for registryOrder, which shuffles nothing/);
+plant('a registry read whole that names a draw', scanOf('hex', (s) => { s.enumeration.sampling.draw = 'package'; }), /enumeration\.sampling\.draw is "package", and a registry read whole draws nothing/);
+plant('a sample that does not say what it drew', scanOf('npm', (s) => { s.enumeration.sampling.draw = null; }), /enumeration\.sampling\.draw is null, not package or page/);
+plant('a draw by page with no page size', scanOf('maven', (s) => { s.enumeration.sampling.pageRows = null; }), /enumeration\.sampling\.pageRows is null; a draw by page says how many rows a page holds/);
+plant('a page size for a draw that is not by page', scanOf('npm', (s) => { s.enumeration.sampling.pageRows = 10; }), /enumeration\.sampling\.pageRows is 10 for a draw that is not by page/);
 plant('a Go index window that is not times', scanOf('go', (s) => { s.enumeration.indexWindow.until = 'later'; }), /enumeration\.indexWindow\.until is "later", not a time/);
 plant('a Go scan with no index window', scanOf('go', (s) => { s.enumeration.indexWindow = null; }), /enumeration\.indexWindow is null, not an object/);
 plant('an index window outside Go', scanOf('hex', (s) => { s.enumeration.indexWindow = { since: '2026-09-01', until: '2026-09-30' }; }), /enumeration\.indexWindow is .*; it is kept for Go's index alone and is null for hex/);
@@ -1111,7 +1117,19 @@ plant('a check that finds absent an entry the tags say is present', scanOf('hex'
 plant('a check that finds present an entry the tags say is absent', scanOf('npm', (s) => { s.catalogCheck.find((row) => row.entry === 'tripledes').status = 'present'; }),
   /finds tripledes present, and the catalogue snapshot tags it registryAbsent/);
 plant('an unmatchable entry found on the registry', scanOf('go', (s) => { s.catalogCheck.find((row) => row.entry === 'crypto/md5').status = 'present'; }),
-  /crypto\/md5 is tagged unmatchable, and the registry has a package under that name/);
+  /crypto\/md5 is tagged unmatchable, and the registry check finds it present/);
+plant('an unmatchable entry left unresolved', scanOf('go', (s) => { s.catalogCheck.find((row) => row.entry === 'crypto/md5').status = 'unresolved'; }),
+  /crypto\/md5 is tagged unmatchable, and the registry check finds it unresolved/);
+
+test('an unmatchable entry the registry check finds absent passes', async () => {
+  const result = await validateOne(scanOf('go', (s) => { Object.assign(s.catalogCheck.find((row) => row.entry === 'crypto/md5'), { status: 'absent', httpStatus: 404 }); }));
+  assert.equal(result.code, 0, result.stderr);
+});
+
+test('an alias whose registry check is unresolved blocks nothing', async () => {
+  const result = await validateOne(scanOf('go', (s) => { s.catalogCheck.find((row) => row.alias === 'gopkg.in/square/go-jose.v2').status = 'unresolved'; }));
+  assert.equal(result.code, 0, result.stderr);
+});
 plant('an unresolved check of a classified entry', scanOf('hex', (s) => { s.catalogCheck[0].status = 'unresolved'; }), /the registry check of "enacl" is unresolved\. For a classified entry that leaves K unestablished/);
 
 // Package records, matches and declarations.
@@ -1416,7 +1434,9 @@ plant('a manifest-match definition without a registry', corpusOf((c) => { delete
 plant('a kind the registry does not have', corpusOf((c) => { c.definitions.anyManifestMatch.includes.npm = ['dependencies', 'bundled']; }), /anyManifestMatch\.includes\.npm is \["dependencies","bundled"\], not a list of distinct npm declaration kinds/);
 plant('a kind the definition leaves out, counted', corpusOf((c) => { c.definitions.anyManifestMatch.includes.packagist = ['require', 'requireDev', 'suggest']; }),
   /anyManifestMatch\.includes\.packagist is \["require","requireDev","suggest"\]; under census\.match\.anyManifest\/1 it is \["require","requireDev"\]/);
-plant('a blocked row', corpusOf((c) => { c.blocked = [{ ecosystem: 'hex', reason: 'unresolvedShareAboveCeiling', detail: 'Above the ceiling.' }]; }), /blocked names "hex"\. A corpus that blocks a row is not published/);
+plant('a blocked row', corpusOf((c) => { c.blocked = [{ ecosystem: 'hex', reason: 'coverageInvalid', detail: 'Above the ceiling.' }]; }), /blocked names "hex"\. A corpus that blocks a row is not published/);
+plant('a blocked row for a reason no longer used', corpusOf((c) => { c.blocked = [{ ecosystem: 'hex', reason: 'unresolvedShareAboveCeiling', detail: 'x' }]; }),
+  /blocked\[0\]\.reason is "unresolvedShareAboveCeiling", not one of: coverageInvalid, catalogCheckMismatch, sourcesOffAllowlist/);
 plant('a blocked row for a reason that is not one', corpusOf((c) => { c.blocked = [{ ecosystem: 'hex', reason: 'tooSmall', detail: 'x' }]; }), /blocked\[0\]\.reason is "tooSmall"/);
 plant('blocked rows that are not a list', corpusOf((c) => { c.blocked = null; }), /corpus-2026-09-30\.json: blocked is null, not a list/);
 plant('a registry\'s coverage that is not the raw file\'s', corpusOf((c) => { c.coverage.byEcosystem.hex.scanned += 1; }), /coverage\.byEcosystem\.hex is not the coverage and enumeration of scan-results-hex\.json/);
@@ -1467,11 +1487,9 @@ plant('an unclassified entry\'s count off by one', corpusOf((c) => { npmRaw(c).e
 plant('an unclassified entry left out because nothing matched it', corpusOf((c) => { c.byEcosystem.packagist.directUnconditional.raw.excludedUnclassified.byEntry = []; }), /packagist\.directUnconditional\.raw\.excludedUnclassified\.byEntry is \[\]; recomputed it is/);
 plant('consolidation figures off by one that still add up', corpusOf((c) => { Object.assign(c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation, { unitsIn: 7, unitsOut: 5 }); }),
   /consolidated\.consolidation\.unitsIn is 7; the consolidation map gives 6/);
-plant('consolidation figures that do not add up', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation.unitsIn = 7; }), /consolidated\.consolidation: unitsIn \(7\) is not unitsOut \+ merged \+ removed \(6\)/);
-plant('a removal count the map does not give', corpusOf((c) => { Object.assign(c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation, { removedByRule: { sharedNamespace: 1 }, merged: 1 }); }),
-  /removedByRule\.sharedNamespace is 1; the consolidation map gives 0/);
-plant('a removal count under a rule the map does not have', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation.removedByRule = { nameTooShort: 0 }; }), /removedByRule names nameTooShort, which is not a rule of the consolidation map/);
-plant('removals that are not counts', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation.removedByRule = { sharedNamespace: '1' }; }), /removedByRule is .*, not an object of counts by rule/);
+plant('consolidation figures that do not add up', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation.unitsIn = 7; }), /consolidated\.consolidation: unitsIn \(7\) is not unitsOut \+ merged \(6\)/);
+plant('a removal counted where no rule removes a package', corpusOf((c) => { Object.assign(c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation, { removedByRule: { sharedNamespace: 1 }, merged: 1 }); }),
+  /removedByRule is \{"sharedNamespace":1\}\. Under census\.unit\.consolidated\/1 no rule removes a package, so it is empty/);
 plant('flags whose parts do not make the matched count', corpusOf((c) => { npmRaw(c).neitherWeakNorPqc.count = 1; }), /anyManifestMatch\.raw: matched \(5\) is not weak \(5\) \+ pqc \(2\) - weakAndPqc \(2\) \+ neitherWeakNorPqc \(1\)/);
 plant('weak outside its two classes', corpusOf((c) => { npmRaw(c).deprecatedLibrary.count = 0; }), /anyManifestMatch\.raw: weak \(5\) is not between the larger of brokenAlgorithm \(4\) and deprecatedLibrary \(0\) and their sum/);
 plant('"neither" counted where post-quantum is not measurable', corpusOf((c) => { c.byEcosystem.go.anyManifestMatch.raw.neitherWeakNorPqc = { count: 2, nullReason: null }; }), /go\.anyManifestMatch\.raw: weakAndPqc or neitherWeakNorPqc is counted while weak or pqc is not measurable/);

@@ -689,13 +689,13 @@ const FILE_LIMIT = {
   why: 'The host refuses a file of 100 MB, so this one could not be published beside the others.',
 };
 
-const MANIFEST_CHECKS = ['missingEcosystems', 'belowPlausibleMinimum', 'withoutPlausibleMinimum', 'noMatches', 'unresolvedAboveCeiling',
-  'sourcesOffAllowlist', 'catalogCheckMismatches', 'inputHashMismatches', 'identityFailures'];
+const MANIFEST_CHECKS = ['missingEcosystems', 'noMatches', 'unresolvedAboveCeiling', 'sourcesOffAllowlist', 'catalogCheckMismatches',
+  'inputHashMismatches', 'identityFailures'];
 
 /** The fields of each object, all of them required. An object is closed: a key not listed here fails. Each section adds the objects it reads. */
 const KEYS = {
   manifest: ['schemaVersion', 'dataset', 'kind', 'collectedAt', 'generatedAt', 'license', 'provenance', 'files', 'coverage',
-    'ecosystems', 'comparability', 'checks', 'complete', 'knownIssues'],
+    'ecosystems', 'comparability', 'checks', 'knownIssues'],
   provenance: ['sourceRepository', 'sourceCommit', 'workflowRun'],
   file: ['role', 'ecosystem', 'file', 'bytes', 'sha256', 'schemaVersion'],
 };
@@ -889,13 +889,10 @@ function checkManifest2(name, m, bad) {
       }
     }
   }
-  // `checks` records what the generator found; `complete` is its verdict. Each
-  // check is recomputed from the files by the rules below, and neither field
-  // is read as proof of anything. A list that is not empty, or a verdict that
-  // is not true, is the generator saying the dataset is not ready.
-  // not checked yet: belowPlausibleMinimum and withoutPlausibleMinimum, the
-  // plausible minimum of packages read per registry, which the schema version
-  // 2 contract does not state.
+  // `checks` records what the generator found. Each check is recomputed from
+  // the files by the rules below, and none is read as proof of anything; a
+  // list that is not empty is the generator saying the dataset is not ready.
+  // The manifest stores no verdict of its own.
   if (closed(m.checks, MANIFEST_CHECKS, `${at}: checks`, bad)) {
     for (const check of MANIFEST_CHECKS) {
       if (!Array.isArray(m.checks[check])) {
@@ -905,9 +902,6 @@ function checkManifest2(name, m, bad) {
           'incomplete dataset is not published.');
       }
     }
-  }
-  if (m.complete !== true) {
-    bad(`${at}: complete is ${describe(m.complete)}. A dataset is published when every check passes, and this one says one did not.`);
   }
   if (!Array.isArray(m.knownIssues)) bad(`${at}: knownIssues is ${describe(m.knownIssues)}, not a list`);
 }
@@ -1362,7 +1356,7 @@ Object.assign(KEYS, {
   scanCatalog: ['entries', 'matchSetSha256', 'matchRule'],
   method: ['versionSelection', 'readFrom', 'declarationKinds', 'notObservableWhen', 'limits'],
   enumeration: ['requested', 'listed', 'truncated', 'reason', 'unit', 'budgetMinutes', 'elapsedMinutes', 'frameSize', 'sampling', 'indexWindow'],
-  sampling: ['method', 'seed'],
+  sampling: ['method', 'seed', 'draw', 'pageRows'],
   indexWindow: ['since', 'until'],
   scanCoverage: [...COVERAGE_COUNTS, 'scannedByReadFrom'],
   listing: ['file', 'sha256', 'rows'],
@@ -1449,6 +1443,16 @@ function checkEnumeration(eco, e, file, bad) {
     if (!SAMPLING_METHODS.includes(s.method)) bad(`${where}.sampling.method is ${describe(s.method)}, not one of: ${SAMPLING_METHODS.join(', ')}`);
     else if (SHUFFLED.includes(s.method) && !isText(s.seed)) bad(`${where}.sampling.seed is ${describe(s.seed)}. A shuffled sample names its seed, so that it can be drawn again.`);
     else if (!SHUFFLED.includes(s.method) && s.seed !== null) bad(`${where}.sampling.seed is ${describe(s.seed)} for ${s.method}, which shuffles nothing; it is null then`);
+    if (s.method === 'all' && s.draw !== null) {
+      bad(`${where}.sampling.draw is ${describe(s.draw)}, and a registry read whole draws nothing; it is null then`);
+    } else if (s.method !== 'all' && !['package', 'page'].includes(s.draw)) {
+      bad(`${where}.sampling.draw is ${describe(s.draw)}, not package or page: a sample says what it drew`);
+    }
+    if (s.draw === 'page' && !(isCount(s.pageRows) && s.pageRows > 0)) {
+      bad(`${where}.sampling.pageRows is ${describe(s.pageRows)}; a draw by page says how many rows a page holds`);
+    } else if (s.draw !== 'page' && s.pageRows !== null) {
+      bad(`${where}.sampling.pageRows is ${describe(s.pageRows)} for a draw that is not by page; it is null then`);
+    }
   }
   if (eco === 'go') {
     if (closed(e.indexWindow, KEYS.indexWindow, `${where}.indexWindow`, bad)) {
@@ -1530,13 +1534,19 @@ function checkCatalogCheck(eco, rows, catalog, file, bad) {
       bad(`${where} checks the alias ${describe(row.alias)}, which ${entry.name} does not have in the catalogue snapshot`);
       return;
     }
-    if (row.alias === null && (row.status === 'absent') !== (entry.registryAbsent !== null)) {
+    // The blocking rules read entry rows; an alias row blocks nothing.
+    if (row.alias !== null) return;
+    if (entry.unmatchable !== null) {
+      if (!['notApplicable', 'absent'].includes(row.status)) {
+        bad(`${where}: ${entry.name} is tagged unmatchable, and the registry check finds it ${row.status}. A name a manifest ` +
+          'cannot declare is notApplicable or absent; present means the tag is wrong.');
+      }
+      return;
+    }
+    if ((row.status === 'absent') !== (entry.registryAbsent !== null)) {
       bad(`${where}: the scan's own registry check finds ${entry.name} ${row.status}, and the catalogue snapshot ` +
         `${entry.registryAbsent === null ? 'does not tag it registryAbsent' : 'tags it registryAbsent'}. The two have to agree, ` +
         'since the tag decides whether the entry counts toward K.');
-    }
-    if (row.alias === null && entry.unmatchable !== null && row.status === 'present') {
-      bad(`${where}: ${entry.name} is tagged unmatchable, and the registry has a package under that name, so the tag is wrong`);
     }
     if (row.status === 'unresolved' && entry.classified === true) {
       bad(`${where}: the registry check of ${label} is unresolved. For a classified entry that leaves K unestablished, and ` +
@@ -2094,7 +2104,7 @@ function checkConsolidation(name, record, scans, bad) {
     }
   }
   if (sound) checkConsolidationRule(byEco, scans, file, bad);
-  return sound ? { byEco, ruleIds } : null;
+  return sound ? { byEco } : null;
 }
 
 /**
@@ -2512,32 +2522,24 @@ function statsRules(stored, where, ctx) {
       ok = false;
     }
   }
-  if (!isObject(stored.removedByRule) || !Object.values(stored.removedByRule).every(isCount)) {
-    ctx.bad(`${where}.removedByRule is ${describe(stored.removedByRule)}, not an object of counts by rule`);
+  if (!isObject(stored.removedByRule) || Object.keys(stored.removedByRule).length > 0) {
+    ctx.bad(`${where}.removedByRule is ${describe(stored.removedByRule)}. Under ${DEFINITIONS.consolidated} no rule removes a ` +
+      'package, so it is empty.');
     return false;
-  }
-  for (const rule of Object.keys(stored.removedByRule)) {
-    if (!ctx.ruleIds.has(rule)) ctx.bad(`${where}.removedByRule names ${rule}, which is not a rule of the consolidation map`);
   }
   return ok;
 }
 
 function statsIdentity(stored, where, ctx) {
-  const removed = sum(Object.values(stored.removedByRule));
-  if (stored.unitsIn !== stored.unitsOut + stored.merged + removed) {
-    ctx.bad(`${where}: unitsIn (${stored.unitsIn}) is not unitsOut + merged + removed (${stored.unitsOut + stored.merged + removed}). ` +
-      'Every unit that goes in is kept, merged or removed, once.');
+  if (stored.unitsIn !== stored.unitsOut + stored.merged) {
+    ctx.bad(`${where}: unitsIn (${stored.unitsIn}) is not unitsOut + merged (${stored.unitsOut + stored.merged}). Every unit ` +
+      'that goes in is kept or merged, once; no rule removes one.');
   }
 }
 
 function statsValue(stored, expected, where, ctx) {
   for (const field of ['unitsIn', 'unitsOut']) {
     if (stored[field] !== expected[field]) ctx.figureBad(`${where}.${field} is ${stored[field]}; the consolidation map gives ${expected[field]}`);
-  }
-  for (const rule of new Set([...Object.keys(stored.removedByRule), ...Object.keys(expected.removedByRule)])) {
-    const has = stored.removedByRule[rule] ?? 0;
-    const want = expected.removedByRule[rule] ?? 0;
-    if (has !== want) ctx.figureBad(`${where}.removedByRule.${rule} is ${has}; the consolidation map gives ${want}`);
   }
   if (stored.merged !== expected.merged) ctx.figureBad(`${where}.merged is ${stored.merged}; the consolidation map gives ${expected.merged}`);
 }
@@ -2938,7 +2940,7 @@ function checkComparability(name, list, corpus, ctx, file, bad) {
   }
 }
 
-const BLOCK_REASONS = ['unresolvedShareAboveCeiling', 'catalogCheckMismatch', 'sourcesOffAllowlist'];
+const BLOCK_REASONS = ['coverageInvalid', 'catalogCheckMismatch', 'sourcesOffAllowlist'];
 
 /** True when the corpus blocks no row. A corpus that blocks one is not published, whatever its figures say. */
 function checkBlocked(list, file, bad) {
@@ -3026,7 +3028,6 @@ function checkCorpus(name, record, ctx, bad) {
   let differing = 0;
   const figureContext = {
     bad,
-    ruleIds: ctx.map.ruleIds,
     figureBad: (message) => {
       differing += 1;
       if (differing <= 40) bad(message);
