@@ -1738,6 +1738,79 @@ test('more malformed rows than are listed one by one are counted after the first
   assert.match(result.stderr, /listing-npm\.tsv\.gz: 3 more row\(s\) are malformed/);
 });
 
+// --- Errata for a version 2 dataset ----------------------------------------------
+
+const ERRATA = `errata/${DATE}.json`;
+
+/** An errata file for the dataset under test, with one issue and one regeneration, changed by `fn`. */
+function errataFor(fn = () => {}) {
+  const errata = {
+    schemaVersion: 2,
+    kind: 'censusErrata',
+    dataset: DATE,
+    doi: '10.5281/zenodo.0000000',
+    issuedAt: '2026-10-01',
+    issues: [{ ...knownIssue(), affects: ['byEcosystem.npm.anyManifestMatch.raw.weak.count'], issuedAt: '2026-10-01' }],
+    regenerations: [{
+      issuedAt: '2026-10-01',
+      namedRun: 'https://ci.example/runs/1',
+      runOutputSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      writtenBy: [{ repository: 'example/census', pullRequest: 1, commit: COMMIT }],
+      beforeSteps: { fields: ['coverage.scanned'], ecosystems: ['npm', 'hex'] },
+      summary: 'The raw files were written again after the run.',
+    }],
+  };
+  fn(errata);
+  return `${JSON.stringify(errata, null, 2)}\n`;
+}
+
+const withErrata = (fn, change = {}) => validateOne(change, (dir) => {
+  mkdirSync(join(dir, 'errata'));
+  writeFileSync(join(dir, ERRATA), errataFor(fn));
+});
+
+test('an errata file for a version 2 dataset is read against the files its manifest lists, and passes', async () => {
+  const result = await withErrata();
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, new RegExp(`1 errata file\\(s\\) validated: ${DATE}\\.json`));
+});
+
+for (const [what, fn, problem] of [
+  ['an errata issue naming a figure the version 2 aggregate does not have',
+    (e) => { e.issues[0].affects = ['byEcosystem.npm.weakExposed']; },
+    /issue 1 \(example-issue\) affects byEcosystem\.npm\.weakExposed, which is not a field of the 2026-09-30 aggregate/],
+  ['a regeneration naming a field a version 2 raw file does not have',
+    (e) => { e.regenerations[0].beforeSteps.fields = ['summary.noCrypto']; },
+    /regeneration 1 names summary\.noCrypto, which scan-results-npm\.json does not have/],
+  ['a regeneration naming a run other than the version 2 manifest\'s',
+    (e) => { e.regenerations[0].namedRun = 'https://ci.example/runs/2'; },
+    /regeneration 1 names the run https:\/\/ci\.example\/runs\/2, and datasets\/2026-09-30\/MANIFEST\.json names "https:\/\/ci\.example\/runs\/1"/],
+]) {
+  test(`${what} is refused`, async () => {
+    const result = await withErrata(fn);
+    assert.equal(result.code, 1, result.stdout);
+    assert.match(firstProblem(result.stderr, ERRATA), problem, result.stderr);
+  });
+}
+
+test('an errata file whose dataset lists no aggregate cannot be checked against it, and says so', async () => {
+  const result = await withErrata(undefined, manifestOf((m) => { m.files = m.files.filter((f) => f.role !== 'corpus'); }));
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(firstProblem(result.stderr, ERRATA), /cannot be checked against datasets\/2026-09-30: its aggregate could not be read/, result.stderr);
+});
+
+test('an errata file whose dataset manifest is a link to a device is answered without reading it', { timeout: 30000 }, async () => {
+  const result = await validateOne({}, (dir) => {
+    mkdirSync(join(dir, 'errata'));
+    writeFileSync(join(dir, ERRATA), errataFor());
+    const path = join(datasetDir(dir), 'MANIFEST.json');
+    unlinkSync(path);
+    symlinkSync('/dev/zero', path);
+  });
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(firstProblem(result.stderr, ERRATA), /cannot be checked against datasets\/2026-09-30: its aggregate could not be read/, result.stderr);
+});
+
 // --- Files that would hang, or exhaust a reader ----------------------------------
 
 const deep = (depth) => `${'['.repeat(depth)}${']'.repeat(depth)}`;

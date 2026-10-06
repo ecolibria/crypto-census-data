@@ -407,7 +407,9 @@ function validateErrata(file) {
     fail(label, `issuedAt is ${errata.issuedAt}, after today (${TODAY})`);
   }
 
-  // The figures an issue names are looked up in the dataset's own aggregate.
+  // The figures an issue names are looked up in the dataset's own aggregate,
+  // which its manifest names by the manifest's version: `corpus` in the first
+  // file shape, the file listed with the role `corpus` in version 2.
   let corpus;
   let manifest;
   const manifestPath = join(DATASETS, date, 'MANIFEST.json');
@@ -415,8 +417,8 @@ function validateErrata(file) {
     fail(label, `describes datasets/${date}, which is not a dataset in this repository`);
   } else {
     try {
-      manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
-      corpus = JSON.parse(readFileSync(join(DATASETS, date, manifest.corpus.file), 'utf-8'));
+      manifest = readBounded(manifestPath);
+      corpus = readBounded(join(DATASETS, date, datasetFile(manifest, 'corpus')));
     } catch {
       // What is wrong with the dataset is reported by its own validation.
       fail(label, `cannot be checked against datasets/${date}: its aggregate could not be read`);
@@ -542,6 +544,23 @@ function validateErrata(file) {
  * of which files were written before steps that came later, so a reader
  * holding the manifest's run knows which of its bytes that run did not write.
  */
+/**
+ * The name of a file a manifest binds, by the manifest's version: the
+ * aggregate (`corpus`) or one registry's raw file (`scan`). Undefined when the
+ * manifest names none, or names it with a path rather than a file name.
+ */
+function datasetFile(manifest, role, ecosystem) {
+  let entry;
+  if (!Object.hasOwn(manifest, 'schemaVersion')) {
+    entry = role === 'corpus' ? manifest.corpus
+      : Array.isArray(manifest.ecosystems) ? manifest.ecosystems.find((e) => isObject(e) && e.ecosystem === ecosystem) : undefined;
+  } else if (manifest.schemaVersion === 2 && Array.isArray(manifest.files)) {
+    entry = manifest.files.find((f) => isObject(f) && f.role === role && (role === 'corpus' || f.ecosystem === ecosystem));
+  }
+  const file = isObject(entry) ? entry.file : undefined;
+  return typeof file === 'string' && /^[^/\\]+$/.test(file) && file !== '..' && file !== '.' ? file : undefined;
+}
+
 function validateRegenerations(label, date, list, manifest) {
   if (!Array.isArray(list) || list.length === 0) {
     fail(label, 'has regenerations that are not a list with a regeneration in it. Where nothing was regenerated the key is left out.');
@@ -553,16 +572,14 @@ function validateRegenerations(label, date, list, manifest) {
   const rawFile = (ecosystem) => {
     if (rawFiles.has(ecosystem)) return rawFiles.get(ecosystem);
     let found;
-    const entry = Array.isArray(manifest.ecosystems) ? manifest.ecosystems.find((e) => isObject(e) && e.ecosystem === ecosystem) : undefined;
-    if (!entry || typeof entry.file !== 'string' || !/^[^/\\]+$/.test(entry.file) || entry.file === '..') {
+    const file = isObject(manifest) ? datasetFile(manifest, 'scan', ecosystem) : undefined;
+    if (file === undefined) {
       found = { problem: `has no raw file in datasets/${date}` };
     } else {
-      const path = join(DATASETS, date, entry.file);
       try {
-        if (!lstatSync(path).isFile()) throw new Error('not a regular file');
-        found = { file: entry.file, value: JSON.parse(readStrict(path)) };
+        found = { file, value: readBounded(join(DATASETS, date, file)) };
       } catch {
-        found = { problem: `has a raw file, ${entry.file}, that cannot be read` };
+        found = { problem: `has a raw file, ${file}, that cannot be read` };
       }
     }
     rawFiles.set(ecosystem, found);
@@ -2868,9 +2885,12 @@ const CHANGES_CHECKED = {
 // them or not.
 const UNCHECKED_CHANGES = ['enumerationFrame', 'manifestReader'];
 
-/** The version of an earlier dataset, read from its manifest: 1 when it declares none. */
-/** A file of an earlier dataset, parsed, if it is a regular file of bounded size nested within the bound; otherwise an error. */
-function readEarlier(path) {
+/**
+ * A file read from beside what is being validated (an earlier dataset, or the
+ * dataset an errata file describes), parsed, if it is a regular file of
+ * bounded size nested within the bound; otherwise an error.
+ */
+function readBounded(path) {
   const stat = lstatSync(path, { throwIfNoEntry: false });
   if (!stat || !stat.isFile() || stat.size > MAX_FILE_BYTES) throw new Error(`${path} is not a regular file of a size these rules read`);
   const value = JSON.parse(readStrict(path));
@@ -2878,9 +2898,10 @@ function readEarlier(path) {
   return value;
 }
 
+/** The version of an earlier dataset, read from its manifest: 1 when it declares none. */
 function versionOf(dataset) {
   try {
-    const manifest = readEarlier(join(DATASETS, dataset, 'MANIFEST.json'));
+    const manifest = readBounded(join(DATASETS, dataset, 'MANIFEST.json'));
     if (!isObject(manifest)) return null;
     if (!Object.hasOwn(manifest, 'schemaVersion')) return 1;
     return manifest.schemaVersion === 2 ? 2 : null;
@@ -2898,11 +2919,11 @@ const definitionIds = (d) => ({
 function instrumentOf(dataset) {
   try {
     const dir = join(DATASETS, dataset);
-    const manifest = readEarlier(join(dir, 'MANIFEST.json'));
+    const manifest = readBounded(join(dir, 'MANIFEST.json'));
     const read = (role, eco = null) => {
       const file = fileNameFor(role, eco, dataset);
       if (!manifest.files.some((entry) => entry.role === role && entry.ecosystem === eco && entry.file === file)) throw new Error(file);
-      return readEarlier(join(dir, file));
+      return readBounded(join(dir, file));
     };
     const catalog = read('catalog');
     return {
