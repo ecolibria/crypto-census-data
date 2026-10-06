@@ -108,6 +108,19 @@ test('a listed file that is a link is refused before it is read', async () => {
   assert.match(result.stderr, /2026-03-18: corpus-2026-03-18\.json is not a regular file/);
 });
 
+test('a manifest entry that names a path outside the dataset is refused, and the file there is not read', async () => {
+  const result = await validateChanged((dir) => {
+    const manifest = JSON.parse(readFileSync(join(dir, 'MANIFEST.json'), 'utf-8'));
+    writeFileSync(join(dir, '..', '..', 'outside.json'), readFileSync(join(dir, manifest.corpus.file)));
+    manifest.corpus.file = '../../outside.json';
+    writeFileSync(join(dir, 'MANIFEST.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  });
+  assert.equal(result.code, 1);
+  const first = result.stderr.split('\n').find((line) => line.startsWith('  2026-03-18: '));
+  assert.match(first, /a manifest entry names "\.\.\/\.\.\/outside\.json", which is not the name of a file in the dataset's own directory/, result.stderr);
+  assert.doesNotMatch(result.stderr, /outside\.json (does not match|is \d+ bytes|does not parse)|could not be checked to the end/);
+});
+
 test('a manifest that is a link is refused before it is read', async () => {
   const result = await validateChanged((dir) => {
     rmSync(join(dir, 'MANIFEST.json'));

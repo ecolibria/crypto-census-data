@@ -137,6 +137,13 @@ function resolvePath(root, path) {
 const problems = [];
 const fail = (dataset, message) => problems.push(`${dataset}: ${message}`);
 
+/**
+ * A name a manifest gives a file is read only as the name of a file in the
+ * dataset's own directory: no separator, and not a step up or in place. A path
+ * would have these checks read, and report on, a file outside it.
+ */
+const isFileName = (name) => typeof name === 'string' && /^[^/\\]+$/.test(name) && name !== '..' && name !== '.';
+
 function validate(name) {
   const dir = join(DATASETS, name);
   const manifestPath = join(dir, 'MANIFEST.json');
@@ -214,6 +221,11 @@ function validate(name) {
       fail(name, 'a manifest entry names no file');
       continue;
     }
+    if (!isFileName(entry.file)) {
+      fail(name, `a manifest entry names ${JSON.stringify(entry.file)}, which is not the name of a file in the dataset's own ` +
+        'directory. A path would have these checks read a file outside it.');
+      continue;
+    }
     listed.add(entry.file);
     const path = join(dir, entry.file);
     if (!existsSync(path)) {
@@ -288,6 +300,7 @@ function validate(name) {
   }
 
   // --- The aggregate and the raw files describe the same run --------------
+  if (!isFileName(manifest.corpus.file)) return;
   const corpusPath = join(dir, manifest.corpus.file);
   if (!existsSync(corpusPath) || !lstatSync(corpusPath).isFile()) return;
   let corpus;
@@ -558,7 +571,7 @@ function datasetFile(manifest, role, ecosystem) {
     entry = manifest.files.find((f) => isObject(f) && f.role === role && (role === 'corpus' || f.ecosystem === ecosystem));
   }
   const file = isObject(entry) ? entry.file : undefined;
-  return typeof file === 'string' && /^[^/\\]+$/.test(file) && file !== '..' && file !== '.' ? file : undefined;
+  return isFileName(file) ? file : undefined;
 }
 
 function validateRegenerations(label, date, list, manifest) {
