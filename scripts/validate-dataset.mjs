@@ -3180,12 +3180,10 @@ function checkWithheld(list, ctx, file, bad) {
       });
     }
     if (codes.includes('noScanFile')) {
+      // Without the file, the dataset fails for its missing scan file; with it, the reason is false.
       if (scan) {
         bad(`${at} gives noScanFile for ${item.ecosystem}, and the dataset holds ${scan.file}. A version 2 dataset holds the scan ` +
           'file of every registry.');
-        sound = false;
-      } else if (item.coverage !== null) {
-        bad(`${at}.coverage is ${describe(item.coverage)}. A row with no scan file has no counts, so it is null.`);
         sound = false;
       }
     } else if (item.coverage === null) {

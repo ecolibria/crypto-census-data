@@ -1170,6 +1170,7 @@ plant('a scan that reads from nowhere', scanOf('hex', (s) => { s.method.readFrom
 plant('a condition that is not a code', scanOf('go', (s) => { s.method.notObservableWhen = ['only a module line']; }), /method\.notObservableWhen is \["only a module line"\]/);
 plant('limits listed twice', scanOf('maven', (s) => { s.method.limits = ['parentPomNotFollowed', 'parentPomNotFollowed']; }), /method\.limits is .*not a list of distinct camelCase codes/);
 plant('a scan that does not record every kind', scanOf('npm', (s) => { s.method.declarationKinds = ['dependencies']; }), /method\.declarationKinds is \["dependencies"\]\. A scan of npm records every kind of the closed list/);
+plant('a listed count that is not one', scanOf('hex', (s) => { s.enumeration.listed = -1; }), /scan-results-hex\.json: enumeration\.listed is -1, not a whole count/);
 plant('a sample that does not name its size', scanOf('npm', (s) => { s.enumeration.requested = null; }), /scan-results-npm\.json: enumeration\.requested is null, not the size of the sample/);
 plant('a sample of no packages', scanOf('npm', (s) => { s.enumeration.requested = 0; }), /scan-results-npm\.json: enumeration\.requested is 0, not the size of the sample\. A row that is not read whole names how many packages it asked for, and that is never 0/);
 plant('a row read whole that names a size', scanOf('hex', (s) => { s.enumeration.requested = 1000; }), /scan-results-hex\.json: enumeration\.requested is 1000 for a row read whole; it is null then/);
