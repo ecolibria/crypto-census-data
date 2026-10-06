@@ -2239,8 +2239,11 @@ const DIRECT = {
   rubygems: (ds) => ds.some((d) => d.kind === 'runtime'),
   hex: (ds) => ds.some((d) => d.optional === false),
   pub: (ds) => ds.some((d) => d.kind === 'dependencies'),
-  cocoapods: (ds, manifest) => ds.some((d) => d.kind === 'topLevel' ||
-    (d.kind === 'subspec' && (manifest.defaultSubspecs === null || manifest.defaultSubspecs.includes(d.subspec)))),
+  // Some object with platform null that is topLevel, or a subspec whose first path element is a default
+  // subspec (any subspec when defaultSubspecs is null, none when it is empty). A platform line is conditional
+  // wherever it sits; platform, testspec and appspec objects never count.
+  cocoapods: (ds, manifest) => ds.some((d) => d.platform === null && (d.kind === 'topLevel' || (d.kind === 'subspec' &&
+    typeof d.subspec === 'string' && (manifest.defaultSubspecs === null || manifest.defaultSubspecs.includes(d.subspec.split('/')[0]))))),
 };
 
 /** The kinds that count as a match under census.match.anyManifest/1: every kind recorded, except Maven managed and plugin and Packagist suggest. */
@@ -2248,7 +2251,7 @@ const ANY_MANIFEST_KINDS = Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, DECL
   !(eco === 'maven' && (kind === 'managed' || kind === 'plugin')) && !(eco === 'packagist' && kind === 'suggest'))]));
 
 const CLASS_IDS = {
-  matched: 'census.class.classifiedEntry/1',
+  matched: 'census.class.countableEntry/1',
   weak: 'census.class.weak/1',
   brokenAlgorithm: 'census.class.brokenAlgorithm/1',
   deprecatedLibrary: 'census.class.deprecatedLibrary/1',

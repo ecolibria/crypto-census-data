@@ -719,7 +719,7 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
       raw: { id: ID.raw },
       consolidated: { id: ID.consolidated },
       classes: {
-        matched: 'census.class.classifiedEntry/1', weak: 'census.class.weak/1', brokenAlgorithm: 'census.class.brokenAlgorithm/1',
+        matched: 'census.class.countableEntry/1', weak: 'census.class.weak/1', brokenAlgorithm: 'census.class.brokenAlgorithm/1',
         deprecatedLibrary: 'census.class.deprecatedLibrary/1', pqc: 'census.class.pqcDedicated/1',
       },
       multiPurposeLibrary: { id: 'census.table.multiPurposeLibrary/1' },
@@ -1251,6 +1251,58 @@ plant('a package with no version', scanOf('hex', (s) => { s.packages[0].version 
 plant('a package read from a source the method does not name', scanOf('hex', (s) => { s.packages[0].readFrom = 'mirror'; }), /\.readFrom is "mirror", not one of method\.readFrom/);
 plant('a NuGet package without its groups', scanOf('nuget', (s) => { s.packages[0].manifest = null; }), /\.manifest is null; for nuget it is \{ dependencyGroups/);
 plant('a CocoaPods package without its default subspecs', scanOf('cocoapods', (s) => { delete s.packages[0].manifest.defaultSubspecs; }), /\.manifest is .*; for cocoapods it is \{ subspecs/);
+
+/** CocoaPods with AppKitX's direct match taken away: ZetaKit alone is direct, and the direct totals lose one unit. */
+const appKitXNotDirect = (change) => ({
+  fixture: (f) => {
+    change(f.cocoapods.rows[0]);
+    f.cocoapods.blocks = plain([2, 2, null, 2, null, null, null], 2, [1, 1, null, 1, null, null, null], 1);
+  },
+  totalTables: (t) => {
+    t.cells.directUnconditional = { raw: [14, 6, 2, 4, 2, 1, 1], consolidated: [11, 6, 2, 4, 2, 1, 0] };
+    t.stats.directUnconditional = [15, 12, 3];
+  },
+});
+
+test('the values set for the Go module entry golang.org/x/crypto pass, as a multi-purpose library', async () => {
+  // Its algorithms are its package entries', in catalogue order, deduplicated; its category is general; the
+  // archive inspected is v0.57.0. It is matched by example.com/app/one (indirectly) and example.com/lib (directly).
+  const result = await validateOne({
+    fixture: (f) => {
+      Object.assign(f.go.entries.find((e) => e.name === 'golang.org/x/crypto'), {
+        algorithms: ['MD4', 'RIPEMD-160', 'RSA', 'DSA', 'CAST5', 'BN256', 'Blowfish', 'TEA', 'Salsa20', 'ChaCha20-Poly1305', 'X25519',
+          'XSalsa20-Poly1305', 'Argon2id', 'bcrypt', 'scrypt', 'BLAKE2b', 'SSH', 'ACME', 'TLS'],
+        category: 'general',
+        multiPurpose: { version: 'v0.57.0', url: 'https://proxy.golang.org/golang.org/x/crypto/@v/v0.57.0.zip', checkedAt: '2026-10-06T17:59:20.568Z' },
+      });
+    },
+    corpus: (c) => {
+      c.multiPurposeLibraries.push({
+        ecosystem: 'go', entry: 'golang.org/x/crypto', definitionId: 'census.table.multiPurposeLibrary/1',
+        dependents: { anyManifestMatch: { raw: 2, consolidated: 2 }, directUnconditional: { raw: 1, consolidated: 1 } },
+      });
+    },
+  });
+  assert.equal(result.code, 0, result.stderr);
+});
+
+test('a CocoaPods dependency in a subspec nested under a default subspec is direct', async () => {
+  const result = await validateOne({ fixture: (f) => { f.cocoapods.rows[0].matches[0].declarations[0].subspec = 'Core/Utils'; } });
+  assert.equal(result.code, 0, result.stderr);
+});
+
+test('a CocoaPods dependency of a default subspec for one platform only is not direct', async () => {
+  const result = await validateOne(appKitXNotDirect((row) => { row.matches[0].declarations[0].platform = 'ios'; }));
+  assert.equal(result.code, 0, result.stderr);
+});
+
+test('a CocoaPods pod that names no default subspec counts none of its subspecs as direct', async () => {
+  const result = await validateOne(appKitXNotDirect((row) => { row.manifest.defaultSubspecs = []; }));
+  assert.equal(result.code, 0, result.stderr);
+});
+
+plant('a CocoaPods direct count that counts a dependency for one platform', { fixture: (f) => { f.cocoapods.rows[0].matches[0].declarations[0].platform = 'ios'; } },
+  /byEcosystem\.cocoapods\.directUnconditional\.raw\.matched is \{"count":2,"k":2,"nullReason":null\}; recomputed from the files it is bound to, it is \{"count":1/);
 plant('a Maven package whose coordinates are not a count', scanOf('maven', (s) => { s.packages[0].manifest.propertyCoordinates = -1; }), /\.manifest is .*; for maven it is \{ hasParent/);
 plant('package-level facts where the registry has none', scanOf('hex', (s) => { s.packages[0].manifest = {}; }), /\.manifest is \{\}; hex has no package-level facts, so it is null/);
 plant('a package with no match', scanOf('hex', (s) => { s.packages[0].matches = []; }), /\.matches is \[\]\. Only packages with a match are listed/);
