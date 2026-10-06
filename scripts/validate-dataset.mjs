@@ -15,6 +15,9 @@
  *   - a dataset says which kind it is, and meets that kind's requirements
  *   - an errata file names a dataset that is here, and figures that are in it
  *
+ * A dataset in schema version 2 is held to the rules of that version, in the
+ * section "Schema version 2" below.
+ *
  * Usage:
  *   node scripts/validate-dataset.mjs            # every dataset and every errata file
  *   node scripts/validate-dataset.mjs 2026-07-29 # one dataset, and its errata file if it has one
@@ -57,9 +60,9 @@ const KINDS = {
  *
  * That shape is accepted for these directories and for no others. A dataset
  * added under a new date has to declare its version, so files in the first
- * shape cannot be published as a new measurement. This script has no rules for
- * a declared version yet, so a dataset that declares one is refused rather than
- * passed unchecked.
+ * shape cannot be published as a new measurement. A dataset that declares
+ * schemaVersion 2 is held to the version 2 rules, under any other name; one
+ * that declares anything else is refused rather than passed unchecked.
  */
 const FIRST_SHAPE_DATASETS = ['2026-03-18', '2026-08-03'];
 
@@ -150,11 +153,24 @@ function validate(name) {
     return;
   }
 
-  // Checked before anything else: every rule below is written for the first
-  // file shape and says nothing about a dataset in another one.
+  // Checked before anything else: the version a manifest declares decides
+  // which rules run. Every rule below this block is written for the first file
+  // shape, which declares none, and says nothing about a dataset in another.
+  if (!isObject(manifest)) {
+    fail(name, 'MANIFEST.json is not a JSON object, so it describes nothing.');
+    return;
+  }
   if (manifest.schemaVersion !== undefined) {
-    fail(name, `schemaVersion is ${JSON.stringify(manifest.schemaVersion)}. This script has no rules for a ` +
-      'declared version yet, and a dataset it cannot check is not one it can pass.');
+    if (manifest.schemaVersion !== 2) {
+      fail(name, `schemaVersion is ${JSON.stringify(manifest.schemaVersion)}, which is not a version these rules know. A ` +
+        'version 2 dataset declares the number 2 and a first-shape one declares none; any other version is refused, never ' +
+        'read as the newest one known.');
+    } else if (FIRST_SHAPE_DATASETS.includes(name)) {
+      fail(name, `schemaVersion is 2, and ${name} is one of the datasets published in the first file shape, which declares ` +
+        'no version. A version 2 manifest under that name is not the dataset that was published.');
+    } else {
+      validateVersion2(name, dir);
+    }
     return;
   }
   if (!FIRST_SHAPE_DATASETS.includes(name)) {
@@ -619,6 +635,336 @@ function validateRegenerations(label, date, list, manifest) {
     if (!hasWords(regeneration.summary)) fail(label, `${at} is missing summary`);
     else if (hasHiddenCharacters(regeneration.summary)) fail(label, `${at} has a control or format character in summary`);
   });
+}
+
+// ---------------------------------------------------------------------------
+// Schema version 2
+// ---------------------------------------------------------------------------
+//
+// A version 2 dataset is a set of files bound to each other by hashes: for
+// each of the eleven registries a raw scan file and a ledger of every package
+// it listed, the catalogue snapshot the aggregate was classified with, the
+// consolidation map, the corpus, and MANIFEST.json. Each section below reads
+// one kind of file and holds it to the schema version 2 contract.
+//
+// These rules are a second implementation of that contract, written apart
+// from the code that produces the files, so that one mistake has to be made
+// twice to pass.
+
+/** The eleven registries, by the ids every file uses. */
+const ECOSYSTEMS = ['npm', 'pypi', 'go', 'maven', 'crates', 'packagist', 'nuget', 'rubygems', 'hex', 'pub', 'cocoapods'];
+
+/** The largest file a dataset may hold. The host refuses a file of 100 MB. */
+const MAX_FILE_BYTES = 95_000_000;
+
+const MANIFEST_CHECKS = ['missingEcosystems', 'belowPlausibleMinimum', 'withoutPlausibleMinimum', 'noMatches', 'unresolvedAboveCeiling',
+  'sourcesOffAllowlist', 'catalogCheckMismatches', 'inputHashMismatches', 'identityFailures'];
+
+/** The fields of each object, all of them required. An object is closed: a key not listed here fails. Each section adds the objects it reads. */
+const KEYS = {
+  manifest: ['schemaVersion', 'dataset', 'kind', 'collectedAt', 'generatedAt', 'license', 'provenance', 'files', 'coverage',
+    'ecosystems', 'comparability', 'checks', 'complete', 'knownIssues'],
+  provenance: ['sourceRepository', 'sourceCommit', 'workflowRun'],
+  file: ['role', 'ecosystem', 'file', 'bytes', 'sha256', 'schemaVersion'],
+};
+
+// --- Small readers ------------------------------------------------------------
+
+const describe = (value) => {
+  if (value === undefined) return 'missing';
+  const text = JSON.stringify(value);
+  return text.length > 160 ? `${text.slice(0, 157)}...` : text;
+};
+const isCount = (v) => Number.isSafeInteger(v) && v >= 0;
+const isSha256 = (v) => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
+/** An ISO 8601 UTC time: a date-time ending in Z, or a date where the source gives no time of day. */
+const isTime = (v) => {
+  if (isCalendarDate(v)) return true;
+  if (typeof v !== 'string') return false;
+  const match = /^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,9})?Z$/.exec(v);
+  return match !== null && isCalendarDate(match[1]);
+};
+const startsWithVersion = (text) => /^\s*\{\s*"schemaVersion"\s*:/.test(text);
+
+/** The words of a camelCase key, so that `weakShareOfCryptoUsing` reads as a share and `generatedAt` does not. */
+const SHARE_WORDS = ['share', 'shares', 'rate', 'rates', 'ratio', 'percent', 'percentage', 'pct', 'proportion', 'fraction'];
+const looksLikeShare = (key, value) =>
+  key.split(/(?=[A-Z])/).some((word) => SHARE_WORDS.includes(word.toLowerCase())) || (typeof value === 'number' && !Number.isInteger(value));
+
+/**
+ * An object with exactly the given keys. Reports each key the contract does
+ * not define and the keys it lacks, and says whether every expected key is
+ * there to be read further.
+ */
+function closed(value, keys, where, bad) {
+  if (!isObject(value)) {
+    bad(`${where} is ${describe(value)}, not an object`);
+    return false;
+  }
+  for (const key of Object.keys(value)) {
+    if (keys.includes(key)) continue;
+    bad(looksLikeShare(key, value[key])
+      ? `${where} carries ${key}, a stored share. No share is stored in a version 2 file: one is computed where it is shown, ` +
+        'from two counts of the same block, so its denominator is never left to the reader.'
+      : `${where} carries ${key}, which the schema version 2 contract does not define. Every object is closed, so a stale or ` +
+        'misspelt field fails instead of being ignored.');
+  }
+  const missing = keys.filter((key) => !Object.hasOwn(value, key));
+  if (missing.length > 0) {
+    bad(`${where} is missing ${missing.join(', ')}. Every field of a version 2 file is written out, null included, so that an ` +
+      'absent field is never read as a default.');
+  }
+  return missing.length === 0;
+}
+
+/** Decode and parse one JSON file of a version 2 dataset, and read its version before anything else. */
+function parseVersion2(buffer, file, bad) {
+  let text;
+  try {
+    text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(buffer);
+  } catch {
+    bad(`${file} is not UTF-8. A decoder that substitutes a character would hide the difference from every check here.`);
+    return null;
+  }
+  let value;
+  try {
+    value = JSON.parse(text);
+  } catch (err) {
+    bad(`${file} does not parse: ${err.message}`);
+    return null;
+  }
+  if (!isObject(value)) {
+    bad(`${file} is not a JSON object`);
+    return null;
+  }
+  if (!Object.hasOwn(value, 'schemaVersion')) {
+    bad(`${file} carries no schemaVersion, so it is a version 1 file. A dataset is version 2 throughout, and a version 1 file ` +
+      'cannot enter a new one.');
+    return null;
+  }
+  if (value.schemaVersion !== 2) {
+    bad(`${file} has schemaVersion ${describe(value.schemaVersion)}. Every file of a version 2 dataset is version 2, and a ` +
+      'version these rules do not know is never read as one they do.');
+    return null;
+  }
+  if (!startsWithVersion(text)) {
+    bad(`${file} does not begin with schemaVersion. It is the first key of every version 2 file, so that a reader learns the ` +
+      'version before it reads anything else.');
+  }
+  return value;
+}
+
+/** A file of the dataset as bytes: a regular file, never a link, and no larger than the host accepts. */
+function readDatasetFile(dir, file, bad) {
+  const path = join(dir, file);
+  const stat = lstatSync(path, { throwIfNoEntry: false });
+  if (!stat) {
+    bad(`${file} is listed in MANIFEST.json but is not in the dataset`);
+    return null;
+  }
+  if (!stat.isFile()) {
+    bad(`${file} is not a regular file. A link would keep its bytes somewhere these checks and the immutability check do not look.`);
+    return null;
+  }
+  if (stat.size > MAX_FILE_BYTES) {
+    bad(`${file} is ${stat.size.toLocaleString('en-US')} bytes, over the ${MAX_FILE_BYTES.toLocaleString('en-US')} a dataset file ` +
+      'may hold. The host refuses a file of 100 MB, so this one could not be published beside the others.');
+    return null;
+  }
+  return readFileSync(path);
+}
+
+// --- MANIFEST.json --------------------------------------------------------------
+
+/** The manifest, read strictly. One that is not a version 2 manifest in shape is reported once, since nothing else can be read from it. */
+function readManifest2(dir, bad) {
+  const path = join(dir, 'MANIFEST.json');
+  const stat = lstatSync(path);
+  if (!stat.isFile()) {
+    bad('MANIFEST.json is not a regular file. A link would keep the text these checks read somewhere the immutability check does not look.');
+    return null;
+  }
+  if (stat.size > MAX_FILE_BYTES) {
+    bad(`MANIFEST.json is ${stat.size.toLocaleString('en-US')} bytes, over the ${MAX_FILE_BYTES.toLocaleString('en-US')} a dataset file may hold`);
+    return null;
+  }
+  let text;
+  try {
+    text = readStrict(path);
+  } catch {
+    bad('MANIFEST.json is not UTF-8. A decoder that substitutes a character would hide the difference from every check here.');
+    return null;
+  }
+  const manifest = JSON.parse(text);
+  const missing = KEYS.manifest.filter((key) => !Object.hasOwn(manifest, key));
+  const extra = Object.keys(manifest).filter((key) => !KEYS.manifest.includes(key));
+  if (missing.length > 0 || extra.length > 0) {
+    const parts = [];
+    if (missing.length > 0) parts.push(`it lacks ${missing.join(', ')}`);
+    if (extra.length > 0) parts.push(`it carries ${extra.join(', ')}, which a version 2 manifest does not define`);
+    bad(`schemaVersion is 2, but MANIFEST.json is not a version 2 manifest: ${parts.join('; ')}. A file is read as version 2 ` +
+      'by the fields it has, not by its marker alone.');
+    return null;
+  }
+  if (!startsWithVersion(text)) {
+    bad('MANIFEST.json does not begin with schemaVersion. It is the first key of every version 2 file, so that a reader learns ' +
+      'the version before it reads anything else.');
+  }
+  return manifest;
+}
+
+/** The manifest's own fields. What it says about the other files is compared with them further down. */
+function checkManifest2(name, m, bad) {
+  const at = 'MANIFEST.json';
+  if (!isText(m.dataset)) bad(`${at}: dataset is ${describe(m.dataset)}, not a title`);
+  if (m.kind !== 'raw+aggregate') {
+    bad(`${at}: kind is ${describe(m.kind)}. A version 2 dataset is raw+aggregate; aggregate-only stays with the one dataset ` +
+      'whose raw output does not exist.');
+  }
+  if (m.collectedAt !== name) {
+    bad(`${at}: collectedAt is ${describe(m.collectedAt)}, and the directory is ${name}. The date names the dataset, its files ` +
+      'and its citation, so they agree.');
+  }
+  if (!isTime(m.generatedAt)) bad(`${at}: generatedAt is ${describe(m.generatedAt)}, not an ISO 8601 UTC time`);
+  if (m.license !== 'CC-BY-4.0') bad(`${at}: license is ${describe(m.license)}; published datasets here are CC-BY-4.0`);
+  if (closed(m.provenance, KEYS.provenance, `${at}: provenance`, bad)) {
+    for (const field of KEYS.provenance) {
+      if (!isText(m.provenance[field])) {
+        bad(`${at}: provenance.${field} is ${describe(m.provenance[field])}. A published dataset that cannot say which run ` +
+          'produced it cannot be reproduced or challenged.');
+      }
+    }
+  }
+  // `checks` records what the generator found; `complete` is its verdict. Each
+  // check is recomputed from the files by the rules below, and neither field
+  // is read as proof of anything. A list that is not empty, or a verdict that
+  // is not true, is the generator saying the dataset is not ready.
+  // not checked yet: belowPlausibleMinimum and withoutPlausibleMinimum, the
+  // plausible minimum of packages read per registry, which the schema version
+  // 2 contract does not state.
+  if (closed(m.checks, MANIFEST_CHECKS, `${at}: checks`, bad)) {
+    for (const check of MANIFEST_CHECKS) {
+      if (!Array.isArray(m.checks[check])) {
+        bad(`${at}: checks.${check} is ${describe(m.checks[check])}, not a list`);
+      } else if (m.checks[check].length > 0) {
+        bad(`${at}: checks.${check} lists ${describe(m.checks[check])}. The generator found the dataset incomplete, and an ` +
+          'incomplete dataset is not published.');
+      }
+    }
+  }
+  if (m.complete !== true) {
+    bad(`${at}: complete is ${describe(m.complete)}. A dataset is published when every check passes, and this one says one did not.`);
+  }
+  if (!Array.isArray(m.knownIssues)) bad(`${at}: knownIssues is ${describe(m.knownIssues)}, not a list`);
+}
+
+// --- The files ------------------------------------------------------------------
+
+const ROLES = ['corpus', 'scan', 'listing', 'catalog', 'consolidation'];
+const PER_REGISTRY = ['scan', 'listing'];
+const fileNameFor = (role, eco, date) => ({
+  corpus: `corpus-${date}.json`,
+  catalog: `catalog-${date}.json`,
+  consolidation: `consolidation-${date}.json`,
+  scan: `scan-results-${eco}.json`,
+  listing: `listing-${eco}.tsv.gz`,
+})[role];
+
+/**
+ * Every file the manifest lists: present, a regular file, within the size
+ * limit, and hashing to what was recorded. Every other file in the directory
+ * is a stray, whatever its name. Returns the parsed files by role.
+ */
+function readListedFiles(name, dir, manifest, bad) {
+  if (!Array.isArray(manifest.files)) {
+    bad(`MANIFEST.json: files is ${describe(manifest.files)}, not a list of the dataset's files`);
+    return null;
+  }
+  const found = { scans: {}, listings: {}, corpus: null, catalog: null, consolidation: null, hashes: new Map() };
+  const listed = new Set();
+  const roles = new Set();
+  manifest.files.forEach((entry, index) => {
+    const where = `MANIFEST.json: files[${index}]`;
+    if (!closed(entry, KEYS.file, where, bad)) return;
+    if (!ROLES.includes(entry.role)) {
+      bad(`${where}.role is ${describe(entry.role)}, not one of: ${ROLES.join(', ')}`);
+      return;
+    }
+    const perRegistry = PER_REGISTRY.includes(entry.role);
+    if (perRegistry && !ECOSYSTEMS.includes(entry.ecosystem)) {
+      bad(`${where}.ecosystem is ${describe(entry.ecosystem)}, not one of the eleven registries`);
+      return;
+    }
+    if (!perRegistry && entry.ecosystem !== null) {
+      bad(`${where}.ecosystem is ${describe(entry.ecosystem)}; the ${entry.role} file covers every registry, so it is null`);
+      return;
+    }
+    const expected = fileNameFor(entry.role, entry.ecosystem, name);
+    if (entry.file !== expected) {
+      bad(`${where} names ${describe(entry.file)} as the ${entry.role} file${perRegistry ? ` of ${entry.ecosystem}` : ''}, ` +
+        `which is named ${expected}`);
+      return;
+    }
+    if (listed.has(entry.file)) {
+      bad(`${where} lists ${entry.file} a second time`);
+      return;
+    }
+    listed.add(entry.file);
+    roles.add(perRegistry ? `${entry.role}:${entry.ecosystem}` : entry.role);
+    if (entry.schemaVersion !== 2) {
+      bad(`${where}.schemaVersion is ${describe(entry.schemaVersion)}. Every file of a version 2 dataset is version 2, the ledger included.`);
+    }
+    if (!isCount(entry.bytes)) bad(`${where}.bytes is ${describe(entry.bytes)}, not a size in bytes`);
+    if (!isSha256(entry.sha256)) bad(`${where}.sha256 is ${describe(entry.sha256)}, not a SHA-256 digest in lower-case hex`);
+
+    const buffer = readDatasetFile(dir, entry.file, bad);
+    if (buffer === null) return;
+    const actual = createHash('sha256').update(buffer).digest('hex');
+    if (isSha256(entry.sha256) && actual !== entry.sha256) {
+      bad(`${entry.file} does not match its recorded hash\n    recorded ${entry.sha256}\n    actual   ${actual}`);
+    }
+    if (isCount(entry.bytes) && entry.bytes !== buffer.length) {
+      bad(`${entry.file} is ${buffer.length} bytes, manifest says ${entry.bytes}`);
+    }
+    found.hashes.set(entry.file, actual);
+    if (entry.role === 'listing') {
+      found.listings[entry.ecosystem] = { file: entry.file, buffer, sha256: actual };
+      return;
+    }
+    const value = parseVersion2(buffer, entry.file, bad);
+    if (value === null) return;
+    const record = { file: entry.file, value, sha256: actual };
+    if (entry.role === 'scan') found.scans[entry.ecosystem] = record;
+    else found[entry.role] = record;
+  });
+
+  for (const role of ['corpus', 'catalog', 'consolidation']) {
+    if (!roles.has(role)) bad(`MANIFEST.json lists no ${role} file, and a version 2 dataset has one`);
+  }
+  for (const eco of ECOSYSTEMS) {
+    for (const role of PER_REGISTRY) {
+      if (!roles.has(`${role}:${eco}`)) {
+        bad(`MANIFEST.json lists no ${role === 'scan' ? 'scan file' : 'listing ledger'} for ${eco}. All eleven registries are ` +
+          'in a version 2 dataset, so that a missing one cannot read as a fall in every total.');
+      }
+    }
+  }
+
+  const strays = readdirSync(dir).filter((entry) => entry !== 'MANIFEST.json' && !listed.has(entry)).sort();
+  if (strays.length > 0) {
+    bad(`present but not listed in MANIFEST.json: ${strays.join(', ')}. An unlisted file is one no reader can attribute ` +
+      'and no hash covers.');
+  }
+  return found;
+}
+
+/** Every rule of a version 2 dataset, in the order its files depend on each other. */
+function validateVersion2(name, dir) {
+  const bad = (message) => fail(name, message);
+  const manifest = readManifest2(dir, bad);
+  if (manifest === null) return;
+  checkManifest2(name, manifest, bad);
+  readListedFiles(name, dir, manifest, bad);
 }
 
 // ---------------------------------------------------------------------------
