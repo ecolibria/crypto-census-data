@@ -20,7 +20,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, truncateSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -1487,6 +1487,55 @@ test('more malformed rows than are listed one by one are counted after the first
   assert.match(firstProblem(result.stderr), /listing-npm\.tsv\.gz: row 2 has the disposition "gone"/, result.stderr);
   assert.equal(result.stderr.split('\n').filter((line) => / listing-npm\.tsv\.gz: row \d+ /.test(line)).length, 5, result.stderr);
   assert.match(result.stderr, /listing-npm\.tsv\.gz: 3 more row\(s\) are malformed/);
+});
+
+// --- Files that would hang, or exhaust a reader ----------------------------------
+
+const deep = (depth) => `${'['.repeat(depth)}${']'.repeat(depth)}`;
+plant('a manifest nested deeper than any version 2 file', {}, /MANIFEST\.json nests values more than 32 deep/, (dir) => {
+  const path = join(datasetDir(dir), 'MANIFEST.json');
+  writeFileSync(path, readText(path).replace(/"comparability": \[[\s\S]*?\n {2}\],\n/, `"comparability": ${deep(20000)},\n`));
+});
+plant('a listed file nested deeper than any version 2 file', {}, /corpus-2026-09-30\.json nests values more than 32 deep/, (dir) => {
+  const text = readText(join(datasetDir(dir), 'corpus-2026-09-30.json'));
+  rehash('corpus-2026-09-30.json', text.replace(/"comparability": \[[\s\S]*?\n {2}\],\n/, `"comparability": ${deep(20000)},\n`))(dir);
+});
+
+test('a manifest that is a link to a device is refused without reading it', { timeout: 30000 }, async () => {
+  const result = await validateOne({}, (dir) => {
+    const path = join(datasetDir(dir), 'MANIFEST.json');
+    unlinkSync(path);
+    symlinkSync('/dev/zero', path);
+  });
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(firstProblem(result.stderr), /MANIFEST\.json is not a regular file/, result.stderr);
+});
+
+test('an earlier dataset whose manifest is a pipe is refused without reading it', { timeout: 30000 }, async () => {
+  const result = await validate({ [DATE]: [DATE, {}, [{ dataset: FIRST_SHAPE, version: 1 }, { dataset: '2026-09-01', version: 1 }]] }, (dir) => {
+    mkdirSync(join(dir, 'datasets', '2026-09-01'));
+    execFileSync('mkfifo', [join(dir, 'datasets', '2026-09-01', 'MANIFEST.json')]);
+  });
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(firstProblem(result.stderr, '2026-09-01'), /MANIFEST\.json is not a regular file/, result.stderr);
+  assert.match(firstProblem(result.stderr), /comparability\[1\]: 2026-09-01 has no manifest these rules can read/, result.stderr);
+});
+
+test('a link under datasets/ that leads nowhere is reported, and the run goes on', async () => {
+  const result = await validateOne({}, (dir) => symlinkSync('nowhere', join(dir, 'datasets', '2026-01-01')));
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(firstProblem(result.stderr, 'datasets'), /2026-01-01 is not a dataset directory/, result.stderr);
+  assert.doesNotMatch(result.stderr, /could not be checked to the end|\n\s+at /);
+});
+
+test('past fifty problems in one file, the rest are counted, not listed', async () => {
+  const result = await validateOne(scanOf('hex', (s) => {
+    for (let i = 0; i < 40; i += 1) s.packages.push({ name: `extra-${i}`, extra: true });
+  }));
+  assert.equal(result.code, 1, result.stdout);
+  const listed = result.stderr.split('\n').filter((line) => line.startsWith(`  ${DATE}: scan-results-hex.json`));
+  assert.equal(listed.length, 51, result.stderr);
+  assert.match(listed.at(-1), /scan-results-hex\.json: \d+ more problem\(s\) in this file are not listed/);
 });
 
 // --- Running the planted defects -------------------------------------------------

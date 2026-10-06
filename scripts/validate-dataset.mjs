@@ -145,6 +145,18 @@ function validate(name) {
     fail(name, 'no MANIFEST.json. A directory of JSON files with nothing describing them is not a dataset.');
     return;
   }
+  // Only a regular file of bounded size is read. A link to a device or a pipe
+  // would never finish reading, and any link keeps its text where the
+  // immutability check does not look.
+  const manifestStat = lstatSync(manifestPath);
+  if (!manifestStat.isFile()) {
+    fail(name, 'MANIFEST.json is not a regular file. A link would keep the text these checks read somewhere the immutability check does not look.');
+    return;
+  }
+  if (manifestStat.size > MAX_FILE_BYTES) {
+    fail(name, `MANIFEST.json is ${manifestStat.size.toLocaleString('en-US')} bytes, over the ${MAX_FILE_BYTES.toLocaleString('en-US')} a dataset file may hold`);
+    return;
+  }
 
   let manifest;
   try {
@@ -206,6 +218,10 @@ function validate(name) {
     const path = join(dir, entry.file);
     if (!existsSync(path)) {
       fail(name, `${entry.file} is listed in MANIFEST.json but is not in the dataset`);
+      continue;
+    }
+    if (!lstatSync(path).isFile()) {
+      fail(name, `${entry.file} is not a regular file. A link would keep its bytes somewhere these checks and the immutability check do not look.`);
       continue;
     }
     if (!entry.sha256) {
@@ -273,8 +289,18 @@ function validate(name) {
 
   // --- The aggregate and the raw files describe the same run --------------
   const corpusPath = join(dir, manifest.corpus.file);
-  if (!existsSync(corpusPath)) return;
-  const corpus = JSON.parse(readFileSync(corpusPath, 'utf-8'));
+  if (!existsSync(corpusPath) || !lstatSync(corpusPath).isFile()) return;
+  let corpus;
+  try {
+    corpus = JSON.parse(readFileSync(corpusPath, 'utf-8'));
+  } catch (err) {
+    fail(name, `${manifest.corpus.file} does not parse: ${err.message}`);
+    return;
+  }
+  if (!isObject(corpus)) {
+    fail(name, `${manifest.corpus.file} is not a JSON object`);
+    return;
+  }
 
   const byEco = corpus.byEcosystem ?? {};
   const sum = (f) => Object.values(byEco).reduce((s, e) => s + (e[f] || 0), 0);
@@ -687,6 +713,27 @@ const isTime = (v) => {
 };
 const startsWithVersion = (text) => /^\s*\{\s*"schemaVersion"\s*:/.test(text);
 
+/**
+ * The deepest a version 2 file nests: a corpus cell sits about nine levels
+ * down. Anything deeper is refused before a reader that recurses meets it.
+ */
+const MAX_NESTING = 32;
+
+/** Whether a parsed value nests deeper than the limit, found without recursion. */
+function nestsDeeperThan(value, limit) {
+  const stack = [[value, 1]];
+  while (stack.length > 0) {
+    const [node, depth] = stack.pop();
+    if (node === null || typeof node !== 'object') continue;
+    if (depth > limit) return true;
+    for (const child of Array.isArray(node) ? node : Object.values(node)) stack.push([child, depth + 1]);
+  }
+  return false;
+}
+
+/** The most problems listed for one file of a dataset; past it, the rest are counted. */
+const MAX_PROBLEMS_PER_FILE = 50;
+
 /** The words of a camelCase key, so that `weakShareOfCryptoUsing` reads as a share and `generatedAt` does not. */
 const SHARE_WORDS = ['share', 'shares', 'rate', 'rates', 'ratio', 'percent', 'percentage', 'pct', 'proportion', 'fraction'];
 const looksLikeShare = (key, value) =>
@@ -738,6 +785,11 @@ function parseVersion2(buffer, file, bad) {
     bad(`${file} is not a JSON object`);
     return null;
   }
+  if (nestsDeeperThan(value, MAX_NESTING)) {
+    bad(`${file} nests values more than ${MAX_NESTING} deep. No version 2 file is nested so deep, and reading one that is ` +
+      'could exhaust the stack of whoever checks it.');
+    return null;
+  }
   if (!Object.hasOwn(value, 'schemaVersion')) {
     bad(`${file} carries no schemaVersion, so it is a version 1 file. A dataset is version 2 throughout, and a version 1 file ` +
       'cannot enter a new one.');
@@ -780,15 +832,6 @@ function readDatasetFile(dir, file, bad) {
 /** The manifest, read strictly. One that is not a version 2 manifest in shape is reported once, since nothing else can be read from it. */
 function readManifest2(dir, bad) {
   const path = join(dir, 'MANIFEST.json');
-  const stat = lstatSync(path);
-  if (!stat.isFile()) {
-    bad('MANIFEST.json is not a regular file. A link would keep the text these checks read somewhere the immutability check does not look.');
-    return null;
-  }
-  if (stat.size > MAX_FILE_BYTES) {
-    bad(`MANIFEST.json is ${stat.size.toLocaleString('en-US')} bytes, over the ${MAX_FILE_BYTES.toLocaleString('en-US')} a dataset file may hold`);
-    return null;
-  }
   let text;
   try {
     text = readStrict(path);
@@ -797,6 +840,11 @@ function readManifest2(dir, bad) {
     return null;
   }
   const manifest = JSON.parse(text);
+  if (nestsDeeperThan(manifest, MAX_NESTING)) {
+    bad(`MANIFEST.json nests values more than ${MAX_NESTING} deep. No version 2 file is nested so deep, and reading one that is ` +
+      'could exhaust the stack of whoever checks it.');
+    return null;
+  }
   const missing = KEYS.manifest.filter((key) => !Object.hasOwn(manifest, key));
   const extra = Object.keys(manifest).filter((key) => !KEYS.manifest.includes(key));
   if (missing.length > 0 || extra.length > 0) {
@@ -1991,7 +2039,9 @@ function checkConsolidationRule(byEco, scans, file, bad) {
         if (!isObject(p) || typeof p.name !== 'string') continue;
         const key = namespace(p.name);
         if (key === null) continue;
-        groups.set(key, [...(groups.get(key) ?? []), p.name]);
+        let members = groups.get(key);
+        if (!members) groups.set(key, (members = []));
+        members.push(p.name);
       }
     }
     const expected = new Map([...groups].filter(([, members]) => members.length > 1)
@@ -2685,9 +2735,18 @@ function checkDefinitions(d, file, bad) {
 }
 
 /** The version of an earlier dataset, read from its manifest: 1 when it declares none. */
+/** A file of an earlier dataset, parsed, if it is a regular file of bounded size nested within the bound; otherwise an error. */
+function readEarlier(path) {
+  const stat = lstatSync(path, { throwIfNoEntry: false });
+  if (!stat || !stat.isFile() || stat.size > MAX_FILE_BYTES) throw new Error(`${path} is not a regular file of a size these rules read`);
+  const value = JSON.parse(readStrict(path));
+  if (nestsDeeperThan(value, MAX_NESTING)) throw new Error(`${path} nests too deep`);
+  return value;
+}
+
 function versionOf(dataset) {
   try {
-    const manifest = JSON.parse(readFileSync(join(DATASETS, dataset, 'MANIFEST.json'), 'utf-8'));
+    const manifest = readEarlier(join(DATASETS, dataset, 'MANIFEST.json'));
     if (!isObject(manifest)) return null;
     if (!Object.hasOwn(manifest, 'schemaVersion')) return 1;
     return manifest.schemaVersion === 2 ? 2 : null;
@@ -2705,12 +2764,11 @@ const definitionIds = (d) => ({
 function instrumentOf(dataset) {
   try {
     const dir = join(DATASETS, dataset);
-    const manifest = JSON.parse(readFileSync(join(dir, 'MANIFEST.json'), 'utf-8'));
+    const manifest = readEarlier(join(dir, 'MANIFEST.json'));
     const read = (role, eco = null) => {
       const file = fileNameFor(role, eco, dataset);
       if (!manifest.files.some((entry) => entry.role === role && entry.ecosystem === eco && entry.file === file)) throw new Error(file);
-      if (!lstatSync(join(dir, file)).isFile()) throw new Error(file);
-      return JSON.parse(readFileSync(join(dir, file), 'utf-8'));
+      return readEarlier(join(dir, file));
     };
     return {
       matchSetSha256: read('catalog').matchSetSha256,
@@ -3051,7 +3109,23 @@ function checkManifestAgainstFiles(manifest, found, scans, bad) {
 
 /** Every rule of a version 2 dataset, in the order its files depend on each other. */
 function validateVersion2(name, dir) {
-  const bad = (message) => fail(name, message);
+  const counted = new Map();
+  const bad = (message) => {
+    const file = (/^([A-Za-z0-9.-]+\.(?:json|gz))[: ]/.exec(message) ?? [])[1] ?? '';
+    const count = (counted.get(file) ?? 0) + 1;
+    counted.set(file, count);
+    if (file === '' || count <= MAX_PROBLEMS_PER_FILE) fail(name, message);
+  };
+  try {
+    validateVersion2Files(name, dir, bad);
+  } finally {
+    for (const [file, count] of counted) {
+      if (file !== '' && count > MAX_PROBLEMS_PER_FILE) fail(name, `${file}: ${count - MAX_PROBLEMS_PER_FILE} more problem(s) in this file are not listed`);
+    }
+  }
+}
+
+function validateVersion2Files(name, dir, bad) {
   const manifest = readManifest2(dir, bad);
   if (manifest === null) return;
   checkManifest2(name, manifest, bad);
@@ -3094,7 +3168,7 @@ for (const entry of readdirSync(DATASETS)) {
     fail('datasets', `${entry} is not a dataset directory. A file directly under datasets/ is read by none of these checks.`);
   }
 }
-const all = readdirSync(DATASETS).filter((f) => statSync(join(DATASETS, f)).isDirectory());
+const all = readdirSync(DATASETS).filter((f) => statSync(join(DATASETS, f), { throwIfNoEntry: false })?.isDirectory());
 const names = requested ? [requested] : all;
 
 if (requested && !all.includes(requested)) {
@@ -3128,10 +3202,21 @@ for (const name of names) {
     fail(name, 'directory name is not a YYYY-MM-DD collection date');
     continue;
   }
-  validate(name);
+  // A check that throws reports where it stopped, and the problems found before it are still listed.
+  try {
+    validate(name);
+  } catch (err) {
+    fail(name, `could not be checked to the end: ${err.message}`);
+  }
 }
 
-for (const file of errataFiles) validateErrata(file);
+for (const file of errataFiles) {
+  try {
+    validateErrata(file);
+  } catch (err) {
+    fail(`errata/${file}`, `could not be checked to the end: ${err.message}`);
+  }
+}
 
 const checked = `${names.length} dataset(s)` +
   (errataFiles.length > 0 ? ` and ${errataFiles.length} errata file(s)` : '');
