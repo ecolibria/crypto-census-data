@@ -702,7 +702,7 @@ function validateRegenerations(label, date, list, manifest) {
 // ---------------------------------------------------------------------------
 //
 // A version 2 dataset is a set of files bound to each other by hashes: for
-// each of the eleven registries a raw scan file and a ledger of every package
+// each registry the corpus read a raw scan file and a ledger of every package
 // it listed, the catalogue snapshot the aggregate was classified with, the
 // consolidation map, the corpus, and MANIFEST.json. Each section below reads
 // one kind of file and holds it to the schema version 2 contract.
@@ -965,14 +965,15 @@ const fileNameFor = (role, eco, date) => ({
 /**
  * Every file the manifest lists: present, a regular file, within the size
  * limit, and hashing to what was recorded. Every other file in the directory
- * is a stray, whatever its name. Returns the parsed files by role.
+ * is a stray, whatever its name. Returns the parsed files by role, and the
+ * registries whose scan file the manifest lists: the scan files the corpus read.
  */
 function readListedFiles(name, dir, manifest, bad) {
   if (!Array.isArray(manifest.files)) {
     bad(`MANIFEST.json: files is ${describe(manifest.files)}, not a list of the dataset's files`);
     return null;
   }
-  const found = { scans: {}, listings: {}, corpus: null, catalog: null, consolidation: null, hashes: new Map() };
+  const found = { scans: {}, listings: {}, corpus: null, catalog: null, consolidation: null, hashes: new Map(), withScanFile: new Set() };
   const listed = new Set();
   let ledgerBytes = 0;
   const roles = new Set();
@@ -1042,12 +1043,15 @@ function readListedFiles(name, dir, manifest, bad) {
   for (const role of ['corpus', 'catalog', 'consolidation']) {
     if (!roles.has(role)) bad(`MANIFEST.json lists no ${role} file, and a version 2 dataset has one`);
   }
+  // One scan file and one ledger per registry read: eleven, less one per row the corpus withholds for having no scan
+  // file. Which registries those are is the corpus's noScanFile rows, compared with this set when the corpus is read.
   for (const eco of ECOSYSTEMS) {
-    for (const role of PER_REGISTRY) {
-      if (!roles.has(`${role}:${eco}`)) {
-        bad(`MANIFEST.json lists no ${role === 'scan' ? 'scan file' : 'listing ledger'} for ${eco}. All eleven registries are ` +
-          'in a version 2 dataset, so that a missing one cannot read as a fall in every total.');
-      }
+    const scan = roles.has(`scan:${eco}`);
+    const listing = roles.has(`listing:${eco}`);
+    if (scan) found.withScanFile.add(eco);
+    if (scan !== listing) {
+      bad(`MANIFEST.json lists ${scan ? `the scan file of ${eco} and no listing ledger` : `the listing ledger of ${eco} and no scan file`} ` +
+        'for it. A scan file and its ledger are written together, so the two roles name the same registries.');
     }
   }
 
@@ -2061,7 +2065,7 @@ Object.assign(KEYS, {
   removal: ['name', 'rule'],
 });
 
-function checkConsolidation(name, record, scans, bad) {
+function checkConsolidation(name, record, scans, withScanFile, bad) {
   const file = record.file;
   const c = record.value;
   if (!closed(c, KEYS.consolidation, file, bad)) return null;
@@ -2104,15 +2108,18 @@ function checkConsolidation(name, record, scans, bad) {
       sound = false;
       continue;
     }
-    const known = scans[eco] && Array.isArray(scans[eco].value.packages)
-      ? new Set(scans[eco].value.packages.filter(isObject).map((p) => p.name)) : null;
+    // A registry with no scan file has no package with a match, so its section places none.
+    const known = !withScanFile.has(eco) ? new Set()
+      : scans[eco] && Array.isArray(scans[eco].value.packages) ? new Set(scans[eco].value.packages.filter(isObject).map((p) => p.name)) : null;
     const place = (member, at) => {
       if (!isText(member)) {
         bad(`${at} names ${describe(member)}, not a package`);
         return false;
       }
       if (known && !known.has(member)) {
-        bad(`${at} names ${member}, which is not a package with a match in the scan file of ${eco}`);
+        bad(withScanFile.has(eco)
+          ? `${at} names ${member}, which is not a package with a match in the scan file of ${eco}`
+          : `${at} names ${member}, and the dataset holds no scan file of ${eco}, so no package of it has a match to place`);
         return false;
       }
       if (unitOf.has(member) || removedBy.has(member)) {
@@ -2869,9 +2876,16 @@ function checkInputs(name, inputs, ctx, file, bad) {
         return;
       }
       seen.add(item.ecosystem);
+      if (!ctx.found.withScanFile.has(item.ecosystem)) {
+        bad(`${at} binds the scan file of ${item.ecosystem}, which the dataset does not hold. The corpus binds one scan file per ` +
+          'scan file it read, and each is in the dataset.');
+        return;
+      }
       binding(item, KEYS.inputScan, at, fileNameFor('scan', item.ecosystem));
     });
-    for (const eco of ECOSYSTEMS) if (!seen.has(eco)) bad(`${where}.scans does not bind the scan file of ${eco}; it binds all eleven`);
+    for (const eco of ctx.found.withScanFile) {
+      if (!seen.has(eco)) bad(`${where}.scans does not bind the scan file of ${eco}, which the dataset holds; it binds one per scan file read`);
+    }
   }
   const catalogFile = fileNameFor('catalog', null, name);
   if (binding(inputs.catalog, KEYS.inputCatalog, `${where}.catalog`, catalogFile) && ctx.catalog) {
@@ -3142,10 +3156,10 @@ const aboveCeiling = (coverage) => coverage.unresolved * ONE_IN > coverage.liste
 
 /**
  * The rows the corpus withholds, as a set of registries, or null when the list
- * cannot be read as one. Each says why. noScanFile is false wherever it is
- * given, because a version 2 dataset holds the scan file of every registry;
- * the ceiling is recomputed both ways; the other reasons rest on the
- * population rule, which is not held here, and are taken as stated.
+ * cannot be read as one. Each says why. noScanFile is given exactly for the
+ * registries whose scan file the manifest does not list; the ceiling is
+ * recomputed both ways; the other reasons rest on the population rule, which
+ * is not held here, and are taken as stated.
  */
 function checkWithheld(list, ctx, file, bad) {
   const where = `${file}: withheld`;
@@ -3193,10 +3207,12 @@ function checkWithheld(list, ctx, file, bad) {
       });
     }
     if (codes.includes('noScanFile')) {
-      // Without the file, the dataset fails for its missing scan file; with it, the reason is false.
-      if (scan) {
-        bad(`${at} gives noScanFile for ${item.ecosystem}, and the dataset holds ${scan.file}. A version 2 dataset holds the scan ` +
-          'file of every registry.');
+      if (ctx.found.withScanFile.has(item.ecosystem)) {
+        bad(`${at} gives noScanFile for ${item.ecosystem}, and the dataset holds ${fileNameFor('scan', item.ecosystem)}. A row is ` +
+          'withheld for having no scan file only when the dataset holds none of it.');
+        sound = false;
+      } else if (item.coverage !== null) {
+        bad(`${at}.coverage is ${describe(item.coverage)}. A row with no scan file has no coverage to copy, so it is null.`);
         sound = false;
       }
     } else if (item.coverage === null) {
@@ -3215,6 +3231,16 @@ function checkWithheld(list, ctx, file, bad) {
         `listed packages unresolved, within the ceiling of 1 in ${ONE_IN}`);
     }
   });
+  // A registry is left out of a dataset only as a row withheld for having no scan file; one missing for any other
+  // reason fails, so that it cannot read as a fall in a total.
+  for (const eco of ECOSYSTEMS) {
+    if (ctx.found.withScanFile.has(eco)) continue;
+    const item = list.find((x) => isObject(x) && x.ecosystem === eco);
+    if (!item || !Array.isArray(item.reasons) || !item.reasons.some((r) => isObject(r) && r.code === 'noScanFile')) {
+      bad(`${eco}: the dataset holds no scan file of ${eco}, and ${file} does not withhold the row for noScanFile. A registry is ` +
+        'left out of a dataset only as a row withheld for having no scan file.');
+    }
+  }
   // Every row above the ceiling is withheld for it.
   for (const eco of ECOSYSTEMS) {
     const scan = ctx.scans[eco];
@@ -3288,7 +3314,7 @@ function checkCorpus(name, record, ctx, bad) {
   if (c.collectedAt !== name) {
     bad(`${file}: collectedAt is ${describe(c.collectedAt)}, and the dataset is ${name}`);
   } else {
-    const finished = ECOSYSTEMS.map((eco) => (ctx.scans[eco] ? ctx.scans[eco].value.finishedAt : null));
+    const finished = [...ctx.found.withScanFile].map((eco) => (ctx.scans[eco] ? ctx.scans[eco].value.finishedAt : null));
     if (finished.every(isTime)) {
       const latest = finished.map((time) => time.slice(0, 10)).sort().at(-1);
       if (latest !== c.collectedAt) {
@@ -3316,8 +3342,11 @@ function checkCorpus(name, record, ctx, bad) {
 
   // The figures are recomputed only from files that passed their own checks:
   // where one did not, it has been reported above, and the dataset fails.
+  // Every scan file read is sound, and every registry without one is withheld: a row is computed from its files.
   const ready = publishable && withheld !== null && includes !== null && ctx.catalog && ctx.catalog.sound && ctx.map &&
-    ECOSYSTEMS.every((eco) => ctx.scans[eco] && ctx.scans[eco].sound && ctx.ledgers[eco] && ctx.ledgers[eco].sound);
+    ECOSYSTEMS.every((eco) => (ctx.found.withScanFile.has(eco)
+      ? ctx.scans[eco] && ctx.scans[eco].sound && ctx.ledgers[eco] && ctx.ledgers[eco].sound
+      : withheld.has(eco)));
   if (!ready) return withheld;
 
   let differing = 0;
@@ -3329,7 +3358,7 @@ function checkCorpus(name, record, ctx, bad) {
     },
   };
   const rows = {};
-  for (const eco of ECOSYSTEMS) {
+  for (const eco of ctx.found.withScanFile) {
     rows[eco] = expectedRow(eco, ctx.catalog.byEco[eco], ctx.scans[eco], ctx.ledgers[eco], ctx.map.byEco[eco], includes[eco]);
   }
   if (rowsShaped) {
@@ -3461,6 +3490,11 @@ function checkManifestAgainstFiles(manifest, found, scans, withheld, bad) {
         return;
       }
       seen.add(item.ecosystem);
+      if (!found.withScanFile.has(item.ecosystem)) {
+        bad(`${where} names ${item.ecosystem}, which has no scan file in files. The manifest has one item per scan file, copied ` +
+          'from its raw header.');
+        return;
+      }
       const scan = scans[item.ecosystem];
       if (!scan) return;
       for (const field of ['coverage', 'enumeration', 'sources']) {
@@ -3470,7 +3504,7 @@ function checkManifestAgainstFiles(manifest, found, scans, withheld, bad) {
         }
       }
     });
-    for (const eco of ECOSYSTEMS) if (!seen.has(eco)) bad(`${at}: ecosystems has no item for ${eco}`);
+    for (const eco of found.withScanFile) if (!seen.has(eco)) bad(`${at}: ecosystems has no item for ${eco}, whose scan file is in files`);
   }
   if (corpus && !sameValue(manifest.comparability, corpus.comparability)) {
     bad(`${at}: comparability is not the corpus's. It is a copy, so that the manifest alone tells a reader which datasets ` +
@@ -3516,7 +3550,7 @@ function validateVersion2Files(name, dir, bad) {
     if (ledger.sound) compareLedger(eco, ledger, scans[eco], bad);
     ledgers[eco] = ledger;
   }
-  const map = found.consolidation ? checkConsolidation(name, found.consolidation, scans, bad) : null;
+  const map = found.consolidation ? checkConsolidation(name, found.consolidation, scans, found.withScanFile, bad) : null;
   const withheld = found.corpus ? checkCorpus(name, found.corpus, { catalog, scans, ledgers, map, found }, bad) : null;
   checkManifestAgainstFiles(manifest, found, scans, withheld ?? null, bad);
   listRegeneratedScans(name, manifest, found);

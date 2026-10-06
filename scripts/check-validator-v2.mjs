@@ -21,7 +21,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, truncateSync, unlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, truncateSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -582,9 +582,12 @@ const coverageOf = (rows) => ({
  * Every file of one version 2 dataset, as bytes by name. `change` may hold one
  * function for each stage, called with what that stage built, before it is
  * written and hashed: fixture, catalog, ledgers (lines by registry), scans,
- * consolidation, corpus, manifest.
+ * consolidation, corpus, manifest. `noScanFile` names registries whose scan
+ * file and ledger the dataset does not hold: the corpus withholds each for it.
  */
 function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, version: 1 }]) {
+  const missing = change.noScanFile ?? [];
+  const read = ECOSYSTEMS.filter((eco) => !missing.includes(eco));
   const fixture = registries();
   change.fixture?.(fixture);
   for (const eco of ECOSYSTEMS) {
@@ -628,9 +631,8 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
         : [row.name, row.disposition, row.reason, '', '', '', '']), ...extra(row)].join('\t'))];
   }
   change.ledgers?.(ledgers);
-  for (const eco of ECOSYSTEMS) {
-    files[fileName.listing(eco)] = Buffer.isBuffer(ledgers[eco]) ? ledgers[eco] : gzipSync(`${ledgers[eco].join('\n')}\n`);
-  }
+  const ledgerBytes = Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, Buffer.isBuffer(ledgers[eco]) ? ledgers[eco] : gzipSync(`${ledgers[eco].join('\n')}\n`)]));
+  for (const eco of read) files[fileName.listing(eco)] = ledgerBytes[eco];
 
   const scans = {};
   for (const eco of ECOSYSTEMS) {
@@ -672,19 +674,19 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
       },
       versionYears: eco === 'go' ? { 2024: 2, 2025: 3 } : null,
       coverage: { ...coverage, scannedByReadFrom: byReadFrom },
-      listing: { file: fileName.listing(eco), sha256: sha256(files[fileName.listing(eco)]), rows: coverage.listed },
+      listing: { file: fileName.listing(eco), sha256: sha256(ledgerBytes[eco]), rows: coverage.listed },
       catalogCheck,
       packagesWithMatch: packages.length,
       packages,
     };
   }
   change.scans?.(scans);
-  for (const eco of ECOSYSTEMS) files[fileName.scan(eco)] = json(scans[eco]);
+  for (const eco of read) files[fileName.scan(eco)] = json(scans[eco]);
 
   const consolidation = {
     schemaVersion: 2, kind: 'censusConsolidation', collectedAt: date, definitionId: ID.consolidated,
     rules: [{ id: 'sharedNamespace', statement: 'Packages that share an npm scope, a Maven groupId, a Packagist vendor or the first three elements of a Go path are one unit.' }],
-    byEcosystem: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, { units: fixture[eco].units, removed: [] }])),
+    byEcosystem: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, { units: missing.includes(eco) ? [] : fixture[eco].units, removed: [] }])),
   };
   change.consolidation?.(consolidation);
   files[fileName.consolidation(date)] = json(consolidation);
@@ -702,7 +704,8 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
     }
   }
   // Rows the corpus withholds: not published, and summed by no total.
-  const withhold = change.withhold ?? [];
+  const withhold = [...(change.withhold ?? []),
+    ...missing.map((eco) => ({ ecosystem: eco, reasons: [{ code: 'noScanFile', detail: `no scan file of ${eco}` }] }))];
   const isPublished = (eco) => !withhold.some((w) => w.ecosystem === eco);
   const tables = { ...totalTables(), withheld: withhold.map((w) => w.ecosystem) };
   change.totalTables?.(tables);
@@ -713,7 +716,7 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
     schemaVersion: 2, kind: 'censusCorpus', collectedAt: date, generatedAt: `${date}T12:00:00.000Z`,
     aggregator: { script: 'scripts/aggregate.mjs', commit: COMMIT },
     inputs: {
-      scans: ECOSYSTEMS.map((eco) => ({ ecosystem: eco, file: fileName.scan(eco), sha256: sha256(files[fileName.scan(eco)]) })),
+      scans: read.map((eco) => ({ ecosystem: eco, file: fileName.scan(eco), sha256: sha256(files[fileName.scan(eco)]) })),
       catalog: { file: fileName.catalog(date), sha256: sha256(files[fileName.catalog(date)]), matchSetSha256: MATCH_SET, classificationSha256: CLASSIFICATION },
       consolidation: { file: fileName.consolidation(date), sha256: sha256(files[fileName.consolidation(date)]) },
     },
@@ -734,7 +737,8 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
     blocked: [],
     // A withheld row keeps the coverage its row would have held: the raw coverage, its enumeration and its sources.
     withheld: withhold.map(({ ecosystem, reasons }) => ({ ecosystem, reasons: structuredClone(reasons),
-      coverage: structuredClone({ ...scans[ecosystem].coverage, enumeration: scans[ecosystem].enumeration, sources: scans[ecosystem].sources }) })),
+      coverage: missing.includes(ecosystem) ? null
+        : structuredClone({ ...scans[ecosystem].coverage, enumeration: scans[ecosystem].enumeration, sources: scans[ecosystem].sources }) })),
     coverage: {
       total: Object.fromEntries(COVERAGE.map((field) => [field, sum(ECOSYSTEMS.filter(isPublished).map((eco) => scans[eco].coverage[field]))])),
       byEcosystem: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, structuredClone({ ...scans[eco].coverage, enumeration: scans[eco].enumeration, sources: scans[eco].sources })])),
@@ -761,7 +765,7 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
     { role: 'corpus', ecosystem: null, file: fileName.corpus(date) },
     { role: 'catalog', ecosystem: null, file: fileName.catalog(date) },
     { role: 'consolidation', ecosystem: null, file: fileName.consolidation(date) },
-    ...ECOSYSTEMS.flatMap((eco) => [
+    ...read.flatMap((eco) => [
       { role: 'scan', ecosystem: eco, file: fileName.scan(eco) },
       { role: 'listing', ecosystem: eco, file: fileName.listing(eco) },
     ]),
@@ -776,7 +780,7 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
     provenance: { sourceRepository: 'example/census', sourceCommit: COMMIT, workflowRun: RUN_URL },
     files: listing.map((item) => ({ ...item, bytes: Buffer.byteLength(files[item.file]), sha256: sha256(files[item.file]), schemaVersion: 2 })),
     coverage: Object.fromEntries(COVERAGE.map((field) => [field, sum(ECOSYSTEMS.filter(isPublished).map((eco) => scans[eco].coverage[field]))])),
-    ecosystems: ECOSYSTEMS.map((eco) => structuredClone({ ecosystem: eco, coverage: scans[eco].coverage, enumeration: scans[eco].enumeration, sources: scans[eco].sources })),
+    ecosystems: read.map((eco) => structuredClone({ ecosystem: eco, coverage: scans[eco].coverage, enumeration: scans[eco].enumeration, sources: scans[eco].sources })),
     comparability: structuredClone(corpus.comparability),
     checks: Object.fromEntries(CHECKS.map((check) => [check, []])),
     knownIssues: [],
@@ -978,8 +982,10 @@ plant('a scan file under its first-shape name', manifestOf((m) => { fileEntry(m,
 plant('a file listed twice', manifestOf((m) => { m.files.push({ ...fileEntry(m, 'listing-pub.tsv.gz') }); }), /files\[25\] lists listing-pub\.tsv\.gz a second time/);
 plant('a ledger recorded as another version', manifestOf((m) => { fileEntry(m, 'listing-pub.tsv.gz').schemaVersion = 1; }), /files\[\d+\]\.schemaVersion is 1\. Every file of a version 2 dataset is version 2/);
 plant('no catalogue snapshot', manifestOf((m) => { m.files = m.files.filter((f) => f.role !== 'catalog'); }), /MANIFEST\.json lists no catalog file/);
-plant('a registry with no scan file', manifestOf((m) => { m.files = m.files.filter((f) => f.file !== 'scan-results-hex.json'); }), /MANIFEST\.json lists no scan file for hex\. All eleven registries/);
-plant('a registry with no ledger', manifestOf((m) => { m.files = m.files.filter((f) => f.file !== 'listing-hex.tsv.gz'); }), /MANIFEST\.json lists no listing ledger for hex/);
+plant('a registry with a ledger and no scan file', manifestOf((m) => { m.files = m.files.filter((f) => f.file !== 'scan-results-hex.json'); }),
+  /MANIFEST\.json lists the listing ledger of hex and no scan file for it\. A scan file and its ledger are written together, so the two roles name the same registries/);
+plant('a registry with a scan file and no ledger', manifestOf((m) => { m.files = m.files.filter((f) => f.file !== 'listing-hex.tsv.gz'); }),
+  /MANIFEST\.json lists the scan file of hex and no listing ledger for it/);
 plant('files that are not a list', manifestOf((m) => { m.files = {}; }), /MANIFEST\.json: files is \{\}, not a list/);
 
 // Every JSON file of the dataset is version 2, read strictly.
@@ -2052,6 +2058,46 @@ plant('withheld rows that are not a list', corpusOf((c) => { c.withheld = null; 
 // A row withheld is recorded once, in the corpus: listing it as a check as well refuses it.
 plant('a withheld row listed as a check as well', withholding('rubygems', ABOVE_CEILING, { ...oneUnresolvedGem, ...manifestOf((m) => { m.checks.unresolvedAboveCeiling = ['rubygems']; }) }),
   /MANIFEST\.json: checks carries unresolvedAboveCeiling, which the schema version 2 contract does not define/);
+
+// --- A registry with no scan file -----------------------------------------------
+//
+// The dataset holds one scan file and one ledger per registry the corpus read:
+// eleven, less one per row withheld with noScanFile, and the registries with no
+// scan file are exactly those rows.
+
+/** A dataset without the scan file and ledger of one registry, the corpus withholding it for that, and its totals without it. */
+const withoutScanFile = (eco, extra = {}) => ({ noScanFile: [eco], totalTables: WITHHELD_TOTALS[eco], ...extra });
+
+for (const eco of ['rubygems', 'pypi']) {
+  test(`a dataset without the scan file of ${eco}, which the corpus withholds for it, passes`, async () => {
+    const result = await validateOne(withoutScanFile(eco), (dir) => {
+      const names = readdirSync(datasetDir(dir));
+      assert.equal(names.filter((name) => name.startsWith('scan-results-')).length, 10);
+      assert.equal(names.filter((name) => name.startsWith('listing-')).length, 10);
+    });
+    assert.equal(result.code, 0, result.stderr);
+  });
+}
+
+plant('a registry with no scan file that the corpus does not withhold', withoutScanFile('rubygems', corpusOf((c) => { c.withheld = []; })),
+  /rubygems: the dataset holds no scan file of rubygems, and corpus-2026-09-30\.json does not withhold the row for noScanFile\. A registry is left out of a dataset only as a row withheld for having no scan file/);
+plant('a registry with no scan file withheld for another reason', withoutScanFile('rubygems', corpusOf((c) => { c.withheld[0].reasons = structuredClone(NOT_UNDER_RULE); })),
+  /withheld\[0\]\.coverage is null\. It is null only for a row with no scan file/);
+plant('a row with no scan file that carries coverage', withoutScanFile('rubygems', corpusOf((c) => { c.withheld[0].coverage = structuredClone(c.coverage.byEcosystem.hex); })),
+  /withheld\[0\]\.coverage is \{.*\. A row with no scan file has no coverage to copy, so it is null/);
+plant('a corpus that binds a scan file the dataset does not hold', withoutScanFile('rubygems', corpusOf((c) => {
+  c.inputs.scans.push({ ecosystem: 'rubygems', file: 'scan-results-rubygems.json', sha256: sha256('not here') });
+})), /inputs\.scans\[10\] binds the scan file of rubygems, which the dataset does not hold/);
+plant('a manifest item for a registry with no scan file', withoutScanFile('rubygems', manifestOf((m) => {
+  m.ecosystems.push({ ecosystem: 'rubygems', coverage: structuredClone(m.ecosystems[0].coverage), enumeration: structuredClone(m.ecosystems[0].enumeration), sources: structuredClone(m.ecosystems[0].sources) });
+})), /MANIFEST\.json: ecosystems\[10\] names rubygems, which has no scan file in files/);
+plant('a map that merges packages of a registry with no scan file', withoutScanFile('rubygems', mapOf((m) => {
+  m.byEcosystem.rubygems.units = [{ unit: 'acme', members: ['acme-gem', 'acme-gem-two'] }];
+})), /byEcosystem\.rubygems\.units\[0\] names acme-gem, and the dataset holds no scan file of rubygems, so no package of it has a match to place/);
+plant('a dataset dated before the last scan it holds finished', withoutScanFile('rubygems', scanOf('hex', (s) => { s.finishedAt = '2026-10-01T02:00:00.000Z'; })),
+  /collectedAt is 2026-09-30, and the last scan finished on 2026-10-01/);
+plant('a scan file left in the directory and out of the manifest', withoutScanFile('rubygems'),
+  /present but not listed in MANIFEST\.json: scan-results-rubygems\.json/, (dir) => { writeFileSync(join(datasetDir(dir), 'scan-results-rubygems.json'), '{}\n'); });
 
 // --- Errata for a version 2 dataset ----------------------------------------------
 
