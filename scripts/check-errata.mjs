@@ -712,3 +712,55 @@ test('a regeneration of a dataset whose manifest names no run, and has no raw fi
   assert.match(result.stderr, /regeneration 1 names the run .*, and datasets\/2026-03-18\/MANIFEST\.json names null/);
   assert.match(result.stderr, /regeneration 1 names npm, which has no raw file in datasets\/2026-03-18/);
 });
+
+/** A regeneration as the immutability check sees it: content it compares and does not read. */
+const recorded = (summary) => ({ issuedAt: '2026-10-06', summary });
+
+/** [what the change does, the change, options]. */
+const allowedRegenerations = [
+  ['adds the first regenerations to a published errata file that had none', (r) => r.write(ERRATA_FILE, changed((e) => { e.regenerations = [recorded('first')]; }))],
+  ['adds a regeneration after the published ones', (r) => r.write(ERRATA_FILE, { ...wellFormed(), regenerations: [recorded('first'), recorded('second')] }),
+    { published: { ...wellFormed(), regenerations: [recorded('first')] } }],
+  ['adds an issue and leaves the published regenerations as they were', (r) => r.write(ERRATA_FILE, { ...changed((e) => { e.issues.push(later()); }), regenerations: [recorded('first')] }),
+    { published: { ...wellFormed(), regenerations: [recorded('first')] } }],
+];
+
+for (const [what, change, options] of allowedRegenerations) {
+  test(`a change that ${what} passes`, async () => {
+    const result = await afterPublication(change, options);
+    assert.equal(result.code, 0, result.stderr);
+    assert.match(result.stdout, /No published errata issue was changed \(1 file\(s\) protected\)/);
+  });
+}
+
+/** [what the change does, the change, what the check reports, options]. */
+const forbiddenRegenerations = [
+  ['edits a published regeneration', (r) => r.write(ERRATA_FILE, { ...wellFormed(), regenerations: [recorded('first, reworded')] }),
+    /regeneration 1 of errata\/2026-03-18\.json is no longer what was published/, { published: { ...wellFormed(), regenerations: [recorded('first')] } }],
+  ['reorders published regenerations', (r) => r.write(ERRATA_FILE, { ...wellFormed(), regenerations: [recorded('second'), recorded('first')] }),
+    /regeneration 1 of errata\/2026-03-18\.json is no longer what was published/, { published: { ...wellFormed(), regenerations: [recorded('first'), recorded('second')] } }],
+  ['removes a published regeneration', (r) => r.write(ERRATA_FILE, { ...wellFormed(), regenerations: [recorded('first')] }),
+    /removed 1 regeneration\(s\) from errata\/2026-03-18\.json/, { published: { ...wellFormed(), regenerations: [recorded('first'), recorded('second')] } }],
+  ['drops the published regenerations', (r) => r.write(ERRATA_FILE, wellFormed()),
+    /dropped regenerations from errata\/2026-03-18\.json/, { published: { ...wellFormed(), regenerations: [recorded('first')] } }],
+  ['adds regenerations that are not a list', (r) => r.write(ERRATA_FILE, { ...wellFormed(), regenerations: recorded('first') }),
+    /errata\/2026-03-18\.json cannot be compared with what was published: regenerations is not a list with a regeneration in it/],
+  ['adds an empty list of regenerations', (r) => r.write(ERRATA_FILE, { ...wellFormed(), regenerations: [] }),
+    /errata\/2026-03-18\.json cannot be compared with what was published: regenerations is not a list with a regeneration in it/],
+  ['adds to regenerations that were published as something other than a list', (r) => r.write(ERRATA_FILE, { ...wellFormed(), regenerations: [recorded('first')] }),
+    /errata\/2026-03-18\.json cannot be compared with what was published: regenerations is not a list with a regeneration in it/,
+    { published: { ...wellFormed(), regenerations: 'none' } }],
+  ['adds to regenerations that were published empty', (r) => r.write(ERRATA_FILE, { ...wellFormed(), regenerations: [recorded('first')] }),
+    /errata\/2026-03-18\.json cannot be compared with what was published: regenerations is not a list with a regeneration in it/,
+    { published: { ...wellFormed(), regenerations: [] } }],
+  ['adds regenerations to a published errata file that does not parse', (r) => r.write(ERRATA_FILE, { ...wellFormed(), regenerations: [recorded('first')] }),
+    /errata\/2026-03-18\.json cannot be compared with what was published: one of the two does not parse/, { published: '{' }],
+];
+
+for (const [what, change, report, options] of forbiddenRegenerations) {
+  test(`a change that ${what} fails`, async () => {
+    const result = await afterPublication(change, options);
+    assert.equal(result.code, 1, result.stdout);
+    assert.match(result.stderr, report);
+  });
+}
