@@ -1310,12 +1310,29 @@ function checkCatalog(name, record, bad) {
 
 /**
  * The base URLs a scan may read from, by registry and role: the admitted
- * allowlist. A source the list does not hold means the scanner was pointed
- * somewhere else, at a stub or a mirror, and the file is not a scan of the
- * registry. A registry with no admitted list fails this rule; it is never
- * skipped. No list has been admitted yet, so until one is, no registry passes.
+ * allowlist. It is written as JSON text, so that a reader that does not run
+ * this script can parse it and recompute its digest. A scan's sources are its
+ * registry's list exactly: the same roles, both ways, and each value the same
+ * text, with no normalisation and no prefix. A source off the list means the
+ * scanner was pointed somewhere else, at a stub or a mirror, and the file is
+ * not a scan of the registry. A registry with no list fails this rule; it is
+ * never skipped.
  */
-const ALLOWED_SOURCES = Object.freeze({});
+const ALLOWED_SOURCES_JSON = `{
+  "cocoapods": {"catalogCheck": "https://trunk.cocoapods.org/api/v1/pods", "enumeration": "https://cdn.cocoapods.org/all_pods.txt", "manifests": "https://cdn.cocoapods.org/Specs", "versions": "https://cdn.cocoapods.org"},
+  "crates": {"catalogCheck": "https://crates.io/api/v1/crates", "enumeration": "https://github.com/rust-lang/crates.io-index.git", "manifests": "https://github.com/rust-lang/crates.io-index.git"},
+  "go": {"catalogCheck": "https://proxy.golang.org", "enumeration": "https://index.golang.org/index", "manifests": "https://proxy.golang.org"},
+  "hex": {"catalogCheck": "https://hex.pm/api", "enumeration": "https://hex.pm/api/packages", "manifests": "https://hex.pm/api"},
+  "maven": {"catalogCheck": "https://repo1.maven.org/maven2", "enumeration": "https://search.maven.org/solrsearch/select", "manifests": "https://repo1.maven.org/maven2"},
+  "npm": {"catalogCheck": "https://registry.npmjs.org", "enumeration": "https://replicate.npmjs.com/_all_docs", "manifests": "https://registry.npmjs.org"},
+  "nuget": {"catalogCheck": "https://api.nuget.org/v3/registration5-gz-semver2", "enumeration": "https://api.nuget.org/v3/catalog0/index.json", "manifests": "https://api.nuget.org/v3/registration5-gz-semver2"},
+  "packagist": {"catalogCheck": "https://repo.packagist.org/p2", "enumeration": "https://packagist.org/packages/list.json", "manifests": "https://repo.packagist.org/p2"},
+  "pub": {"catalogCheck": "https://pub.dev/api/packages", "enumeration": "https://pub.dev/api/package-names", "manifests": "https://pub.dev/api/packages"},
+  "pypi": {"catalogCheck": "https://pypi.org/pypi", "enumeration": "https://pypi.org/simple/", "manifests": "https://pypi.org/pypi"},
+  "rubygems": {"catalogCheck": "https://rubygems.org/api/v1/gems", "enumeration": "https://index.rubygems.org/names", "manifests": "https://rubygems.org/api/v1/gems"}
+}`;
+const ALLOWED_SOURCES = Object.freeze(Object.fromEntries(Object.entries(JSON.parse(ALLOWED_SOURCES_JSON))
+  .map(([eco, roles]) => [eco, Object.freeze(roles)])));
 
 /**
  * What a manifest can declare, by registry: the closed list of declaration
@@ -1390,31 +1407,30 @@ const CHECK_STATUSES = ['present', 'absent', 'unresolved', 'notApplicable'];
 
 function checkSources(eco, sources, file, bad) {
   const where = `${file}: sources`;
-  if (!isObject(sources)) {
-    bad(`${where} is ${describe(sources)}, not an object of base URLs by role`);
-    return;
-  }
-  for (const role of ['enumeration', 'manifests']) {
-    if (!Object.hasOwn(sources, role)) {
-      bad(`${where} has no ${role}. A scan names every base URL it read from, so that a scan of the registry can be told ` +
-        'from a scan of something else.');
-    }
-  }
   const allowed = Object.hasOwn(ALLOWED_SOURCES, eco) ? ALLOWED_SOURCES[eco] : null;
   if (allowed === null) {
     bad(`${where}: no allowlist of sources is admitted for ${eco}, so these cannot be shown to be the registry's own. A scan ` +
       'enters a dataset only from admitted sources.');
+    return;
   }
-  for (const [role, url] of Object.entries(sources)) {
-    if (!isCamel(role)) bad(`${where} has the role ${describe(role)}, not a camelCase name`);
-    if (!isUrl(url)) {
-      bad(`${where}.${role} is ${describe(url)}, not a URL`);
-      continue;
+  if (!isObject(sources)) {
+    bad(`${where} is ${describe(sources)}, not an object of base URLs by role`);
+    return;
+  }
+  // The roles both ways: a role the list does not hold, and a role it holds that the file leaves out.
+  for (const role of Object.keys(sources)) {
+    if (!Object.hasOwn(allowed, role)) {
+      bad(`${where} names the role ${describe(role)}, which the allowlist for ${eco} does not hold (it holds ` +
+        `${Object.keys(allowed).join(', ')}). A scan names the roles it is admitted to read from, and no others.`);
     }
-    if (allowed !== null && !(Object.hasOwn(allowed, role) && allowed[role] === url)) {
-      bad(`${where}.${role} is ${url}, which is off the allowlist for ${eco}` +
-        `${Object.hasOwn(allowed, role) ? ` (${allowed[role]})` : ''}. A source off the list means the scanner was pointed at ` +
-        'a stub or a mirror, and the file is not a scan of the registry.');
+  }
+  for (const [role, url] of Object.entries(allowed)) {
+    if (!Object.hasOwn(sources, role)) {
+      bad(`${where} has no ${role}. A scan of ${eco} names every base URL the allowlist holds for it, so that a scan of the ` +
+        'registry can be told from a scan of something else.');
+    } else if (sources[role] !== url) {
+      bad(`${where}.${role} is ${describe(sources[role])}, not ${url}, the base URL admitted for ${eco}. Sources are compared ` +
+        'as exact text: one off the list means the scanner was pointed at a stub or a mirror, and the file is not a scan of the registry.');
     }
   }
 }

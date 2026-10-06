@@ -651,7 +651,7 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
       schemaVersion: 2, kind: 'censusScan', ecosystem: eco,
       startedAt: `${date}T00:00:00Z`, finishedAt: `${date}T06:00:00Z`,
       scanner: { script: `scripts/scan-${eco}.mjs`, commit: COMMIT },
-      sources: { enumeration: `https://${eco}.registry.example/list`, manifests: `https://${eco}.registry.example/manifests` },
+      sources: structuredClone(ADMITTED_SOURCES[eco]),
       catalog: { entries: r.entries.length, matchSetSha256: MATCH_SET, matchRule: `${eco}Name/1` },
       method: { versionSelection: 'latest', readFrom: r.method.readFrom, declarationKinds: [...KINDS[eco]], notObservableWhen: r.method.notObservableWhen, limits: r.method.limits },
       enumeration: {
@@ -777,17 +777,25 @@ const run = (args, options) => new Promise((done) => {
 });
 
 /**
- * The validator admits no list of sources yet, so every real scan fails that
- * rule. Each copy these tests run admits the fixture's example sources in its
- * place; one test runs the validator as it stands.
+ * The admitted allowlist of sources, this file's own copy, written as JSON
+ * text like the validator's. Every scan the fixture writes reads from exactly
+ * these, and the digest below pins both copies.
  */
-const UNADMITTED = 'const ALLOWED_SOURCES = Object.freeze({});';
-const ADMITTED = Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, { enumeration: `https://${eco}.registry.example/list`, manifests: `https://${eco}.registry.example/manifests` }]));
-function copyValidator(target, admitted) {
-  const source = readFileSync(join(ROOT, 'scripts', 'validate-dataset.mjs'), 'utf-8');
-  if (source.split(UNADMITTED).length !== 2) throw new Error('the validator no longer holds an empty allowlist in the line these tests admit sources into');
-  writeFileSync(target, admitted ? source.replace(UNADMITTED, `const ALLOWED_SOURCES = Object.freeze(${JSON.stringify(ADMITTED)});`) : source);
-}
+const ADMITTED_SOURCES_JSON = `{
+  "cocoapods": {"catalogCheck": "https://trunk.cocoapods.org/api/v1/pods", "enumeration": "https://cdn.cocoapods.org/all_pods.txt", "manifests": "https://cdn.cocoapods.org/Specs", "versions": "https://cdn.cocoapods.org"},
+  "crates": {"catalogCheck": "https://crates.io/api/v1/crates", "enumeration": "https://github.com/rust-lang/crates.io-index.git", "manifests": "https://github.com/rust-lang/crates.io-index.git"},
+  "go": {"catalogCheck": "https://proxy.golang.org", "enumeration": "https://index.golang.org/index", "manifests": "https://proxy.golang.org"},
+  "hex": {"catalogCheck": "https://hex.pm/api", "enumeration": "https://hex.pm/api/packages", "manifests": "https://hex.pm/api"},
+  "maven": {"catalogCheck": "https://repo1.maven.org/maven2", "enumeration": "https://search.maven.org/solrsearch/select", "manifests": "https://repo1.maven.org/maven2"},
+  "npm": {"catalogCheck": "https://registry.npmjs.org", "enumeration": "https://replicate.npmjs.com/_all_docs", "manifests": "https://registry.npmjs.org"},
+  "nuget": {"catalogCheck": "https://api.nuget.org/v3/registration5-gz-semver2", "enumeration": "https://api.nuget.org/v3/catalog0/index.json", "manifests": "https://api.nuget.org/v3/registration5-gz-semver2"},
+  "packagist": {"catalogCheck": "https://repo.packagist.org/p2", "enumeration": "https://packagist.org/packages/list.json", "manifests": "https://repo.packagist.org/p2"},
+  "pub": {"catalogCheck": "https://pub.dev/api/packages", "enumeration": "https://pub.dev/api/package-names", "manifests": "https://pub.dev/api/packages"},
+  "pypi": {"catalogCheck": "https://pypi.org/pypi", "enumeration": "https://pypi.org/simple/", "manifests": "https://pypi.org/pypi"},
+  "rubygems": {"catalogCheck": "https://rubygems.org/api/v1/gems", "enumeration": "https://index.rubygems.org/names", "manifests": "https://rubygems.org/api/v1/gems"}
+}`;
+const ADMITTED_SOURCES = JSON.parse(ADMITTED_SOURCES_JSON);
+const ADMITTED_SOURCES_SHA256 = 'dc3da855b33e5ef92470b0647f54da194006bf1fc6c71a46348e63b4f4b78a05';
 
 /**
  * Write a repository holding a copy of the validator, a copy of the smaller
@@ -795,11 +803,11 @@ function copyValidator(target, admitted) {
  * `datasets` maps a directory name to [date, change, earlier]; `prepare` runs
  * on the directory before the validator does.
  */
-async function validate(datasets, prepare, { admitted = true } = {}) {
+async function validate(datasets, prepare) {
   const dir = mkdtempSync(join(tmpdir(), 'census-v2-'));
   try {
     mkdirSync(join(dir, 'scripts'));
-    copyValidator(join(dir, 'scripts', 'validate-dataset.mjs'), admitted);
+    cpSync(join(ROOT, 'scripts', 'validate-dataset.mjs'), join(dir, 'scripts', 'validate-dataset.mjs'));
     cpSync(join(ROOT, 'datasets', FIRST_SHAPE), join(dir, 'datasets', FIRST_SHAPE), { recursive: true });
     for (const [directory, [date, change, earlier]] of Object.entries(datasets)) {
       const target = join(dir, 'datasets', directory);
@@ -1076,20 +1084,43 @@ plant('a scan of another registry', scanOf('hex', (s) => { s.ecosystem = 'pub'; 
 plant('a scan with no start', scanOf('hex', (s) => { s.startedAt = null; }), /startedAt is null, not an ISO 8601 UTC time/);
 plant('a scan with no instrument commit', scanOf('hex', (s) => { s.scanner.commit = null; }), /scanner\.commit is null\. A published scan names the instrument commit/);
 plant('a scan with no script', scanOf('hex', (s) => { s.scanner.script = ''; }), /scanner\.script is ""/);
-plant('a source outside the allowlist', scanOf('go', (s) => { s.sources.manifests = 'http://127.0.0.1:8080'; }), /sources\.manifests is http:\/\/127\.0\.0\.1:8080, which is off the allowlist for go \(https:\/\/go\.registry\.example\/manifests\)/);
-
-test('with no allowlist admitted, the sources of every registry are refused', async () => {
-  // Admitting a list for a registry is a deliberate change, and this count changes with it.
-  const result = await validate({ [DATE]: [DATE, {}] }, undefined, { admitted: false });
-  assert.equal(result.code, 1, result.stdout);
-  assert.match(firstProblem(result.stderr), /scan-results-npm\.json: sources: no allowlist of sources is admitted for npm/, result.stderr);
-  assert.equal(result.stderr.split('\n').filter((line) => /: sources: no allowlist of sources is admitted for /.test(line)).length, 11, result.stderr);
-});
-plant('a source role the allowlist does not have', scanOf('go', (s) => { s.sources.mirror = 'https://goproxy.example'; }), /sources\.mirror is https:\/\/goproxy\.example, which is off the allowlist for go\. A source off the list/);
+plant('a source off the allowlist', scanOf('go', (s) => { s.sources.manifests = 'http://127.0.0.1:8080'; }),
+  /sources\.manifests is "http:\/\/127\.0\.0\.1:8080", not https:\/\/proxy\.golang\.org, the base URL admitted for go\. Sources are compared as exact text/);
+plant('a source that only begins with the admitted URL', scanOf('go', (s) => { s.sources.manifests = 'https://proxy.golang.org/cached-only'; }),
+  /sources\.manifests is "https:\/\/proxy\.golang\.org\/cached-only", not https:\/\/proxy\.golang\.org, the base URL admitted for go/);
+plant('a source written without the admitted trailing slash', scanOf('pypi', (s) => { s.sources.enumeration = 'https://pypi.org/simple'; }),
+  /sources\.enumeration is "https:\/\/pypi\.org\/simple", not https:\/\/pypi\.org\/simple\/, the base URL admitted for pypi/);
+plant('a source in another case', scanOf('npm', (s) => { s.sources.manifests = 'https://Registry.npmjs.org'; }), /sources\.manifests is "https:\/\/Registry\.npmjs\.org", not https:\/\/registry\.npmjs\.org/);
+plant('a scan that leaves out a role the allowlist holds', scanOf('go', (s) => { delete s.sources.catalogCheck; }),
+  /scan-results-go\.json: sources has no catalogCheck\. A scan of go names every base URL the allowlist holds for it/);
+plant('a CocoaPods scan that leaves out where it read versions', scanOf('cocoapods', (s) => { delete s.sources.versions; }), /scan-results-cocoapods\.json: sources has no versions/);
 plant('a scan that does not say where it enumerated', scanOf('hex', (s) => { delete s.sources.enumeration; }), /sources has no enumeration/);
-plant('a source that is not a URL', scanOf('hex', (s) => { s.sources.manifests = 'the registry'; }), /sources\.manifests is "the registry", not a URL/);
-plant('a source role that is not a name', scanOf('hex', (s) => { s.sources['base-url'] = 'https://hex.registry.example/'; }), /sources has the role "base-url", not a camelCase name/);
-plant('sources that are not an object', scanOf('hex', (s) => { s.sources = 'https://hex.registry.example/'; }), /sources is "https:\/\/hex\.registry\.example\/", not an object of base URLs/);
+plant('a source role the allowlist does not hold', scanOf('go', (s) => { s.sources.mirror = 'https://goproxy.example'; }),
+  /sources names the role "mirror", which the allowlist for go does not hold \(it holds catalogCheck, enumeration, manifests\)/);
+plant('a role the allowlist holds for another registry', scanOf('npm', (s) => { s.sources.versions = 'https://cdn.cocoapods.org'; }), /sources names the role "versions", which the allowlist for npm does not hold/);
+plant('a source that is not text', scanOf('hex', (s) => { s.sources.manifests = ['https://hex.pm/api']; }), /sources\.manifests is \["https:\/\/hex\.pm\/api"\], not https:\/\/hex\.pm\/api/);
+plant('sources that are not an object', scanOf('hex', (s) => { s.sources = 'https://hex.pm/api'; }), /sources is "https:\/\/hex\.pm\/api", not an object of base URLs/);
+plant('a scan with no sources', scanOf('hex', (s) => { delete s.sources; }), /scan-results-hex\.json is missing sources/);
+
+/** The allowlist literal of a script, read as text and parsed as JSON: nothing in the script is run. */
+function allowlistIn(source, name) {
+  const match = new RegExp(`\\nconst ${name} = \x60([^\x60]*)\x60;\\n`).exec(source);
+  assert.ok(match, `no ${name} literal`);
+  return JSON.parse(match[1]);
+}
+const digestOf = (value) => createHash('sha256').update(canonicalJson(value), 'utf-8').digest('hex');
+
+test('the validator holds the admitted allowlist, read without running it', () => {
+  const held = allowlistIn(readText(join(ROOT, 'scripts', 'validate-dataset.mjs')), 'ALLOWED_SOURCES_JSON');
+  assert.equal(digestOf(held), ADMITTED_SOURCES_SHA256);
+  assert.deepEqual(Object.keys(held).sort(), [...ECOSYSTEMS].sort());
+});
+
+test('these tests read from the admitted allowlist, read without running them', () => {
+  assert.equal(digestOf(allowlistIn(readText(fileURLToPath(import.meta.url)), 'ADMITTED_SOURCES_JSON')), ADMITTED_SOURCES_SHA256);
+  assert.equal(digestOf(ADMITTED_SOURCES), ADMITTED_SOURCES_SHA256);
+});
+
 plant('a scan matched against another number of entries', scanOf('hex', (s) => { s.catalog.entries = 2; }), /catalog\.entries is 2, and the catalogue snapshot has 1 hex entries/);
 plant('a scan matched against another set of names', scanOf('hex', (s) => { s.catalog.matchSetSha256 = sha256('other'); }), /catalog\.matchSetSha256 differs from the catalogue snapshot's/);
 plant('a scan with another match rule', scanOf('hex', (s) => { s.catalog.matchRule = 'hexName/2'; }), /catalog\.matchRule is "hexName\/2", and the catalogue snapshot's rule for hex is "hexName\/1"/);
@@ -1619,7 +1650,7 @@ plant('the manifest\'s comparability not a copy of the corpus\'s', manifestOf((m
 // MANIFEST.json against the files.
 plant('a manifest coverage that is not the files\'', manifestOf((m) => { m.coverage = { ...m.coverage, unresolved: 1 }; }), /MANIFEST\.json: coverage\.unresolved is 1; the eleven scan files sum to 0/);
 plant('a manifest coverage count that is not a count', manifestOf((m) => { m.coverage = { ...m.coverage, absent: null }; }), /MANIFEST\.json: coverage\.absent is null, not a whole count/);
-plant('a manifest registry whose sources are not the raw file\'s', manifestOf((m) => { m.ecosystems[2] = { ...m.ecosystems[2], sources: { enumeration: 'https://go.registry.example/list', manifests: 'https://mirror.example/go' } }; }),
+plant('a manifest registry whose sources are not the raw file\'s', manifestOf((m) => { m.ecosystems[2] = { ...m.ecosystems[2], sources: { ...m.ecosystems[2].sources, manifests: 'https://mirror.example/go' } }; }),
   /MANIFEST\.json: ecosystems\[2\]\.sources is not the sources of scan-results-go\.json/);
 plant('a manifest registry listed twice', manifestOf((m) => { m.ecosystems[1] = m.ecosystems[0]; }), /MANIFEST\.json: ecosystems\[1\]\.ecosystem is "npm", not a registry listed once/);
 plant('a manifest without a registry', manifestOf((m) => { m.ecosystems.pop(); }), /MANIFEST\.json: ecosystems has no item for cocoapods/);
