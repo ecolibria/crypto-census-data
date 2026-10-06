@@ -1297,17 +1297,13 @@ function checkCatalog(name, record, bad) {
 // --- The raw scan files ---------------------------------------------------------
 
 /**
- * The base URLs a scan may read from, by registry and role. A source off the
- * list means the scanner was pointed somewhere else, at a stub or a mirror,
- * and the file is not a scan of the registry.
- *
- * not checked yet: the allowed sources of npm, PyPI, Maven, crates, Packagist,
- * NuGet, RubyGems, Hex, pub and CocoaPods, which the schema version 2 contract
- * does not list. Their sources are checked for shape only.
+ * The base URLs a scan may read from, by registry and role: the admitted
+ * allowlist. A source the list does not hold means the scanner was pointed
+ * somewhere else, at a stub or a mirror, and the file is not a scan of the
+ * registry. A registry with no admitted list fails this rule; it is never
+ * skipped. No list has been admitted yet, so until one is, no registry passes.
  */
-const ALLOWED_SOURCES = {
-  go: { enumeration: 'https://index.golang.org/index', manifests: 'https://proxy.golang.org/cached-only' },
-};
+const ALLOWED_SOURCES = Object.freeze({});
 
 /**
  * What a manifest can declare, by registry: the closed list of declaration
@@ -1392,14 +1388,18 @@ function checkSources(eco, sources, file, bad) {
         'from a scan of something else.');
     }
   }
-  const allowed = ALLOWED_SOURCES[eco];
+  const allowed = Object.hasOwn(ALLOWED_SOURCES, eco) ? ALLOWED_SOURCES[eco] : null;
+  if (allowed === null) {
+    bad(`${where}: no allowlist of sources is admitted for ${eco}, so these cannot be shown to be the registry's own. A scan ` +
+      'enters a dataset only from admitted sources.');
+  }
   for (const [role, url] of Object.entries(sources)) {
     if (!isCamel(role)) bad(`${where} has the role ${describe(role)}, not a camelCase name`);
     if (!isUrl(url)) {
       bad(`${where}.${role} is ${describe(url)}, not a URL`);
       continue;
     }
-    if (allowed && !(Object.hasOwn(allowed, role) && allowed[role] === url)) {
+    if (allowed !== null && !(Object.hasOwn(allowed, role) && allowed[role] === url)) {
       bad(`${where}.${role} is ${url}, which is off the allowlist for ${eco}` +
         `${Object.hasOwn(allowed, role) ? ` (${allowed[role]})` : ''}. A source off the list means the scanner was pointed at ` +
         'a stub or a mirror, and the file is not a scan of the registry.');

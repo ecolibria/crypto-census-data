@@ -64,8 +64,7 @@ const INCLUDES = Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, KINDS[eco].fil
   !(eco === 'maven' && ['managed', 'plugin'].includes(kind)) && !(eco === 'packagist' && kind === 'suggest'))]));
 
 // Example values. The commit id has the right form and names nothing; the URLs
-// are in reserved example domains, except Go's two sources, which are the ones
-// on the validator's allowlist.
+// are in reserved example domains.
 const COMMIT = '0123456789abcdef0123456789abcdef01234567';
 
 /**
@@ -609,9 +608,7 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
       schemaVersion: 2, kind: 'censusScan', ecosystem: eco,
       startedAt: `${date}T00:00:00Z`, finishedAt: `${date}T06:00:00Z`,
       scanner: { script: `scripts/scan-${eco}.mjs`, commit: COMMIT },
-      sources: eco === 'go'
-        ? { enumeration: 'https://index.golang.org/index', manifests: 'https://proxy.golang.org/cached-only' }
-        : { enumeration: `https://${eco}.registry.example/list`, manifests: `https://${eco}.registry.example/manifests` },
+      sources: { enumeration: `https://${eco}.registry.example/list`, manifests: `https://${eco}.registry.example/manifests` },
       catalog: { entries: r.entries.length, matchSetSha256: MATCH_SET, matchRule: `${eco}Name/1` },
       method: { versionSelection: 'latest', readFrom: r.method.readFrom, declarationKinds: [...KINDS[eco]], notObservableWhen: r.method.notObservableWhen, limits: r.method.limits },
       enumeration: {
@@ -744,16 +741,29 @@ const run = (args, options) => new Promise((done) => {
 });
 
 /**
+ * The validator admits no list of sources yet, so every real scan fails that
+ * rule. Each copy these tests run admits the fixture's example sources in its
+ * place; one test runs the validator as it stands.
+ */
+const UNADMITTED = 'const ALLOWED_SOURCES = Object.freeze({});';
+const ADMITTED = Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, { enumeration: `https://${eco}.registry.example/list`, manifests: `https://${eco}.registry.example/manifests` }]));
+function copyValidator(target, admitted) {
+  const source = readFileSync(join(ROOT, 'scripts', 'validate-dataset.mjs'), 'utf-8');
+  if (source.split(UNADMITTED).length !== 2) throw new Error('the validator no longer holds an empty allowlist in the line these tests admit sources into');
+  writeFileSync(target, admitted ? source.replace(UNADMITTED, `const ALLOWED_SOURCES = Object.freeze(${JSON.stringify(ADMITTED)});`) : source);
+}
+
+/**
  * Write a repository holding a copy of the validator, a copy of the smaller
  * published dataset, and the version 2 datasets given, and run the copy.
  * `datasets` maps a directory name to [date, change, earlier]; `prepare` runs
  * on the directory before the validator does.
  */
-async function validate(datasets, prepare) {
+async function validate(datasets, prepare, { admitted = true } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'census-v2-'));
   try {
     mkdirSync(join(dir, 'scripts'));
-    cpSync(join(ROOT, 'scripts', 'validate-dataset.mjs'), join(dir, 'scripts', 'validate-dataset.mjs'));
+    copyValidator(join(dir, 'scripts', 'validate-dataset.mjs'), admitted);
     cpSync(join(ROOT, 'datasets', FIRST_SHAPE), join(dir, 'datasets', FIRST_SHAPE), { recursive: true });
     for (const [directory, [date, change, earlier]] of Object.entries(datasets)) {
       const target = join(dir, 'datasets', directory);
@@ -1028,7 +1038,15 @@ plant('a scan of another registry', scanOf('hex', (s) => { s.ecosystem = 'pub'; 
 plant('a scan with no start', scanOf('hex', (s) => { s.startedAt = null; }), /startedAt is null, not an ISO 8601 UTC time/);
 plant('a scan with no instrument commit', scanOf('hex', (s) => { s.scanner.commit = null; }), /scanner\.commit is null\. A published scan names the instrument commit/);
 plant('a scan with no script', scanOf('hex', (s) => { s.scanner.script = ''; }), /scanner\.script is ""/);
-plant('a source outside the allowlist', scanOf('go', (s) => { s.sources.manifests = 'http://127.0.0.1:8080'; }), /sources\.manifests is http:\/\/127\.0\.0\.1:8080, which is off the allowlist for go \(https:\/\/proxy\.golang\.org\/cached-only\)/);
+plant('a source outside the allowlist', scanOf('go', (s) => { s.sources.manifests = 'http://127.0.0.1:8080'; }), /sources\.manifests is http:\/\/127\.0\.0\.1:8080, which is off the allowlist for go \(https:\/\/go\.registry\.example\/manifests\)/);
+
+test('with no allowlist admitted, the sources of every registry are refused', async () => {
+  // Admitting a list for a registry is a deliberate change, and this count changes with it.
+  const result = await validate({ [DATE]: [DATE, {}] }, undefined, { admitted: false });
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(firstProblem(result.stderr), /scan-results-npm\.json: sources: no allowlist of sources is admitted for npm/, result.stderr);
+  assert.equal(result.stderr.split('\n').filter((line) => /: sources: no allowlist of sources is admitted for /.test(line)).length, 11, result.stderr);
+});
 plant('a source role the allowlist does not have', scanOf('go', (s) => { s.sources.mirror = 'https://goproxy.example'; }), /sources\.mirror is https:\/\/goproxy\.example, which is off the allowlist for go\. A source off the list/);
 plant('a scan that does not say where it enumerated', scanOf('hex', (s) => { delete s.sources.enumeration; }), /sources has no enumeration/);
 plant('a source that is not a URL', scanOf('hex', (s) => { s.sources.manifests = 'the registry'; }), /sources\.manifests is "the registry", not a URL/);
@@ -1492,7 +1510,7 @@ plant('the manifest\'s comparability not a copy of the corpus\'s', manifestOf((m
 // MANIFEST.json against the files.
 plant('a manifest coverage that is not the files\'', manifestOf((m) => { m.coverage = { ...m.coverage, unresolved: 1 }; }), /MANIFEST\.json: coverage\.unresolved is 1; the eleven scan files sum to 0/);
 plant('a manifest coverage count that is not a count', manifestOf((m) => { m.coverage = { ...m.coverage, absent: null }; }), /MANIFEST\.json: coverage\.absent is null, not a whole count/);
-plant('a manifest registry whose sources are not the raw file\'s', manifestOf((m) => { m.ecosystems[2] = { ...m.ecosystems[2], sources: { enumeration: 'https://index.golang.org/index', manifests: 'https://proxy.golang.org' } }; }),
+plant('a manifest registry whose sources are not the raw file\'s', manifestOf((m) => { m.ecosystems[2] = { ...m.ecosystems[2], sources: { enumeration: 'https://go.registry.example/list', manifests: 'https://mirror.example/go' } }; }),
   /MANIFEST\.json: ecosystems\[2\]\.sources is not the sources of scan-results-go\.json/);
 plant('a manifest registry listed twice', manifestOf((m) => { m.ecosystems[1] = m.ecosystems[0]; }), /MANIFEST\.json: ecosystems\[1\]\.ecosystem is "npm", not a registry listed once/);
 plant('a manifest without a registry', manifestOf((m) => { m.ecosystems.pop(); }), /MANIFEST\.json: ecosystems has no item for cocoapods/);
