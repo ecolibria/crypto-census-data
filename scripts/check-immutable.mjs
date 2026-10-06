@@ -204,8 +204,9 @@ for (const change of changesUnder('datasets')) {
 // An errata file is the record of what was known to be wrong with a dataset,
 // and when. An issue that could be reworded or withdrawn afterwards would let
 // that record change without trace. So a file that was already published may
-// only grow: everything outside `issues` stays as it was, and the issues it
-// listed stay first, in order, unchanged.
+// only grow: everything outside `issues` and `regenerations` stays as it was,
+// and the elements each list held stay first, in order, unchanged. A
+// `regenerations` list the published file does not have reads as empty.
 
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
@@ -246,7 +247,7 @@ for (const change of changesUnder('errata')) {
   // key would compare equal to its absence.
   const own = (object, key) => (Object.hasOwn(object, key) ? object[key] : undefined);
   for (const field of new Set([...Object.keys(was), ...Object.keys(is)])) {
-    if (field === 'issues') continue;
+    if (field === 'issues' || field === 'regenerations') continue;
     if (canonical(own(was, field)) !== canonical(own(is, field))) edits.push(`  changed ${field} in ${change.path}`);
   }
   if (is.issues.length < was.issues.length) {
@@ -257,6 +258,28 @@ for (const change of changesUnder('errata')) {
     const name = isObject(issue) && typeof issue.defect === 'string' ? ` (${issue.defect})` : '';
     edits.push(`  issue ${index + 1}${name} of ${change.path} is no longer what was published`);
   });
+
+  // Regenerations grow the same way. Absent from the published file, the list
+  // reads as empty, so the first regeneration may be added; once present it is
+  // a list with a regeneration in it, on both sides, and it is never dropped.
+  const had = Object.hasOwn(was, 'regenerations');
+  const has = Object.hasOwn(is, 'regenerations');
+  const isList = (value) => Array.isArray(value) && value.length > 0;
+  if (had && !has) {
+    edits.push(`  dropped regenerations from ${change.path}`);
+  } else if ((had && !isList(was.regenerations)) || (has && !isList(is.regenerations))) {
+    edits.push(`  ${change.path} cannot be compared with what was published: regenerations is not a list with a regeneration in it`);
+  } else {
+    const before = had ? was.regenerations : [];
+    const after = has ? is.regenerations : [];
+    if (after.length < before.length) {
+      edits.push(`  removed ${before.length - after.length} regeneration(s) from ${change.path}`);
+    }
+    before.forEach((regeneration, index) => {
+      if (index >= after.length || canonical(regeneration) === canonical(after[index])) return;
+      edits.push(`  regeneration ${index + 1} of ${change.path} is no longer what was published`);
+    });
+  }
 }
 
 if (violations.length > 0) {
