@@ -1197,6 +1197,7 @@ function measure(registry) {
     registry.measure[cls] = { k: counted.length, entries: counted, excluded };
   }
   registry.unclassified = registry.entries.filter((e) => e.classified !== true).map((e) => e.name);
+  registry.notCountable = registry.entries.filter((e) => e.classified === true && !isCountable(e)).map((e) => e.name);
   registry.multiPurpose = registry.entries.filter((e) => e.multiPurpose !== null).map((e) => e.name);
 }
 
@@ -2228,19 +2229,22 @@ Object.assign(KEYS, {
   corpusCoverage: ['total', 'byEcosystem'],
   rowCoverage: [...COVERAGE_COUNTS, 'scannedByReadFrom', 'enumeration'],
   row: ['measurability', 'anyManifestMatch', 'directUnconditional', 'excludingDevMetadata'],
-  total: ['anyManifestMatch', 'directUnconditional', 'excludingDevMetadata'],
+  total: ['anyManifestMatch', 'directUnconditional'],
   pair: ['raw', 'consolidated'],
   devRow: ['coverage', 'anyManifestMatch', 'directUnconditional'],
   measure: ['k', 'entries', 'excluded'],
   measureMatched: ['k', 'excluded'],
   exclusion: ['entry', 'why'],
-  block: ['definitionId', ...CLASSES, ...JOINT, 'excludedUnclassified'],
-  consolidatedBlock: ['definitionId', ...CLASSES, ...JOINT, 'excludedUnclassified', 'consolidation'],
+  block: ['definitionId', ...CLASSES, ...JOINT, 'excludedUnclassified', 'excludedNotCountable'],
+  consolidatedBlock: ['definitionId', ...CLASSES, ...JOINT, 'excludedUnclassified', 'excludedNotCountable', 'consolidation'],
   cell: ['count', 'k', 'nullReason'],
   totalCell: ['count', 'k', 'nullReason', 'measurableIn', 'notMeasurableIn'],
   jointCell: ['count', 'nullReason'],
+  totalJointCell: ['count', 'nullReason', 'measurableIn', 'notMeasurableIn'],
   excludedUnclassified: ['matches', 'unitsWithOnlyUnclassifiedMatches', 'byEntry'],
+  excludedNotCountable: ['matches', 'unitsWithOnlyNotCountableMatches', 'byEntry'],
   byEntry: ['entry', 'matches'],
+  totalByEntry: ['ecosystem', 'entry', 'matches'],
   consolidationStats: ['unitsIn', 'unitsOut', 'merged', 'removedByRule'],
   multiPurposeLibrary: ['ecosystem', 'entry', 'definitionId', 'dependents'],
   magnitude: ['value', 'of', 'unit'],
@@ -2297,24 +2301,34 @@ function unitsOf(packages, eco, definition, includes, map) {
 /** One figure block as the files give it: a cell per class, the two joint cells, what was left out, and the consolidation. */
 function figureBlock({ units, stats }, registry, definitionId) {
   const counts = Object.fromEntries([...CLASSES, ...JOINT].map((key) => [key, 0]));
-  const byEntry = new Map(registry.unclassified.map((name) => [name, 0]));
+  const unclassified = new Map(registry.unclassified.map((name) => [name, 0]));
+  const notCountable = new Map(registry.notCountable.map((name) => [name, 0]));
   let onlyUnclassified = 0;
+  let onlyNotCountable = 0;
   for (const entries of units) {
     const flags = Object.fromEntries(CLASSES.map((cls) => [cls, false]));
-    let unclassified = false;
+    let sawUnclassified = false;
+    let sawNotCountable = false;
     for (const name of entries) {
       const entry = registry.byName.get(name);
       if (entry.classified !== true) {
-        byEntry.set(name, byEntry.get(name) + 1);
-        unclassified = true;
-        continue;
+        unclassified.set(name, unclassified.get(name) + 1);
+        sawUnclassified = true;
+      } else if (!isCountable(entry)) {
+        // Counted only where it can be observed, so a count and its K cover the same entries.
+        notCountable.set(name, notCountable.get(name) + 1);
+        sawNotCountable = true;
+      } else {
+        for (const cls of CLASSES) if (IN_CLASS[cls](entry)) flags[cls] = true;
       }
-      for (const cls of CLASSES) if (IN_CLASS[cls](entry)) flags[cls] = true;
     }
     for (const cls of CLASSES) if (flags[cls]) counts[cls] += 1;
     if (flags.weak && flags.pqc) counts.weakAndPqc += 1;
     if (flags.matched && !flags.weak && !flags.pqc) counts.neitherWeakNorPqc += 1;
-    if (!flags.matched && unclassified) onlyUnclassified += 1;
+    // A unit with no countable match is left out of every class: under its classified matches that cannot be
+    // observed if it has any, otherwise under its unclassified ones.
+    if (!flags.matched && sawNotCountable) onlyNotCountable += 1;
+    else if (!flags.matched && sawUnclassified) onlyUnclassified += 1;
   }
   const block = { definitionId };
   for (const cls of CLASSES) {
@@ -2326,9 +2340,14 @@ function figureBlock({ units, stats }, registry, definitionId) {
     block[joint] = both ? { count: counts[joint], nullReason: null } : { count: null, nullReason: 'noCountableEntry' };
   }
   block.excludedUnclassified = {
-    matches: sum([...byEntry.values()]),
+    matches: sum([...unclassified.values()]),
     unitsWithOnlyUnclassifiedMatches: onlyUnclassified,
-    byEntry: [...byEntry].map(([entry, matches]) => ({ entry, matches })),
+    byEntry: [...unclassified].map(([entry, matches]) => ({ entry, matches })),
+  };
+  block.excludedNotCountable = {
+    matches: sum([...notCountable.values()]),
+    unitsWithOnlyNotCountableMatches: onlyNotCountable,
+    byEntry: [...notCountable].map(([entry, matches]) => ({ entry, matches })),
   };
   if (stats !== null) block.consolidation = stats;
   return { block, population: units.length };
@@ -2382,43 +2401,37 @@ function totalOf(rows, consolidated) {
       notMeasurableIn: rows.filter(({ block }) => block[cls].k === 0).map(({ eco }) => eco),
     };
   }
+  // The two joint cells sum the rows where weak and pqc are both counted, and name them.
   for (const joint of JOINT) {
     const counted = rows.filter(({ block }) => block[joint].count !== null);
-    total[joint] = counted.length === 0
-      ? { count: null, nullReason: 'noCountableEntry' }
-      : { count: sum(counted.map(({ block }) => block[joint].count)), nullReason: null };
+    total[joint] = {
+      count: counted.length === 0 ? null : sum(counted.map(({ block }) => block[joint].count)),
+      nullReason: counted.length === 0 ? 'noCountableEntry' : null,
+      measurableIn: counted.map(({ eco }) => eco),
+      notMeasurableIn: rows.filter(({ block }) => block[joint].count === null).map(({ eco }) => eco),
+    };
   }
-  total.excludedUnclassified = {
-    matches: sum(rows.map(({ block }) => block.excludedUnclassified.matches)),
-    unitsWithOnlyUnclassifiedMatches: sum(rows.map(({ block }) => block.excludedUnclassified.unitsWithOnlyUnclassifiedMatches)),
-    byEntry: rows.flatMap(({ block }) => block.excludedUnclassified.byEntry),
-  };
+  for (const [group, spec] of Object.entries(EXCLUDED)) {
+    total[group] = {
+      matches: sum(rows.map(({ block }) => block[group].matches)),
+      [spec.units]: sum(rows.map(({ block }) => block[group][spec.units])),
+      byEntry: rows.flatMap(({ eco, block }) => block[group].byEntry.map((item) => ({ ecosystem: eco, ...item }))),
+    };
+  }
   if (consolidated) {
-    const removedByRule = {};
-    for (const { block } of rows) {
-      for (const [rule, n] of Object.entries(block.consolidation.removedByRule)) removedByRule[rule] = (removedByRule[rule] ?? 0) + n;
-    }
     total.consolidation = {
       unitsIn: sum(rows.map(({ block }) => block.consolidation.unitsIn)),
       unitsOut: sum(rows.map(({ block }) => block.consolidation.unitsOut)),
       merged: sum(rows.map(({ block }) => block.consolidation.merged)),
-      removedByRule,
+      removedByRule: {},
     };
   }
   return total;
 }
 
 function expectedTotal(rows) {
-  const pairOf = (pick) => Object.fromEntries(MATCH_DEFINITIONS.map((definition) => [definition, Object.fromEntries(UNITS.map((unit) => [
-    unit, totalOf(ECOSYSTEMS.map((eco) => ({ eco, block: pick(rows[eco])[definition][unit] })), unit === 'consolidated')]))]));
-  const total = { ...pairOf((r) => r.row), excludingDevMetadata: null };
-  if (ECOSYSTEMS.some((eco) => rows[eco].dev !== null)) {
-    total.excludingDevMetadata = {
-      coverage: Object.fromEntries(COVERAGE_COUNTS.map((field) => [field, sum(ECOSYSTEMS.map((eco) => (rows[eco].dev ?? rows[eco]).coverage[field]))])),
-      ...pairOf((r) => r.row.excludingDevMetadata ?? r.row),
-    };
-  }
-  return total;
+  return Object.fromEntries(MATCH_DEFINITIONS.map((definition) => [definition, Object.fromEntries(UNITS.map((unit) => [
+    unit, totalOf(ECOSYSTEMS.map((eco) => ({ eco, block: rows[eco].row[definition][unit] })), unit === 'consolidated')]))]));
 }
 
 // --- The corpus: comparison -----------------------------------------------------
@@ -2479,10 +2492,16 @@ function cellValue(stored, expected, where, keys, ctx) {
   }
 }
 
-function excludedRules(stored, where, ctx) {
-  if (!closed(stored, KEYS.excludedUnclassified, where, ctx.bad)) return false;
+/** What a block leaves out of every class, by the kind of entry: unclassified, or classified and not countable. */
+const EXCLUDED = {
+  excludedUnclassified: { units: 'unitsWithOnlyUnclassifiedMatches', what: 'unclassified' },
+  excludedNotCountable: { units: 'unitsWithOnlyNotCountableMatches', what: 'classified and not countable' },
+};
+
+function excludedRules(stored, group, where, ctx, total) {
+  if (!closed(stored, KEYS[group], where, ctx.bad)) return false;
   let ok = true;
-  for (const field of ['matches', 'unitsWithOnlyUnclassifiedMatches']) {
+  for (const field of ['matches', EXCLUDED[group].units]) {
     if (!isCount(stored[field])) {
       ctx.bad(`${where}.${field} is ${describe(stored[field])}, not a whole count`);
       ok = false;
@@ -2493,23 +2512,23 @@ function excludedRules(stored, where, ctx) {
     return false;
   }
   stored.byEntry.forEach((item, index) => {
-    if (!closed(item, KEYS.byEntry, `${where}.byEntry[${index}]`, ctx.bad)) ok = false;
-    else if (!isText(item.entry) || !isCount(item.matches)) {
-      ctx.bad(`${where}.byEntry[${index}] is ${describe(item)}, not an entry and a count`);
+    if (!closed(item, total ? KEYS.totalByEntry : KEYS.byEntry, `${where}.byEntry[${index}]`, ctx.bad)) ok = false;
+    else if (!isText(item.entry) || !isCount(item.matches) || (total && !ECOSYSTEMS.includes(item.ecosystem))) {
+      ctx.bad(`${where}.byEntry[${index}] is ${describe(item)}, not ${total ? 'a registry, ' : 'an '}entry and a count`);
       ok = false;
     }
   });
   return ok;
 }
 
-function excludedValue(stored, expected, where, ctx) {
-  for (const field of ['matches', 'unitsWithOnlyUnclassifiedMatches']) {
+function excludedValue(stored, expected, group, where, ctx) {
+  for (const field of ['matches', EXCLUDED[group].units]) {
     if (stored[field] !== expected[field]) ctx.figureBad(`${where}.${field} is ${stored[field]}; recomputed it is ${expected[field]}`);
   }
-  const items = (list) => list.map((item) => `${item.entry}\0${item.matches}`).sort();
+  const items = (list) => list.map((item) => `${item.ecosystem ?? ''}\0${item.entry}\0${item.matches}`).sort();
   if (!sameValue(items(stored.byEntry), items(expected.byEntry))) {
     ctx.figureBad(`${where}.byEntry is ${describe(stored.byEntry)}; recomputed it is ${describe(expected.byEntry)}. It lists ` +
-      'every unclassified entry of the registry, each with the units that matched it.');
+      `every ${EXCLUDED[group].what} entry of the registry, each with the units that matched it.`);
   }
 }
 
@@ -2549,8 +2568,8 @@ function blockRules(stored, consolidated, where, ctx, total) {
   if (!closed(stored, consolidated ? KEYS.consolidatedBlock : KEYS.block, where, ctx.bad)) return false;
   let ok = true;
   for (const cls of CLASSES) ok = cellRules(stored[cls], `${where}.${cls}`, total ? KEYS.totalCell : KEYS.cell, ctx) && ok;
-  for (const joint of JOINT) ok = cellRules(stored[joint], `${where}.${joint}`, KEYS.jointCell, ctx) && ok;
-  ok = excludedRules(stored.excludedUnclassified, `${where}.excludedUnclassified`, ctx) && ok;
+  for (const joint of JOINT) ok = cellRules(stored[joint], `${where}.${joint}`, total ? KEYS.totalJointCell : KEYS.jointCell, ctx) && ok;
+  for (const group of Object.keys(EXCLUDED)) ok = excludedRules(stored[group], group, `${where}.${group}`, ctx, total) && ok;
   if (consolidated) ok = statsRules(stored.consolidation, `${where}.consolidation`, ctx) && ok;
   return ok;
 }
@@ -2562,8 +2581,8 @@ function blockValues(stored, expected, where, ctx, total) {
       'the definitions it was counted under.');
   }
   for (const cls of CLASSES) cellValue(stored[cls], expected[cls], `${where}.${cls}`, total ? KEYS.totalCell : KEYS.cell, ctx);
-  for (const joint of JOINT) cellValue(stored[joint], expected[joint], `${where}.${joint}`, KEYS.jointCell, ctx);
-  excludedValue(stored.excludedUnclassified, expected.excludedUnclassified, `${where}.excludedUnclassified`, ctx);
+  for (const joint of JOINT) cellValue(stored[joint], expected[joint], `${where}.${joint}`, total ? KEYS.totalJointCell : KEYS.jointCell, ctx);
+  for (const group of Object.keys(EXCLUDED)) excludedValue(stored[group], expected[group], group, `${where}.${group}`, ctx);
   if (Object.hasOwn(expected, 'consolidation')) statsValue(stored.consolidation, expected.consolidation, `${where}.consolidation`, ctx);
 }
 
@@ -2590,6 +2609,22 @@ function blockIdentities(block, where, coverage, ctx) {
   if (m !== null && coverage && m > coverage.scanned - coverage.dependenciesNotObservable) {
     ctx.bad(`${where}: matched (${m}) is more than the ${coverage.scanned - coverage.dependenciesNotObservable} packages read ` +
       'whose dependencies could be observed');
+  }
+}
+
+/**
+ * At a total the first identity holds only where its five cells sum the same
+ * rows; elsewhere its parts are counted over different registries.
+ */
+function totalIdentity(block, where, ctx) {
+  const cells = ['matched', 'weak', 'pqc', 'weakAndPqc', 'neitherWeakNorPqc'].map((key) => block[key]);
+  if (!cells.every((cell) => isCount(cell.count))) return;
+  const rowsOf = (cell) => [...cell.measurableIn].sort().join(' ');
+  if (!cells.every((cell) => rowsOf(cell) === rowsOf(cells[0]))) return;
+  const [m, w, p, wp, nw] = cells.map((cell) => cell.count);
+  if (m !== w + p - wp + nw) {
+    ctx.bad(`${where}: matched (${m}) is not weak (${w}) + pqc (${p}) - weakAndPqc (${wp}) + neitherWeakNorPqc (${nw}), and all ` +
+      'five sum the same registries');
   }
 }
 
@@ -2815,6 +2850,24 @@ function checkDefinitions(d, file, bad) {
   return usable ? d.anyManifestMatch.includes : null;
 }
 
+/** The change codes these rules recompute, each from the fields it names, for two version 2 datasets. */
+const CHANGES_CHECKED = {
+  versionSelection: (a, b) => ECOSYSTEMS.some((eco) => !sameValue(a.methods[eco]?.versionSelection, b.methods[eco]?.versionSelection)),
+  declarationKinds: (a, b) => ECOSYSTEMS.some((eco) => !sameSet(a.methods[eco]?.declarationKinds ?? [], b.methods[eco]?.declarationKinds ?? [])),
+  matchRule: (a, b) => !sameValue(a.matchRules, b.matchRules),
+  matchSet: (a, b) => a.matchSetSha256 !== b.matchSetSha256,
+  coverageDefinition: (a, b) => a.definitionIds.coverage !== b.definitionIds.coverage,
+  matchDefinition: (a, b) => a.definitionIds.anyManifestMatch !== b.definitionIds.anyManifestMatch ||
+    a.definitionIds.directUnconditional !== b.definitionIds.directUnconditional,
+  classDefinition: (a, b) => !sameValue(a.definitionIds.classes, b.definitionIds.classes),
+  classification: (a, b) => a.classificationSha256 !== b.classificationSha256,
+  consolidationRule: (a, b) => a.definitionIds.consolidated !== b.definitionIds.consolidated,
+};
+// not checked yet: enumerationFrame and manifestReader, for which the
+// schema version 2 contract names no field to compare. A dataset may name
+// them or not.
+const UNCHECKED_CHANGES = ['enumerationFrame', 'manifestReader'];
+
 /** The version of an earlier dataset, read from its manifest: 1 when it declares none. */
 /** A file of an earlier dataset, parsed, if it is a regular file of bounded size nested within the bound; otherwise an error. */
 function readEarlier(path) {
@@ -2851,8 +2904,11 @@ function instrumentOf(dataset) {
       if (!manifest.files.some((entry) => entry.role === role && entry.ecosystem === eco && entry.file === file)) throw new Error(file);
       return readEarlier(join(dir, file));
     };
+    const catalog = read('catalog');
     return {
-      matchSetSha256: read('catalog').matchSetSha256,
+      matchSetSha256: catalog.matchSetSha256,
+      classificationSha256: catalog.classificationSha256,
+      matchRules: catalog.matchRules,
       definitionIds: definitionIds(read('corpus').definitions),
       methods: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, read('scan', eco).method])),
     };
@@ -2907,18 +2963,26 @@ function checkComparability(name, list, corpus, ctx, file, bad) {
         bad(`${at}.changes is ${describe(item.changes)}. A version 1 dataset differs in every component, so it names all ` +
           `eleven codes (${CHANGE_CODES.join(', ')}).`);
       }
-    } else if (version === 2 && item.comparable) {
-      // not checked yet: which change codes apply between two version 2
-      // datasets, beyond the conditions under which they are comparable.
+    } else if (version === 2) {
       const theirs = instrumentOf(item.dataset);
-      const ours = ctx.catalog && corpus && isObject(corpus.definitions) ? {
-        matchSetSha256: ctx.catalog.value.matchSetSha256,
-        definitionIds: definitionIds(corpus.definitions),
-        methods: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, ctx.scans[eco] ? ctx.scans[eco].value.method : null])),
-      } : null;
+      let ours = null;
+      try {
+        ours = ctx.catalog ? {
+          matchSetSha256: ctx.catalog.value.matchSetSha256,
+          classificationSha256: ctx.catalog.value.classificationSha256,
+          matchRules: ctx.catalog.value.matchRules,
+          definitionIds: definitionIds(corpus.definitions),
+          methods: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, ctx.scans[eco] ? ctx.scans[eco].value.method : null])),
+        } : null;
+      } catch {
+        ours = null;
+      }
       if (theirs === null || ours === null) {
-        bad(`${at}: ${item.dataset} is marked comparable, and the files that would show it cannot be read`);
-      } else {
+        bad(`${at}: ${item.dataset} is a version 2 dataset whose instrument cannot be read beside this one's, so neither ` +
+          'whether it is comparable nor the changes named can be checked');
+        return;
+      }
+      if (item.comparable) {
         const differ = [];
         if (!sameValue(theirs.matchSetSha256, ours.matchSetSha256)) differ.push('the match set');
         if (!sameValue(theirs.definitionIds, ours.definitionIds)) differ.push('the definition ids');
@@ -2927,6 +2991,13 @@ function checkComparability(name, list, corpus, ctx, file, bad) {
           bad(`${at}: ${item.dataset} is marked comparable, and these differ between the two datasets: ${differ.join(', ')}. Two ` +
             'datasets are comparable only when the match set, the definition ids and every scanner\'s method are the same.');
         }
+      }
+      // The change codes, recomputed from the fields each one names.
+      const computed = Object.keys(CHANGES_CHECKED).filter((code) => CHANGES_CHECKED[code](theirs, ours));
+      const stated = item.changes.filter((code) => !UNCHECKED_CHANGES.includes(code));
+      if (!sameSet(stated, computed)) {
+        bad(`${at}.changes is ${describe(item.changes)}; recomputed from the fields each code names, the two datasets differ in ` +
+          `${describe(computed)}${UNCHECKED_CHANGES.length ? ` (and ${UNCHECKED_CHANGES.join(' and ')} are not recomputed)` : ''}`);
       }
     } else if (version === null) {
       bad(`${at}: ${item.dataset} has no manifest these rules can read, so whether it is comparable cannot be checked`);
@@ -3084,23 +3155,11 @@ function checkCorpus(name, record, ctx, bad) {
     }
   }
   if (totalShaped) {
-    const total = expectedTotal(rows);
-    const items = blocksOf(c.total, total, `${file}: total`, null, figureContext);
-    const where = `${file}: total.excludingDevMetadata`;
-    let devCoverage = null;
-    if (total.excludingDevMetadata === null) {
-      if (c.total.excludingDevMetadata !== null) bad(`${where} is set, and no registry is read partly from dev metadata; it is null then`);
-    } else if (closed(c.total.excludingDevMetadata, KEYS.devRow, where, bad)) {
-      if (closed(c.total.excludingDevMetadata.coverage, COVERAGE_COUNTS, `${where}.coverage`, bad)) devCoverage = c.total.excludingDevMetadata.coverage;
-      items.push(...blocksOf(c.total.excludingDevMetadata, total.excludingDevMetadata, where, null, figureContext));
-    }
+    const items = blocksOf(c.total, expectedTotal(rows), `${file}: total`, null, figureContext);
     const ready = items.filter((item) => blockRules(item.stored, item.consolidated, item.where, figureContext, true));
-    if (devCoverage) {
-      for (const field of COVERAGE_COUNTS) {
-        if (devCoverage[field] !== total.excludingDevMetadata.coverage[field]) {
-          figureContext.figureBad(`${where}.coverage.${field} is ${describe(devCoverage[field])}; the ledgers give ${total.excludingDevMetadata.coverage[field]}`);
-        }
-      }
+    for (const item of ready) {
+      totalIdentity(item.stored, item.where, figureContext);
+      if (item.consolidated) statsIdentity(item.stored.consolidation, `${item.where}.consolidation`, figureContext);
     }
     for (const item of ready) blockValues(item.stored, item.expected, item.where, figureContext, true);
   }

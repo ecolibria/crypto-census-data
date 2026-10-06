@@ -9,11 +9,10 @@
  *
  * The dataset has all eleven registries and 36 listed packages. Every figure
  * of each registry's row is written out by hand below, beside the packages it
- * comes from, small enough to be checked by eye. The coverage counts, the
- * ledger's match counts and the totals are computed by the small code in this
- * file from what is listed here, never by the validator's code; the totals'
- * code sums the rows the way the contract says, so it is a second statement
- * of that rule, not an independent one.
+ * comes from, small enough to be checked by eye, and so is every figure of the
+ * total. The coverage counts and the ledger's match counts are computed by the
+ * small code in this file from what is listed here, never by the validator's
+ * code.
  *
  *   node --test scripts/check-validator-v2.mjs
  */
@@ -142,6 +141,8 @@ const pod = (kind, subspec, platform = null) => ({ kind, platform, subspec });
 // neitherWeakNorPqc. null is a figure that cannot be measured because K is 0.
 
 const measure = (k, entries, excluded) => ({ k, entries, excluded: excluded.map(([e, why]) => ({ entry: e, why })) });
+/** The same figure in every block of a registry. */
+const everywhere = (spec) => ({ anyManifestMatch: { raw: spec, consolidated: spec }, directUnconditional: { raw: spec, consolidated: spec } });
 /** A registry with no namespace and no unclassified entry: the consolidated blocks are the raw ones, nothing merged. */
 const plain = (anyCells, anyUnits, directCells, directUnits) => ({
   anyManifestMatch: { raw: [anyCells, {}, 0], consolidated: [anyCells, {}, 0, [anyUnits, anyUnits, 0]] },
@@ -182,20 +183,22 @@ function registries() {
         pqc: measure(1, ['@noble/post-quantum'], []),
       },
       // Any manifest match (all four kinds): alpha {md5, post-quantum}, beta {crypto-js}, gamma {node-forge, md5},
-      // delta {@types} only, epsilon {md5, post-quantum}, zeta {tripledes, @types}. A match to tripledes counts:
-      // it is classified, though not countable. Direct: alpha {md5}, gamma {node-forge}, epsilon {md5, post-quantum},
-      // zeta {tripledes, @types}; beta is optional, delta a dev dependency, gamma's md5 an optional peer.
-      // Consolidated: alpha, beta and gamma are one unit (@acme).
+      // delta {@types} only, epsilon {md5, post-quantum}, zeta {tripledes, @types}. tripledes is absent from the
+      // registry, so not countable: zeta is in no class, and is counted under excludedNotCountable. Direct: alpha
+      // {md5}, gamma {node-forge}, epsilon {md5, post-quantum}, zeta {tripledes, @types}; beta is optional, delta a
+      // dev dependency, gamma's md5 an optional peer. Consolidated: alpha, beta and gamma are one unit (@acme).
       blocks: {
         anyManifestMatch: {
-          raw: [[5, 5, 4, 1, 2, 2, 0], { '@types/bcryptjs': 2 }, 1],
-          consolidated: [[3, 3, 3, 1, 2, 2, 0], { '@types/bcryptjs': 2 }, 1, [6, 4, 2]],
+          raw: [[4, 4, 3, 1, 2, 2, 0], { '@types/bcryptjs': 2 }, 1],
+          consolidated: [[2, 2, 2, 1, 2, 2, 0], { '@types/bcryptjs': 2 }, 1, [6, 4, 2]],
         },
         directUnconditional: {
-          raw: [[4, 3, 3, 0, 1, 1, 1], { '@types/bcryptjs': 1 }, 0],
-          consolidated: [[3, 3, 3, 0, 1, 1, 0], { '@types/bcryptjs': 1 }, 0, [4, 3, 1]],
+          raw: [[3, 2, 2, 0, 1, 1, 1], { '@types/bcryptjs': 1 }, 0],
+          consolidated: [[2, 2, 2, 0, 1, 1, 0], { '@types/bcryptjs': 1 }, 0, [4, 3, 1]],
         },
       },
+      // zeta, under every definition and unit: its match to tripledes, and nothing countable.
+      notCountable: everywhere([{ tripledes: 1 }, 1]),
     },
     pypi: {
       method: { readFrom: ['release'], notObservableWhen: ['requiresDistNullAndNoWheel'], limits: [] },
@@ -242,6 +245,7 @@ function registries() {
         unread('example.com/zgone', 'absent', 'http410'),
       ],
       units: [{ unit: 'example.com/app/one', members: ['example.com/app/one', 'example.com/app/one/v2'] }],
+      notCountable: everywhere([{ 'crypto/md5': 0 }, 0]),
       measurability: {
         matched: { k: 3, excluded: [{ entry: 'crypto/md5', why: 'unmatchable' }] },
         weak: measure(1, ['github.com/square/go-jose'], [['crypto/md5', 'unmatchable']]),
@@ -284,6 +288,7 @@ function registries() {
         { ...unread('org.example:gone', 'absent', 'http404'), page: 1 },
       ],
       units: [{ unit: 'com.example', members: ['com.example:app', 'com.example:lib', 'com.example:tool'] }],
+      notCountable: everywhere([{ 'org.bouncycastle:bcpqc-jdk18on': 0 }, 0]),
       measurability: {
         matched: { k: 2, excluded: [{ entry: 'commons-codec:commons-codec', why: 'unclassified' }, { entry: 'org.bouncycastle:bcpqc-jdk18on', why: 'registryAbsent' }] },
         weak: measure(1, ['org.bouncycastle:bcprov-jdk15on'], []),
@@ -458,7 +463,7 @@ const fileName = {
   listing: (eco) => `listing-${eco}.tsv.gz`,
 };
 
-function cellsOf(spec, k, definitionId) {
+function cellsOf(spec, k, definitionId, [notCountable, onlyNotCountable] = [{}, 0]) {
   const [cells, byEntry, only, stats] = spec;
   const block = { definitionId };
   CLASSES.forEach((cls, i) => {
@@ -472,6 +477,11 @@ function cellsOf(spec, k, definitionId) {
     unitsWithOnlyUnclassifiedMatches: only,
     byEntry: Object.entries(byEntry).map(([entry, matches]) => ({ entry, matches })),
   };
+  block.excludedNotCountable = {
+    matches: sum(Object.values(notCountable)),
+    unitsWithOnlyNotCountableMatches: onlyNotCountable,
+    byEntry: Object.entries(notCountable).map(([entry, matches]) => ({ entry, matches })),
+  };
   if (stats) block.consolidation = { unitsIn: stats[0], unitsOut: stats[1], merged: stats[2], removedByRule: {} };
   return block;
 }
@@ -483,42 +493,73 @@ const ID = {
   consolidated: 'census.unit.consolidated/1',
 };
 
-function blocksOf(specs, k) {
+function blocksOf(specs, k, notCountable = {}) {
   return Object.fromEntries(DEFINITIONS.map((definition) => [definition, Object.fromEntries(UNITS.map((unit) =>
-    [unit, cellsOf(specs[definition][unit], k, `${ID[definition]}+${ID[unit]}`)]))]));
+    [unit, cellsOf(specs[definition][unit], k, `${ID[definition]}+${ID[unit]}`, notCountable[definition]?.[unit])]))]));
 }
 
 /** A total, summed by this file's own code: a class cell over the rows where its K is above 0. */
-function totalOf(rows) {
-  const total = { definitionId: rows[0].block.definitionId };
-  for (const cls of CLASSES) {
-    const measurable = rows.filter(({ block }) => block[cls].k > 0);
-    total[cls] = {
-      count: measurable.length ? sum(measurable.map(({ block }) => block[cls].count)) : null,
-      k: sum(measurable.map(({ block }) => block[cls].k)),
-      nullReason: measurable.length ? null : 'noCountableEntry',
-      measurableIn: measurable.map(({ eco }) => eco),
-      notMeasurableIn: rows.filter(({ block }) => block[cls].k === 0).map(({ eco }) => eco),
-    };
-  }
-  for (const joint of JOINT) {
-    const counted = rows.filter(({ block }) => block[joint].count !== null);
-    total[joint] = counted.length ? { count: sum(counted.map(({ block }) => block[joint].count)), nullReason: null } : { count: null, nullReason: 'noCountableEntry' };
-  }
-  total.excludedUnclassified = {
-    matches: sum(rows.map(({ block }) => block.excludedUnclassified.matches)),
-    unitsWithOnlyUnclassifiedMatches: sum(rows.map(({ block }) => block.excludedUnclassified.unitsWithOnlyUnclassifiedMatches)),
-    byEntry: rows.flatMap(({ block }) => block.excludedUnclassified.byEntry),
+function totalTables() {
+  return {
+    // A class cell sums the rows where its K is above 0 and names them; the two joint cells sum the rows
+    // where weak and pqc are both counted. K over those rows: matched 4+3+3+2+2+2+2+1+1+1+2, and so on.
+    measurable: {
+      matched: [...ECOSYSTEMS],
+      weak: ['npm', 'pypi', 'go', 'maven', 'crates', 'packagist', 'nuget', 'cocoapods'],
+      brokenAlgorithm: ['npm', 'pypi'],
+      deprecatedLibrary: ['npm', 'pypi', 'go', 'maven', 'crates', 'packagist', 'nuget', 'cocoapods'],
+      pqc: ['npm', 'crates'],
+      weakAndPqc: ['npm', 'crates'],
+      neitherWeakNorPqc: ['npm', 'crates'],
+    },
+    k: { matched: 23, weak: 10, brokenAlgorithm: 2, deprecatedLibrary: 8, pqc: 2 },
+    // matched, weak, brokenAlgorithm, deprecatedLibrary, pqc, weakAndPqc, neitherWeakNorPqc: the rows above, summed.
+    cells: {
+      anyManifestMatch: { raw: [20, 13, 4, 9, 3, 3, 0], consolidated: [15, 11, 3, 9, 3, 3, 0] },
+      directUnconditional: { raw: [15, 6, 2, 4, 2, 1, 1], consolidated: [12, 6, 2, 4, 2, 1, 0] },
+    },
+    // Each entry left out, by registry, and the units whose only matches it holds; the same for both units.
+    excluded: {
+      anyManifestMatch: {
+        excludedUnclassified: [[['npm', '@types/bcryptjs', 2], ['maven', 'commons-codec:commons-codec', 1], ['packagist', 'paragonie/random_compat', 1]], 2],
+        excludedNotCountable: [[['npm', 'tripledes', 1], ['go', 'crypto/md5', 0], ['maven', 'org.bouncycastle:bcpqc-jdk18on', 0]], 1],
+      },
+      directUnconditional: {
+        excludedUnclassified: [[['npm', '@types/bcryptjs', 1], ['maven', 'commons-codec:commons-codec', 1], ['packagist', 'paragonie/random_compat', 0]], 0],
+        excludedNotCountable: [[['npm', 'tripledes', 1], ['go', 'crypto/md5', 0], ['maven', 'org.bouncycastle:bcpqc-jdk18on', 0]], 1],
+      },
+    },
+    // unitsIn, unitsOut, merged: npm 6, 4, 2; go 3, 2, 1; maven 2, 1, 1; packagist 3, 2, 1; the rest unmerged.
+    stats: { anyManifestMatch: [23, 18, 5], directUnconditional: [16, 13, 3] },
   };
-  if (rows[0].block.consolidation) {
-    total.consolidation = {
-      unitsIn: sum(rows.map(({ block }) => block.consolidation.unitsIn)),
-      unitsOut: sum(rows.map(({ block }) => block.consolidation.unitsOut)),
-      merged: sum(rows.map(({ block }) => block.consolidation.merged)),
-      removedByRule: {},
-    };
-  }
-  return total;
+}
+
+/** The total blocks, from the tables written out above. */
+function totalsFrom(t) {
+  const rows = (cell) => ({ measurableIn: t.measurable[cell], notMeasurableIn: ECOSYSTEMS.filter((eco) => !t.measurable[cell].includes(eco)) });
+  const UNITS_FIELD = { excludedUnclassified: 'unitsWithOnlyUnclassifiedMatches', excludedNotCountable: 'unitsWithOnlyNotCountableMatches' };
+  return Object.fromEntries(DEFINITIONS.map((definition) => [definition, Object.fromEntries(UNITS.map((unit) => {
+    const cells = t.cells[definition][unit];
+    const block = { definitionId: `${ID[definition]}+${ID[unit]}` };
+    CLASSES.forEach((cls, i) => {
+      block[cls] = { count: cells[i], k: t.k[cls], nullReason: cells[i] === null ? 'noCountableEntry' : null, ...rows(cls) };
+    });
+    JOINT.forEach((joint, j) => {
+      block[joint] = { count: cells[5 + j], nullReason: cells[5 + j] === null ? 'noCountableEntry' : null, ...rows(joint) };
+    });
+    for (const [group, [items, only]] of Object.entries(t.excluded[definition])) {
+      block[group] = {
+        matches: sum(items.map(([, , matches]) => matches)),
+        [UNITS_FIELD[group]]: only,
+        byEntry: items.map(([ecosystem, entry, matches]) => ({ ecosystem, entry, matches })),
+      };
+    }
+    if (unit === 'consolidated') {
+      const [unitsIn, unitsOut, merged] = t.stats[definition];
+      block.consolidation = { unitsIn, unitsOut, merged, removedByRule: {} };
+    }
+    return [unit, block];
+  }))]));
 }
 
 const scannedRow = (row) => row.disposition === 'scanned';
@@ -641,19 +682,19 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
   for (const eco of ECOSYSTEMS) {
     const r = fixture[eco];
     const k = Object.fromEntries(CLASSES.map((cls) => [cls, r.measurability[cls].k]));
-    rows[eco] = { ...blocksOf(r.blocks, k), excludingDevMetadata: null };
+    rows[eco] = { ...blocksOf(r.blocks, k, r.notCountable), excludingDevMetadata: null };
     if (r.devBlocks) {
       rows[eco].excludingDevMetadata = {
         coverage: coverageOf(r.rows.filter((row) => row.readFrom !== 'devDefaultBranch')),
-        ...blocksOf(r.devBlocks, k),
+        ...blocksOf(r.devBlocks, k, r.notCountable),
       };
     }
   }
-  const totalsOver = (pick) => Object.fromEntries(DEFINITIONS.map((definition) => [definition, Object.fromEntries(UNITS.map((unit) =>
-    [unit, totalOf(ECOSYSTEMS.map((eco) => ({ eco, block: pick(eco)[definition][unit] })))]))]));
-  const comparability = earlier.map(({ dataset, version }) => (version === 1
+  const tables = totalTables();
+  change.totalTables?.(tables);
+  const comparability = earlier.map(({ dataset, version, comparable = true, changes = [] }) => (version === 1
     ? { dataset, doi: null, comparable: false, reason: 'instrumentChanged', changes: [...CHANGE_CODES] }
-    : { dataset, doi: null, comparable: true, reason: null, changes: [] }));
+    : { dataset, doi: null, comparable, reason: comparable ? null : 'instrumentChanged', changes }));
   const corpus = {
     schemaVersion: 2, kind: 'censusCorpus', collectedAt: date, generatedAt: `${date}T12:00:00Z`,
     inputs: {
@@ -681,13 +722,7 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
       byEcosystem: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, structuredClone({ ...scans[eco].coverage, enumeration: scans[eco].enumeration })])),
     },
     byEcosystem: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, { measurability: fixture[eco].measurability, ...rows[eco] }])),
-    total: {
-      ...totalsOver((eco) => rows[eco]),
-      excludingDevMetadata: {
-        coverage: Object.fromEntries(COVERAGE.map((field) => [field, sum(ECOSYSTEMS.map((eco) => (rows[eco].excludingDevMetadata ?? { coverage: scans[eco].coverage }).coverage[field]))])),
-        ...totalsOver((eco) => rows[eco].excludingDevMetadata ?? rows[eco]),
-      },
-    },
+    total: totalsFrom(tables),
     multiPurposeLibraries: MULTI_PURPOSE.map(({ ecosystem, entry: name, counts }) => ({
       ecosystem, entry: name, definitionId: 'census.table.multiPurposeLibrary/1',
       dependents: { anyManifestMatch: { raw: counts[0], consolidated: counts[1] }, directUnconditional: { raw: counts[2], consolidated: counts[3] } },
@@ -1342,10 +1377,9 @@ const corpusOf = (fn) => ({ corpus: fn });
 
 const npmRaw = (c) => c.byEcosystem.npm.anyManifestMatch.raw;
 
-test('a dataset in which no registry can measure post-quantum passes, with its joint totals null', async () => {
-  // Both countable post-quantum entries become absent from their registries. K drops, so every post-quantum
-  // cell and every joint cell is null; the matches to them still count toward matched, which needs only a
-  // classified entry. Written out by hand: npm and crates lose their pqc K, nothing else moves.
+test('a dataset in which no registry can measure post-quantum passes, with its post-quantum totals null', async () => {
+  // Both countable post-quantum entries become absent from their registries: K for pqc drops to 0 in npm and
+  // crates, every pqc and joint cell is null, and the matches to them leave every class for excludedNotCountable.
   const result = await validateOne({
     fixture: (f) => {
       for (const [eco, name] of [['npm', '@noble/post-quantum'], ['crates', 'pqcrypto']]) {
@@ -1353,10 +1387,36 @@ test('a dataset in which no registry can measure post-quantum passes, with its j
         f[eco].measurability.matched.k -= 1;
         f[eco].measurability.matched.excluded.push({ entry: name, why: 'registryAbsent' });
         f[eco].measurability.pqc = measure(0, [], [[name, 'registryAbsent']]);
-        for (const definition of DEFINITIONS) {
-          for (const unit of UNITS) f[eco].blocks[definition][unit][0].splice(4, 3, null, null, null);
-        }
       }
+      // npm: alpha and epsilon keep md5, so only zeta is in no class; under direct, epsilon's post-quantum is left out.
+      f.npm.blocks = {
+        anyManifestMatch: {
+          raw: [[4, 4, 3, 1, null, null, null], { '@types/bcryptjs': 2 }, 1],
+          consolidated: [[2, 2, 2, 1, null, null, null], { '@types/bcryptjs': 2 }, 1, [6, 4, 2]],
+        },
+        directUnconditional: {
+          raw: [[3, 2, 2, 0, null, null, null], { '@types/bcryptjs': 1 }, 0],
+          consolidated: [[2, 2, 2, 0, null, null, null], { '@types/bcryptjs': 1 }, 0, [4, 3, 1]],
+        },
+      };
+      f.npm.notCountable = {
+        anyManifestMatch: { raw: [{ '@noble/post-quantum': 2, tripledes: 1 }, 1], consolidated: [{ '@noble/post-quantum': 2, tripledes: 1 }, 1] },
+        directUnconditional: { raw: [{ '@noble/post-quantum': 1, tripledes: 1 }, 1], consolidated: [{ '@noble/post-quantum': 1, tripledes: 1 }, 1] },
+      };
+      // crates: quantum-app keeps rust-crypto as a manifest match; its one direct match is the absent pqcrypto.
+      f.crates.blocks = plain([1, 1, null, 1, null, null, null], 1, [0, 0, null, 0, null, null, null], 1);
+      f.crates.notCountable = { anyManifestMatch: { raw: [{ pqcrypto: 1 }, 0], consolidated: [{ pqcrypto: 1 }, 0] },
+        directUnconditional: { raw: [{ pqcrypto: 1 }, 1], consolidated: [{ pqcrypto: 1 }, 1] } };
+    },
+    totalTables: (t) => {
+      Object.assign(t.measurable, { pqc: [], weakAndPqc: [], neitherWeakNorPqc: [] });
+      Object.assign(t.k, { matched: 21, pqc: 0 });
+      t.cells.anyManifestMatch = { raw: [20, 13, 4, 9, null, null, null], consolidated: [15, 11, 3, 9, null, null, null] };
+      t.cells.directUnconditional = { raw: [14, 6, 2, 4, null, null, null], consolidated: [11, 6, 2, 4, null, null, null] };
+      const notCountable = (npmPqc) => [['npm', '@noble/post-quantum', npmPqc], ['npm', 'tripledes', 1], ['go', 'crypto/md5', 0],
+        ['maven', 'org.bouncycastle:bcpqc-jdk18on', 0], ['crates', 'pqcrypto', 1]];
+      t.excluded.anyManifestMatch.excludedNotCountable = [notCountable(2), 1];
+      t.excluded.directUnconditional.excludedNotCountable = [notCountable(1), 2];
     },
   });
   assert.equal(result.code, 0, result.stderr);
@@ -1457,9 +1517,9 @@ plant('a multi-purpose library among the post-quantum entries', corpusOf((c) => 
 // figure is caught as not following from the files rather than as one that breaks an identity.
 // neitherWeakNorPqc cannot move alone without breaking the first identity, so its test is that one.
 const offByOne = [
-  ['matched', 'anyManifestMatch', { matched: 1, neitherWeakNorPqc: 1 }, 6],
-  ['weak', 'directUnconditional', { weak: 1, brokenAlgorithm: 1, neitherWeakNorPqc: -1 }, 4],
-  ['brokenAlgorithm', 'anyManifestMatch', { brokenAlgorithm: 1 }, 5],
+  ['matched', 'anyManifestMatch', { matched: 1, neitherWeakNorPqc: 1 }, 5],
+  ['weak', 'directUnconditional', { weak: 1, brokenAlgorithm: 1, neitherWeakNorPqc: -1 }, 3],
+  ['brokenAlgorithm', 'anyManifestMatch', { brokenAlgorithm: 1 }, 4],
   ['deprecatedLibrary', 'anyManifestMatch', { deprecatedLibrary: 1 }, 2],
   ['pqc', 'anyManifestMatch', { pqc: 1, weakAndPqc: 1 }, 3],
   ['weakAndPqc', 'anyManifestMatch', { weakAndPqc: 1, neitherWeakNorPqc: 1 }, 3],
@@ -1470,14 +1530,14 @@ for (const [cell, definition, moves, count] of offByOne) {
   }), new RegExp(`byEcosystem\\.npm\\.${definition}\\.raw\\.${cell} is \\{"count":${count}[,}].*recomputed from the files it is bound to`));
 }
 plant('a consolidated cell off by one', corpusOf((c) => { c.byEcosystem.maven.anyManifestMatch.consolidated.matched.count += 1; }), /maven\.anyManifestMatch\.consolidated\.matched is \{"count":2.*recomputed/);
-plant('a total cell off by one', corpusOf((c) => { c.total.anyManifestMatch.raw.matched.count += 1; }), /total\.anyManifestMatch\.raw\.matched is \{"count":22.*recomputed/);
+plant('a total cell off by one', corpusOf((c) => { c.total.anyManifestMatch.raw.matched.count += 1; }), /total\.anyManifestMatch\.raw\.matched is \{"count":21.*recomputed/);
 plant('a count where K is 0', corpusOf((c) => { c.byEcosystem.go.anyManifestMatch.raw.pqc = { count: 0, k: 0, nullReason: null }; }), /go\.anyManifestMatch\.raw\.pqc is \{"count":0,"k":0,"nullReason":null\}: count must be null when k is 0/);
 plant('null where K is not 0', corpusOf((c) => { c.byEcosystem.pypi.directUnconditional.raw.weak = { count: null, k: 2, nullReason: 'noCountableEntry' }; }), /pypi\.directUnconditional\.raw\.weak is .*: count is null while k is 2/);
 plant('a null with no reason', corpusOf((c) => { c.byEcosystem.go.anyManifestMatch.raw.pqc.nullReason = null; }), /go\.anyManifestMatch\.raw\.pqc is .*: nullReason says why count is null/);
 plant('a reason with no null', corpusOf((c) => { npmRaw(c).weakAndPqc.nullReason = 'noCountableEntry'; }), /anyManifestMatch\.raw\.weakAndPqc is .*: nullReason says why count is null/);
 plant('a null reason that is not one', corpusOf((c) => { c.byEcosystem.go.anyManifestMatch.raw.pqc.nullReason = 'notMeasured'; }), /pqc\.nullReason is "notMeasured", not noCountableEntry, rowBlocked or null/);
 plant('a K that is not a count', corpusOf((c) => { npmRaw(c).weak.k = null; }), /anyManifestMatch\.raw\.weak\.k is null, not a whole count/);
-plant('a cell under another K', corpusOf((c) => { npmRaw(c).weak.k = 3; }), /anyManifestMatch\.raw\.weak is \{"count":5,"k":3,"nullReason":null\}; recomputed/);
+plant('a cell under another K', corpusOf((c) => { npmRaw(c).weak.k = 3; }), /anyManifestMatch\.raw\.weak is \{"count":4,"k":3,"nullReason":null\}; recomputed/);
 plant('a block under another definition id', corpusOf((c) => { npmRaw(c).definitionId = 'census.match.anyManifest/1'; }), /anyManifestMatch\.raw\.definitionId is "census\.match\.anyManifest\/1", not census\.match\.anyManifest\/1\+census\.unit\.package\/1/);
 plant('a block without its consolidation figures', corpusOf((c) => { delete c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation; }), /anyManifestMatch\.consolidated is missing consolidation/);
 plant('a raw block with consolidation figures', corpusOf((c) => { npmRaw(c).consolidation = { unitsIn: 6, unitsOut: 6, merged: 0, removedByRule: {} }; }), /anyManifestMatch\.raw carries consolidation/);
@@ -1490,8 +1550,33 @@ plant('consolidation figures off by one that still add up', corpusOf((c) => { Ob
 plant('consolidation figures that do not add up', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation.unitsIn = 7; }), /consolidated\.consolidation: unitsIn \(7\) is not unitsOut \+ merged \(6\)/);
 plant('a removal counted where no rule removes a package', corpusOf((c) => { Object.assign(c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation, { removedByRule: { sharedNamespace: 1 }, merged: 1 }); }),
   /removedByRule is \{"sharedNamespace":1\}\. Under census\.unit\.consolidated\/1 no rule removes a package, so it is empty/);
-plant('flags whose parts do not make the matched count', corpusOf((c) => { npmRaw(c).neitherWeakNorPqc.count = 1; }), /anyManifestMatch\.raw: matched \(5\) is not weak \(5\) \+ pqc \(2\) - weakAndPqc \(2\) \+ neitherWeakNorPqc \(1\)/);
-plant('weak outside its two classes', corpusOf((c) => { npmRaw(c).deprecatedLibrary.count = 0; }), /anyManifestMatch\.raw: weak \(5\) is not between the larger of brokenAlgorithm \(4\) and deprecatedLibrary \(0\) and their sum/);
+plant('flags whose parts do not make the matched count', corpusOf((c) => { npmRaw(c).neitherWeakNorPqc.count = 1; }), /anyManifestMatch\.raw: matched \(4\) is not weak \(4\) \+ pqc \(2\) - weakAndPqc \(2\) \+ neitherWeakNorPqc \(1\)/);
+plant('a corpus that counts a match no scan can observe', corpusOf((c) => {
+  // As if zeta's match to tripledes, absent from the registry, put it in matched, weak and brokenAlgorithm.
+  Object.assign(npmRaw(c), { matched: { count: 5, k: 4, nullReason: null }, weak: { count: 5, k: 2, nullReason: null }, brokenAlgorithm: { count: 4, k: 1, nullReason: null } });
+  Object.assign(npmRaw(c).excludedNotCountable, { unitsWithOnlyNotCountableMatches: 0 });
+}), /byEcosystem\.npm\.anyManifestMatch\.raw\.matched is \{"count":5,"k":4,"nullReason":null\}; recomputed/);
+plant('matches no scan can observe off by one', corpusOf((c) => { npmRaw(c).excludedNotCountable.matches = 2; }), /raw\.excludedNotCountable\.matches is 2; recomputed it is 1/);
+plant('units whose only matches no scan can observe off by one', corpusOf((c) => { npmRaw(c).excludedNotCountable.unitsWithOnlyNotCountableMatches = 2; }), /excludedNotCountable\.unitsWithOnlyNotCountableMatches is 2; recomputed it is 1/);
+plant('an entry no scan can observe left out of its list', corpusOf((c) => { c.byEcosystem.go.anyManifestMatch.raw.excludedNotCountable.byEntry = []; }),
+  /go\.anyManifestMatch\.raw\.excludedNotCountable\.byEntry is \[\]; recomputed it is .*every classified and not countable entry/);
+plant('a block without the matches it could not count', corpusOf((c) => { delete npmRaw(c).excludedNotCountable; }), /anyManifestMatch\.raw is missing excludedNotCountable/);
+plant('a total whose five cells sum the same registries and do not add up', corpusOf((c) => {
+  const total = c.total.anyManifestMatch.raw;
+  const npmAndCrates = { measurableIn: ['npm', 'crates'], notMeasurableIn: ECOSYSTEMS.filter((eco) => !['npm', 'crates'].includes(eco)) };
+  Object.assign(total.matched, { count: 5, ...npmAndCrates });
+  Object.assign(total.weak, { count: 5, ...npmAndCrates });
+  Object.assign(total.pqc, npmAndCrates);
+  Object.assign(total.weakAndPqc, npmAndCrates);
+  Object.assign(total.neitherWeakNorPqc, { count: 1, ...npmAndCrates });
+}), /total\.anyManifestMatch\.raw: matched \(5\) is not weak \(5\) \+ pqc \(3\) - weakAndPqc \(3\) \+ neitherWeakNorPqc \(1\), and all five sum the same registries/);
+plant('a total joint cell that does not name its registries', corpusOf((c) => { delete c.total.directUnconditional.raw.weakAndPqc.measurableIn; }), /total\.directUnconditional\.raw\.weakAndPqc is missing measurableIn/);
+plant('a total joint cell that names the wrong registries', corpusOf((c) => { c.total.directUnconditional.raw.neitherWeakNorPqc.measurableIn = ['npm']; }), /total\.directUnconditional\.raw\.neitherWeakNorPqc is .*recomputed/);
+plant('a total entry that does not name its registry', corpusOf((c) => { delete c.total.anyManifestMatch.raw.excludedUnclassified.byEntry[0].ecosystem; }),
+  /total\.anyManifestMatch\.raw\.excludedUnclassified\.byEntry\[0\] is missing ecosystem/);
+plant('a total entry under another registry', corpusOf((c) => { c.total.anyManifestMatch.raw.excludedUnclassified.byEntry[0].ecosystem = 'pypi'; }),
+  /total\.anyManifestMatch\.raw\.excludedUnclassified\.byEntry is .*recomputed/);
+plant('weak outside its two classes', corpusOf((c) => { npmRaw(c).deprecatedLibrary.count = 0; }), /anyManifestMatch\.raw: weak \(4\) is not between the larger of brokenAlgorithm \(3\) and deprecatedLibrary \(0\) and their sum/);
 plant('"neither" counted where post-quantum is not measurable', corpusOf((c) => { c.byEcosystem.go.anyManifestMatch.raw.neitherWeakNorPqc = { count: 2, nullReason: null }; }), /go\.anyManifestMatch\.raw: weakAndPqc or neitherWeakNorPqc is counted while weak or pqc is not measurable/);
 plant('more matched than packages read with observable dependencies', corpusOf((c) => { c.byEcosystem.go.anyManifestMatch.raw.matched.count = 5; }), /go\.anyManifestMatch\.raw: matched \(5\) is more than the 4 packages read whose dependencies could be observed/);
 plant('a direct figure above the manifest-match one', corpusOf((c) => { c.byEcosystem.npm.directUnconditional.raw.deprecatedLibrary.count = 2; }),
@@ -1502,9 +1587,7 @@ plant('coverage without dev metadata off by one', corpusOf((c) => { c.byEcosyste
 plant('a figure without dev metadata off by one', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata.anyManifestMatch.raw.matched.count = 2; }), /packagist\.excludingDevMetadata\.anyManifestMatch\.raw\.matched is \{"count":2.*recomputed/);
 plant('a total that names the wrong rows as measurable', corpusOf((c) => { c.total.directUnconditional.raw.pqc.measurableIn = ['npm']; }), /total\.directUnconditional\.raw\.pqc is .*recomputed/);
 plant('a total whose measurable rows are not registries', corpusOf((c) => { c.total.directUnconditional.raw.pqc.measurableIn = ['npm', 'npm']; }), /total\.directUnconditional\.raw\.pqc\.measurableIn is \["npm","npm"\], not a list of distinct registries/);
-plant('a total without dev metadata left out', corpusOf((c) => { c.total.excludingDevMetadata = null; }), /total\.excludingDevMetadata is null, not an object/);
-plant('a total coverage without dev metadata off by one', corpusOf((c) => { c.total.excludingDevMetadata.coverage.listed = 36; }), /total\.excludingDevMetadata\.coverage\.listed is 36; the ledgers give 35/);
-plant('a total figure without dev metadata off by one', corpusOf((c) => { c.total.excludingDevMetadata.directUnconditional.raw.weak.count += 1; }), /total\.excludingDevMetadata\.directUnconditional\.raw\.weak is .*recomputed/);
+plant('a total that carries figures without dev metadata', corpusOf((c) => { c.total.excludingDevMetadata = null; }), /corpus-2026-09-30\.json: total carries excludingDevMetadata/);
 plant('a multi-purpose library left out', corpusOf((c) => { c.multiPurposeLibraries.pop(); }), /multiPurposeLibraries has no row for go:github\.com\/cloudflare\/circl/);
 plant('a library listed as multi-purpose that is not', corpusOf((c) => { c.multiPurposeLibraries.push({ ...c.multiPurposeLibraries[0], entry: 'pyDes' }); }), /multiPurposeLibraries\[2\] names "pypi":"pyDes", which is not a multi-purpose entry/);
 plant('a multi-purpose library listed twice', corpusOf((c) => { c.multiPurposeLibraries.push(structuredClone(c.multiPurposeLibraries[0])); }), /multiPurposeLibraries\[2\] names pypi:cryptography a second time/);
@@ -1540,10 +1623,6 @@ plant('an unclassified count that is not a count', corpusOf((c) => { npmRaw(c).e
 plant('consolidation figures that are not counts', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation.unitsOut = null; }), /consolidated\.consolidation\.unitsOut is null, not a whole count/);
 plant('a comparable dataset that still gives a reason', corpusOf((c) => { c.comparability[0].comparable = true; }), /comparability\[0\] is comparable and still gives a reason or changes/);
 plant('a coverage total that is not a count', corpusOf((c) => { c.coverage.total.absent = -1; }), /coverage\.total\.absent is -1, not a whole count/);
-plant('a total without dev metadata where no registry reads from it', {
-  fixture: (f) => { f.packagist.method.readFrom = ['taggedRelease']; f.packagist.rows.find((r) => r.name === 'acme/cli').readFrom = 'taggedRelease'; },
-  corpus: (c) => { c.byEcosystem.packagist.excludingDevMetadata = null; },
-}, /total\.excludingDevMetadata is set, and no registry is read partly from dev metadata/);
 
 // Where a dataset sits.
 test('comparability missing an earlier directory is refused', async () => {
@@ -1562,13 +1641,47 @@ test('a later dataset marked comparable with an earlier one whose instrument dif
   assert.equal(result.code, 1, result.stdout);
   assert.match(firstProblem(result.stderr), /2026-09-15 is marked comparable, and these differ between the two datasets: the npm scanner's method\. Two datasets are comparable only when/, result.stderr);
 });
+test('a later dataset that names what changed in the instrument passes', async () => {
+  const result = await validate({
+    [EARLIER_V2]: [EARLIER_V2, { scans: (s) => { s.npm.method.versionSelection = 'distTagLatest'; } }],
+    [DATE]: [DATE, {}, [{ dataset: FIRST_SHAPE, version: 1 }, { dataset: EARLIER_V2, version: 2, comparable: false, changes: ['versionSelection'] }]],
+  });
+  assert.equal(result.code, 0, result.stderr);
+});
+
+test('a change code these rules do not recompute may be named beside the others', async () => {
+  const result = await validate({
+    [EARLIER_V2]: [EARLIER_V2, { scans: (s) => { s.npm.method.versionSelection = 'distTagLatest'; } }],
+    [DATE]: [DATE, {}, [{ dataset: FIRST_SHAPE, version: 1 }, { dataset: EARLIER_V2, version: 2, comparable: false, changes: ['versionSelection', 'enumerationFrame'] }]],
+  });
+  assert.equal(result.code, 0, result.stderr);
+});
+
+for (const [what, earlierChange, changes, problem] of [
+  ['changes that do not name what changed', { scans: (s) => { s.npm.method.versionSelection = 'distTagLatest'; } }, ['matchSet'],
+    /comparability\[1\]\.changes is \["matchSet"\]; recomputed from the fields each code names, the two datasets differ in \["versionSelection"\]/],
+  ['changes that name what did not change', { scans: (s) => { s.npm.method.versionSelection = 'distTagLatest'; } }, ['versionSelection', 'classification'],
+    /comparability\[1\]\.changes is \["versionSelection","classification"\]; recomputed .* differ in \["versionSelection"\]/],
+  ['a change named between two datasets whose instruments are the same', {}, ['matchRule'],
+    /comparability\[1\]\.changes is \["matchRule"\]; recomputed from the fields each code names, the two datasets differ in \[\]/],
+]) {
+  test(`${what} are refused`, async () => {
+    const result = await validate({
+      [EARLIER_V2]: [EARLIER_V2, earlierChange],
+      [DATE]: [DATE, {}, [{ dataset: FIRST_SHAPE, version: 1 }, { dataset: EARLIER_V2, version: 2, comparable: false, changes }]],
+    });
+    assert.equal(result.code, 1, result.stdout);
+    assert.match(firstProblem(result.stderr), problem, result.stderr);
+  });
+}
+
 test('a later dataset marked comparable with an earlier one that cannot be read is refused', async () => {
   const result = await validate({
     [EARLIER_V2]: [EARLIER_V2, {}],
     [DATE]: [DATE, {}, [{ dataset: FIRST_SHAPE, version: 1 }, { dataset: EARLIER_V2, version: 2 }]],
   }, (dir) => unlinkSync(join(dir, 'datasets', EARLIER_V2, 'catalog-2026-09-15.json')));
   assert.equal(result.code, 1, result.stdout);
-  assert.match(firstProblem(result.stderr), /2026-09-15 is marked comparable, and the files that would show it cannot be read/, result.stderr);
+  assert.match(firstProblem(result.stderr), /2026-09-15 is a version 2 dataset whose instrument cannot be read beside this one's/, result.stderr);
 });
 test('an earlier dataset whose manifest cannot be read is refused as a comparison', async () => {
   const result = await validate({ [DATE]: [DATE, {}, [{ dataset: FIRST_SHAPE, version: 1 }, { dataset: '2026-09-01', version: 1 }]] },
@@ -1610,8 +1723,8 @@ const closedInTheCorpus = [
   ['the figures without dev metadata', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata.note = 'x'; }), /byEcosystem\.packagist\.excludingDevMetadata carries note/],
   ['the total', corpusOf((c) => { c.total.coverage = c.coverage.total; }), /corpus-2026-09-30\.json: total carries coverage/],
   ['a total cell', corpusOf((c) => { c.total.anyManifestMatch.raw.weak.note = 'x'; }), /total\.anyManifestMatch\.raw\.weak carries note/],
-  ['a joint total cell', corpusOf((c) => { c.total.anyManifestMatch.raw.weakAndPqc.measurableIn = ['npm']; }), /total\.anyManifestMatch\.raw\.weakAndPqc carries measurableIn/],
-  ['the total without dev metadata', corpusOf((c) => { c.total.excludingDevMetadata.note = 'x'; }), /total\.excludingDevMetadata carries note/],
+  ['a joint total cell', corpusOf((c) => { c.total.anyManifestMatch.raw.weakAndPqc.k = 2; }), /total\.anyManifestMatch\.raw\.weakAndPqc carries k/],
+  ['what a block could not count', corpusOf((c) => { npmRaw(c).excludedNotCountable.note = 'x'; }), /raw\.excludedNotCountable carries note/],
   ['a multi-purpose library', corpusOf((c) => { c.multiPurposeLibraries[0].total = 2; }), /multiPurposeLibraries\[0\] carries total/],
   ['its dependents', corpusOf((c) => { c.multiPurposeLibraries[0].dependents.anyManifestMatch.total = 2; }), /dependents\.anyManifestMatch carries total/],
 ];
