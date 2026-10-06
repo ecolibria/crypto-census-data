@@ -20,7 +20,7 @@ reading as valid.
 
 ## What is published
 
-| Dataset | Kind | Packages listed | Matched a catalogued library | Ecosystems | Known issues |
+| Dataset | Kind | Packages listed | Counted as matching a catalogued library | Ecosystems | Known issues |
 |---|---|---|---|---|---|
 | [`2026-08-03`](datasets/2026-08-03) | raw+aggregate | 2,170,994 | 65,686 | 11 | [`errata/2026-08-03.json`](errata/2026-08-03.json) |
 | [`2026-03-18`](datasets/2026-03-18) | aggregate-only | 2,809,479 | 108,145 | 11 | two rows annotated in place (below) |
@@ -73,6 +73,7 @@ measured, and how to check it.
 | npm, PyPI, Go, Maven, Packagist, NuGet, CocoaPods | A package that could not be read was counted as scanned and as using no cryptography. | `packagesScanned` overstates; match counts understate |
 | npm, Go, Maven, NuGet, RubyGems, Hex, pub.dev | The packages listed are the first part of the registry's list. | Not a sample |
 | Every ecosystem but Hex and pub.dev | The weak tier mixes libraries that implement broken algorithms with libraries that are deprecated or unmaintained, and holds entries the corrected classes do not class as weak. | Overstates |
+| Totals | Packages three processing steps dropped were counted as using no cryptography. | `packagesWithCrypto` understates; `withNoCrypto` overstates |
 | Totals and shares | They sum or divide the counts above. | Not established |
 | `topExposedProjects`, `topPqcProjects` | The two lists name packages through entries not classed weak, or through optional declarations. | Overstates |
 
@@ -166,6 +167,8 @@ a run in which any ecosystem enumerated implausibly little, or enumerated
 normally and matched nothing at all — both of which have happened, and neither
 of which looks like a failure in the totals.
 
+The 2026-08-03 files were written after the run their manifest's `provenance` names; `regenerations` in [`errata/2026-08-03.json`](errata/2026-08-03.json) records what wrote them, and which fields still hold values from before the processing steps.
+
 A scan limit is not to be chosen to reproduce a previously published figure. On 2026-10-05 four limits in the
 source repository were raised so that a run would list more packages than the March dataset did. No dataset was
 published from those limits. They are to be replaced by a rule that takes each limit from what the registry lists
@@ -179,8 +182,8 @@ a new dated dataset that supersedes the old one and says so.
 
 A defect measured after publication is recorded in `errata/<date>.json`, outside the dataset directory, so the
 deposited bytes do not change. An errata file only grows. CI rejects a pull request that edits, reorders or
-removes an issue already published in one, changes anything else in the file, or deletes or renames it. Each
-issue carries the date it was added.
+removes an issue or regeneration already published in one, changes anything else in the file, or deletes or renames it. Each
+issue or regeneration carries the date it was added.
 
 This is the property a DOI depends on: a citation points at bytes that must not
 move underneath it.
