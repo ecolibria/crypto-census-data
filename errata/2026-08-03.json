@@ -1,0 +1,392 @@
+{
+  "schemaVersion": 2,
+  "kind": "censusErrata",
+  "dataset": "2026-08-03",
+  "doi": "10.5281/zenodo.21791658",
+  "issuedAt": "2026-10-06",
+  "issues": [
+    {
+      "defect": "first-dependencies-element-read-wherever-it-sat",
+      "summary": "The Maven scanner read the first <dependencies> element in each POM wherever it sat, which is not always the project's own dependency list. Two sets of POMs from Maven Central were compared with an XML parser on 2026-10-05. Neither is a random sample: the first is three pages of the search index and four group queries, the second is the dependency lists of two BOMs, parent POMs and hand-picked files, so the counts describe those sets. In the first, the scanner's dependency list differs on 87 of 420, each time reporting a dependency the POM does not declare. In the second it differs on 141 of 393. In that second set the XML parser finds a catalogued library in 23 POMs. The scanner flagged 26: 17 of those 23 and 9 that declare none. It missed the other 6. The Maven counts are wrong in both directions.",
+      "affects": [
+        "byEcosystem.maven.weakExposed",
+        "byEcosystem.maven.modernOnly"
+      ],
+      "direction": "unknown",
+      "magnitude": {
+        "value": 141,
+        "of": 393,
+        "unit": "POMs in the second set whose dependency list the scanner read differently from an XML parser"
+      },
+      "correctedIn": "scripts/scan-maven.mjs was corrected on 2026-10-05 to read project-level dependencies only; no scan has been published with it. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "entries-matched-only-by-libraries-being-removed",
+      "summary": "Six catalogue entries are being taken out of the count because their primary function is not cryptography or they are polyfills for a language built-in: commons-codec, OkHttp and ESAPI (Maven), paragonie/random_compat and ircmaxell/password-compat (Packagist) and @types/bcryptjs (npm). 1,081 published entries match only those: 1,000 of the 1,957 Maven entries, 78 of the 1,153 Packagist entries and 3 of the 10,249 npm entries. To recount: in each scan-results file, the entries whose cryptoDeps name only the libraries listed here.",
+      "affects": [
+        "byEcosystem.maven.weakExposed",
+        "byEcosystem.maven.modernOnly",
+        "byEcosystem.packagist.weakExposed",
+        "byEcosystem.npm.modernOnly"
+      ],
+      "direction": "overstates",
+      "magnitude": {
+        "value": 1081,
+        "of": 65686,
+        "unit": "packages counted as matching a catalogued library"
+      },
+      "correctedIn": "A correction to the catalogue is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "catalogue-names-matched-by-path-prefix",
+      "summary": "The Go scanner matched catalogue names by path prefix. 937 of the 13,343 modules counted as using cryptography are counted only through two cloud SDK entries, cloud.google.com/go/kms/apiv1 and github.com/aws/aws-sdk-go-v2/service/kms. To recount: in scan-results-go-clean.json, the entries whose cryptoDeps name only those two. The effect of prefix matching on the other Go counts has not been measured.",
+      "affects": [
+        "byEcosystem.go.modernOnly"
+      ],
+      "direction": "overstates",
+      "magnitude": {
+        "value": 937,
+        "of": 13343,
+        "unit": "Go modules counted as using cryptography"
+      },
+      "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "packages-counted-only-through-removed-entries-or-a-prefix-match",
+      "summary": "2,018 of the 65,686 packages counted as matching a catalogued library are counted only through catalogue entries that are being taken out of the count or through the Go path-prefix match: Maven 1,000, Go 937, Packagist 78, npm 3. packagesWithCrypto overstates by that number on this account. Each of the two mechanisms has its own entry here.",
+      "affects": [
+        "packagesWithCrypto"
+      ],
+      "direction": "overstates",
+      "magnitude": {
+        "value": 2018,
+        "of": 65686,
+        "unit": "packages counted as matching a catalogued library"
+      },
+      "correctedIn": "Corrections are planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "catalogue-entry-absent-from-the-registry",
+      "summary": "Every post-quantum entry the catalogue held for Maven Central (org.bouncycastle:bcpqc-jdk18on and org.openquantumsafe:liboqs-java) and for CocoaPods (liboqs) names a package the registry does not have. No package in either registry could be counted as post-quantum, so the two zeros are not measurements. To check: https://repo1.maven.org/maven2/org/bouncycastle/bcpqc-jdk18on/ , https://repo1.maven.org/maven2/org/openquantumsafe/liboqs-java/ and https://trunk.cocoapods.org/api/v1/pods/liboqs each returned 404 on 2026-10-05.",
+      "affects": [
+        "byEcosystem.maven.pqcReady",
+        "byEcosystem.cocoapods.pqcReady"
+      ],
+      "direction": "unknown",
+      "magnitude": null,
+      "correctedIn": "A correction to the catalogue is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "indirect-requirements-counted-as-direct",
+      "summary": "The Go scanner counted requirements marked // indirect as direct dependencies. In a reconstruction made on 2026-10-05 from the scan's own index pages and go.mod files, 4,720 of the 13,045 published entries that could be re-read required the matched library only as // indirect. The raw file marks every match as direct, so it cannot be used to separate them.",
+      "affects": [
+        "byEcosystem.go.weakExposed",
+        "byEcosystem.go.modernOnly",
+        "byEcosystem.go.pqcReady"
+      ],
+      "direction": "overstates",
+      "magnitude": {
+        "value": 4720,
+        "of": 13045,
+        "unit": "published Go entries re-read in the reconstruction that required the matched library only as // indirect"
+      },
+      "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "module-read-at-its-first-indexed-version",
+      "summary": "The Go scanner read each module at its first indexed version, reading the index from 2019-04-10, the scanner's default. The run recorded no end. In a reconstruction made on 2026-10-05, the 13,141 of the 13,343 published entries that could be located were first indexed between 2019-04-10 and 2020-07-30. The Go row therefore describes manifests of that period, not of August 2026. In a sample of 400 modules checked the same day, 379 were readable and 295 of them have no version after 2020.",
+      "affects": [
+        "byEcosystem.go.weakExposed",
+        "byEcosystem.go.modernOnly",
+        "byEcosystem.go.pqcReady"
+      ],
+      "direction": "unknown",
+      "magnitude": {
+        "value": 13141,
+        "of": 13343,
+        "unit": "published Go entries located in the reconstruction, each first indexed between 2019-04-10 and 2020-07-30"
+      },
+      "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "module-line-only-manifests-counted-as-no-cryptography",
+      "summary": "In a reconstruction of the Go scan made on 2026-10-05, 113,638 of the 200,895 go.mod files read hold only a module line and declare no dependencies. The scanner counted such modules as using no cryptography. Those two figures are the reconstruction's; the published row's own are 200,117 modules scanned and 76 not read.",
+      "affects": [
+        "byEcosystem.go.weakExposed",
+        "byEcosystem.go.modernOnly",
+        "byEcosystem.go.pqcReady"
+      ],
+      "direction": "understates",
+      "magnitude": {
+        "value": 113638,
+        "of": 200895,
+        "unit": "go.mod files read in the reconstruction that hold only a module line"
+      },
+      "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "dependencies-counted-however-declared",
+      "summary": "The crates.io scanner counted a dependency however it is declared: optional, development, build and platform-specific dependencies as well as required ones. Re-read on 2026-10-05 from the crates.io index at each crate's newest version as of the scan date, and counting only dependencies declared as normal, not optional and for every platform: post-quantum 259 becomes 157, weak 4,460 becomes 3,740 and modern-only 24,485 becomes 20,935. 224 crates move between the three counts. 285 of the 29,204 crates could not be re-read and are in none of the after-figures. Of the 259 counted as post-quantum: 157 required, 84 optional, 12 development only, 1 for one platform only, 5 not re-readable. Applying the scanner's own rule to the re-read data reproduces the published class for 28,914 of the 28,919 crates that could be re-read. In the raw file 3,057 matches are marked as not direct and still count toward a crate's class.",
+      "affects": [
+        "byEcosystem.crates.weakExposed",
+        "byEcosystem.crates.modernOnly",
+        "byEcosystem.crates.pqcReady"
+      ],
+      "direction": "overstates",
+      "magnitude": {
+        "value": 157,
+        "of": 259,
+        "unit": "crates counted as post-quantum that require the library unconditionally at the scanned version"
+      },
+      "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "requirements-behind-an-extra-or-marker-counted",
+      "summary": "The PyPI scanner counted requirements declared behind an extra or an environment marker as dependencies. Read from pypi.org on 2026-10-05: of the 5,019 published entries, 3,768 have had no upload since the scan, so their metadata is what the scan read. Counting only requirements with no marker, 380 of those 3,768 no longer match a catalogued library, and among the 3,768 post-quantum 13 becomes 4, weak 174 becomes 165 and modern-only 3,581 becomes 3,219. The other 1,251 entries have had an upload since the scan or are no longer on the registry, and are not counted here.",
+      "affects": [
+        "byEcosystem.pypi.weakExposed",
+        "byEcosystem.pypi.modernOnly",
+        "byEcosystem.pypi.pqcReady"
+      ],
+      "direction": "overstates",
+      "magnitude": {
+        "value": 380,
+        "of": 3768,
+        "unit": "published PyPI entries unchanged since the scan that match a catalogued library only behind an extra or a marker"
+      },
+      "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "dependencies-declared-for-some-target-frameworks-counted",
+      "summary": "The NuGet scanner counted a library that a package declares for only some of its target frameworks as a dependency of the package. Re-read from the NuGet registry on 2026-10-05 at the last version it lists for each package, which is the scanner's own rule: 1,905 of the 1,911 published entries could be read, and 87 of them match a catalogued library only in dependency groups for some target frameworks. Of the 200 re-read packages that remain weak-classed under the corrected classes, 57 declare the weak library that way, and 42 of the 57 belong to one family of packages whose names share their first part. Of the 1,702 re-read packages counted as modern-only, 36 match only that way. How far the re-read shows what the scan read depends on the date of that last version. For 721 packages it is dated before the scan, so the version is the one the scan read: among them the two counts are 2 of 63 and 14 of 656. For 1,047 it is dated after the scan, so the re-read is of a later version. The other 137 are unlisted, and the registry gives an unlisted version no date, so their date does not show which version the scan read: among them the counts are 51 of 65 and 1 of 72. A library is taken as declared for every target framework when it is in every dependency group of the package or in a group that names no framework.",
+      "affects": [
+        "byEcosystem.nuget.weakExposed",
+        "byEcosystem.nuget.modernOnly"
+      ],
+      "direction": "overstates",
+      "magnitude": {
+        "value": 87,
+        "of": 1905,
+        "unit": "published NuGet entries re-read on 2026-10-05 that match a catalogued library only in dependency groups for some target frameworks"
+      },
+      "correctedIn": "A correction that records how each match is declared is planned for every scanner and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "dependencies-in-non-default-subspecs-counted",
+      "summary": "The CocoaPods scanner counted a library that a pod declares only in a subspec outside its default subspecs, which is not installed unless asked for. Re-read from the CocoaPods CDN on 2026-10-05 at the last version it lists for each pod, which is the scanner's own rule: of the 357 matched pods, 5 match a catalogued library only that way, 3 counted as modern-only and 2 as weak. Both of the weak ones are counted through OpenSSL, which the corrected classes keep as weak. The re-read reproduces the published matches for 355 of the 357 pods.",
+      "affects": [
+        "byEcosystem.cocoapods.weakExposed",
+        "byEcosystem.cocoapods.modernOnly"
+      ],
+      "direction": "overstates",
+      "magnitude": {
+        "value": 5,
+        "of": 357,
+        "unit": "matched pods re-read on 2026-10-05 whose every catalogued match is in a subspec outside the default subspecs"
+      },
+      "correctedIn": "A correction that records how each match is declared is planned for every scanner and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "unread-packages-counted-as-scanned",
+      "summary": "A package whose metadata could not be read was still counted as scanned, and as using no cryptography. Each raw file records the number as fetchErrors: npm 5,374 of 1,000,000; PyPI 4,084 of 150,000; Go 76 of 200,117; Maven 26 of 103,400; Packagist 20,826 of 100,000; NuGet 6,855 of 100,000; CocoaPods 1 of 50,000. packagesScanned (2,170,994) therefore includes at least 37,242 packages that were not read, and withNoCrypto counts them as using no cryptography. The figure is a floor: in the npm and NuGet scanners some failed reads are not added to fetchErrors. Packagist cause, from a seeded sample of 300 packages run on 2026-10-05: 46 had no tagged release, which the scanner treated as a failed fetch. NuGet cause: not verified. crates.io has no fetchErrors field; its scanner counted only crates it read, and its file records 12 parse errors. RubyGems, Hex and pub.dev report 0. The Hex scanner counted a package only once it had read it, and the RubyGems and pub.dev scanners added every failed request to fetchErrors. Whether any pub.dev answer came without a pubspec, which that scanner counted as scanned and not as a failure, has not been verified.",
+      "affects": [
+        "packagesScanned",
+        "withNoCrypto",
+        "byEcosystem.npm.scanned",
+        "byEcosystem.pypi.scanned",
+        "byEcosystem.go.scanned",
+        "byEcosystem.maven.scanned",
+        "byEcosystem.packagist.scanned",
+        "byEcosystem.nuget.scanned",
+        "byEcosystem.cocoapods.scanned"
+      ],
+      "direction": "overstates",
+      "magnitude": {
+        "value": 37242,
+        "of": 2170994,
+        "unit": "packages counted as scanned that were not read (at least)"
+      },
+      "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "unread-packages-missing-from-match-counts",
+      "summary": "The packages that were not read (see unread-packages-counted-as-scanned) are absent from every count of packages matching a catalogued library, in the seven ecosystems named there. The size of the effect has not been measured on any row.",
+      "affects": [
+        "byEcosystem.npm.weakExposed",
+        "byEcosystem.npm.modernOnly",
+        "byEcosystem.npm.pqcReady",
+        "byEcosystem.pypi.weakExposed",
+        "byEcosystem.pypi.modernOnly",
+        "byEcosystem.pypi.pqcReady",
+        "byEcosystem.go.weakExposed",
+        "byEcosystem.go.modernOnly",
+        "byEcosystem.go.pqcReady",
+        "byEcosystem.maven.weakExposed",
+        "byEcosystem.maven.modernOnly",
+        "byEcosystem.maven.pqcReady",
+        "byEcosystem.packagist.weakExposed",
+        "byEcosystem.packagist.modernOnly",
+        "byEcosystem.packagist.pqcReady",
+        "byEcosystem.nuget.weakExposed",
+        "byEcosystem.nuget.modernOnly",
+        "byEcosystem.nuget.pqcReady",
+        "byEcosystem.cocoapods.weakExposed",
+        "byEcosystem.cocoapods.modernOnly",
+        "byEcosystem.cocoapods.pqcReady"
+      ],
+      "direction": "understates",
+      "magnitude": null,
+      "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "weak-tier-mixes-two-kinds-of-library",
+      "summary": "The catalogue's weak tier mixes libraries that implement broken algorithms with libraries that are deprecated or unmaintained, and it holds entries that the corrected classes do not class as weak. Re-aggregated on 2026-10-05 under the corrected classes, the 12,465 packages counted as depending on a weak library become between 10,749 and 10,809. Counting every package with a weak match, the published figure is 12,488: it adds the 23 that are filed as post-quantum because they also have a post-quantum match (21 crates, 2 npm packages). On that count the corrected figure is between 10,770 and 10,830. It adds 21 of the 23, the crates: under the corrected classes the two npm packages have no weak match. By ecosystem, on the published rule: npm 3,146 to 2,655; PyPI 201 to 173 or 174; Go 3,244 to 3,227; Maven 895 to 152; crates.io 4,460 to 4,266; Packagist 177 to between 61 and 86; NuGet 204 to 201; RubyGems 83 to between 4 and 37; CocoaPods 52 to 7 or 8; Hex and pub.dev do not change. A package that leaves the weak count and still matches another catalogued library moves to the modern-only count. The corrected classes count a library as weak only where it implements broken algorithms or an end-of-life signal was found. For 11 entries left out of the weak class no such signal was found either way and their status is not verified: tlslite (PyPI); bordoni/phpass and ircmaxell/random-lib (Packagist); CryptSharpOfficial (NuGet); crypt, gibberish and ezcrypto (RubyGems); crypto_dart (pub.dev); AESCrypt-ObjC, Arcane and CommonCryptoSwift (CocoaPods). 60 packages are counted as weak only through those entries: RubyGems 33, Packagist 25, PyPI 1, CocoaPods 1. That is why the corrected figures are ranges: the lower end takes none of the 11 as weak and the upper end takes all of them. On npm, Packagist and NuGet the unread packages work in the other direction and are unmeasured, so the net direction of weakExposed on those three rows is not established.",
+      "affects": [
+        "withWeakCrypto",
+        "weakShareOfCryptoUsing",
+        "byEcosystem.npm.weakExposed",
+        "byEcosystem.pypi.weakExposed",
+        "byEcosystem.go.weakExposed",
+        "byEcosystem.maven.weakExposed",
+        "byEcosystem.crates.weakExposed",
+        "byEcosystem.packagist.weakExposed",
+        "byEcosystem.nuget.weakExposed",
+        "byEcosystem.rubygems.weakExposed",
+        "byEcosystem.cocoapods.weakExposed"
+      ],
+      "direction": "overstates",
+      "magnitude": {
+        "value": 10749,
+        "of": 12465,
+        "unit": "packages counted as depending on a weak library that remain so under the corrected classes; 10,809 if all 11 entries of unverified status are weak"
+      },
+      "correctedIn": "A correction to the catalogue is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "totals-derived-from-affected-rows",
+      "summary": "packagesWithCrypto, withWeakCrypto, withModernOnly, withPqcReady and the two published shares sum or divide the per-ecosystem counts named in the entries above and inherit their defects. Their net error has not been established.",
+      "affects": [
+        "packagesWithCrypto",
+        "withWeakCrypto",
+        "withModernOnly",
+        "withPqcReady",
+        "weakShareOfCryptoUsing",
+        "pqcShareOfCryptoUsing"
+      ],
+      "direction": "unknown",
+      "magnitude": null,
+      "correctedIn": "Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "top-exposed-list-names-packages-not-classed-weak",
+      "summary": "topExposedProjects names 50 packages with posture weak or mixed. Under the corrected weak classes, between 23 and 35 of them leave the list and between 15 and 27 remain. 15 remain, each through a library classed as deprecated. 23 are counted as weak only through catalogue entries those classes do not class as weak. The other 12 are counted as weak only through entries whose status is not verified (gibberish 6, ezcrypto 4, crypt 2; see weak-tier-mixes-two-kinds-of-library), and leave or remain as those are settled.",
+      "affects": [
+        "topExposedProjects"
+      ],
+      "direction": "overstates",
+      "magnitude": {
+        "value": 23,
+        "of": 50,
+        "unit": "packages named in topExposedProjects that leave the list under the corrected classes, at least; 35 if none of the three entries of unverified status is weak"
+      },
+      "correctedIn": "A correction to the catalogue is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "top-post-quantum-list-counts-optional-declarations-and-is-unranked",
+      "summary": "topPqcProjects names 20 crates with posture pqc-ready. At the scanned version, 8 of them do not require the post-quantum library unconditionally: 6 declare it as optional, 1 as optional and enabled by default, and 1 for one platform only. Every downloads value in the list is 0, so the list is not ranked by downloads.",
+      "affects": [
+        "topPqcProjects"
+      ],
+      "direction": "overstates",
+      "magnitude": {
+        "value": 8,
+        "of": 20,
+        "unit": "crates named in topPqcProjects that do not require the post-quantum library unconditionally"
+      },
+      "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "march-and-august-figures-compared-as-a-trend",
+      "summary": "The README and the record description archived with this deposit compare the shares in this dataset with those of the 2026-03-18 dataset (post-quantum 0.17% to 0.54%, weak flat at about 19%). The comparison is withdrawn. The instrument changed between the two runs and the March raw output no longer exists, so no change over time can be read from the two datasets.",
+      "affects": [
+        "weakShareOfCryptoUsing",
+        "pqcShareOfCryptoUsing"
+      ],
+      "direction": "unknown",
+      "magnitude": null,
+      "correctedIn": "The comparison is removed from the repository README and from the description used for later deposits. The copy archived with this deposit cannot change.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "limited-rows-are-the-first-part-of-a-list-not-a-sample",
+      "summary": "In seven ecosystems the packages listed are the first part of the registry's list, not a sample of the registry. npm: the first 1.2 million names in key order, where scoped names precede names that begin with a letter; 10,102 of the 10,249 published npm entries are scoped. pub.dev: alphabetical. RubyGems: search results letter by letter from a. Hex: most downloaded first. NuGet and Maven Central: newest first. Go: oldest first. The totals and the two shares pool these rows.",
+      "affects": [
+        "byEcosystem.npm.weakExposed",
+        "byEcosystem.npm.modernOnly",
+        "byEcosystem.npm.pqcReady",
+        "byEcosystem.go.weakExposed",
+        "byEcosystem.go.modernOnly",
+        "byEcosystem.go.pqcReady",
+        "byEcosystem.maven.weakExposed",
+        "byEcosystem.maven.modernOnly",
+        "byEcosystem.maven.pqcReady",
+        "byEcosystem.nuget.weakExposed",
+        "byEcosystem.nuget.modernOnly",
+        "byEcosystem.nuget.pqcReady",
+        "byEcosystem.rubygems.weakExposed",
+        "byEcosystem.rubygems.modernOnly",
+        "byEcosystem.rubygems.pqcReady",
+        "byEcosystem.hex.weakExposed",
+        "byEcosystem.hex.modernOnly",
+        "byEcosystem.hex.pqcReady",
+        "byEcosystem.pub.weakExposed",
+        "byEcosystem.pub.modernOnly",
+        "byEcosystem.pub.pqcReady",
+        "packagesWithCrypto",
+        "withWeakCrypto",
+        "withModernOnly",
+        "withPqcReady",
+        "weakShareOfCryptoUsing",
+        "pqcShareOfCryptoUsing"
+      ],
+      "direction": "unknown",
+      "magnitude": null,
+      "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "packages-with-no-listed-version-counted",
+      "summary": "The NuGet scanner counted packages with no listed version. Of the 1,905 published entries re-read on 2026-10-05, 99 have none. 81 of them had none when the scan ran, their record last written before it; 49 of the 81 are among the 203 re-read entries counted as weak. Against packages with a listed version the match counts are too high by 81 to 99. Another 38 were read at an unlisted version though one is listed; the effect, also on shares, is not established.",
+      "affects": [
+        "byEcosystem.nuget.weakExposed",
+        "byEcosystem.nuget.modernOnly"
+      ],
+      "direction": "overstates",
+      "magnitude": {
+        "value": 81,
+        "of": 1905,
+        "unit": "re-read NuGet entries with no listed version at the scan (at least)"
+      },
+      "correctedIn": "A correction is planned and not yet built. Corrected figures can only come from a new scan, published as a new dated dataset. No date is set.",
+      "issuedAt": "2026-10-06"
+    }
+  ]
+}
