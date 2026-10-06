@@ -2573,11 +2573,14 @@ function statsIdentity(stored, where, ctx) {
   }
 }
 
+/**
+ * unitsIn and unitsOut against the map. merged is not compared apart: where
+ * both are the map's and the identity above holds, it is the map's too.
+ */
 function statsValue(stored, expected, where, ctx) {
   for (const field of ['unitsIn', 'unitsOut']) {
     if (stored[field] !== expected[field]) ctx.figureBad(`${where}.${field} is ${stored[field]}; the consolidation map gives ${expected[field]}`);
   }
-  if (stored.merged !== expected.merged) ctx.figureBad(`${where}.merged is ${stored.merged}; the consolidation map gives ${expected.merged}`);
 }
 
 /** A block's shape and the rules its cells state about themselves. True when all of it can be read further. */

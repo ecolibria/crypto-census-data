@@ -998,6 +998,7 @@ plant('a snapshot of another date', catalogOf((c) => { c.collectedAt = '2026-09-
 plant('a snapshot with no source commit', catalogOf((c) => { c.sourceCommit = null; }), /sourceCommit is null, not the commit/);
 plant('a digest that is not one', catalogOf((c) => { c.classificationSha256 = 'PLACEHOLDER'; }), /classificationSha256 is "PLACEHOLDER", not a SHA-256 digest/);
 plant('a registry with no match rule', catalogOf((c) => { delete c.matchRules.hex; }), /matchRules is missing hex/);
+plant('a match rule that is not an id', catalogOf((c) => { c.matchRules.hex = 7; }), /catalog-2026-09-30\.json: matchRules\.hex is 7, not a rule id/);
 plant('a match set digest that is not the entries\'', catalogOf((c) => { c.matchSetSha256 = sha256('another match set'); }),
   /catalog-2026-09-30\.json: matchSetSha256 is not the digest of the entries it covers/);
 plant('a classification digest that is not the entries\'', catalogOf((c) => { c.classificationSha256 = sha256('another classification'); }),
@@ -1142,6 +1143,7 @@ plant('a check with no time', scanOf('hex', (s) => { s.catalogCheck[0].checkedAt
 plant('a latest version that is not one', scanOf('hex', (s) => { s.catalogCheck[0].latestVersion = 1; }), /catalogCheck\[0\]\.latestVersion is 1, not a version or null/);
 plant('a latest release that is not a time', scanOf('hex', (s) => { s.catalogCheck[0].latestReleaseAt = 'recent'; }), /catalogCheck\[0\]\.latestReleaseAt is "recent", not a time or null/);
 plant('a check of an alias that is not a name', scanOf('hex', (s) => { s.catalogCheck[0].alias = ''; }), /catalogCheck\[0\]\.alias is "", not a name or null/);
+plant('a check that names no entry', scanOf('hex', (s) => { s.catalogCheck[0].entry = 7; }), /scan-results-hex\.json: catalogCheck\[0\]\.entry is 7/);
 plant('a check of an entry the snapshot does not have', scanOf('hex', (s) => { s.catalogCheck.push({ ...s.catalogCheck[0], entry: 'other' }); }), /checks "other", which is not a hex entry of the catalogue snapshot/);
 plant('a check of an alias the entry does not have', scanOf('go', (s) => { s.catalogCheck.push({ ...s.catalogCheck[1], alias: 'example.com/alias' }); }), /checks the alias "example\.com\/alias", which .* does not have/);
 plant('an entry checked twice', scanOf('hex', (s) => { s.catalogCheck.push({ ...s.catalogCheck[0] }); }), /catalogCheck\[1\] checks "enacl" a second time/);
@@ -1498,6 +1500,9 @@ plant('a blocked row', corpusOf((c) => { c.blocked = [{ ecosystem: 'hex', reason
 plant('a blocked row for a reason no longer used', corpusOf((c) => { c.blocked = [{ ecosystem: 'hex', reason: 'unresolvedShareAboveCeiling', detail: 'x' }]; }),
   /blocked\[0\]\.reason is "unresolvedShareAboveCeiling", not one of: coverageInvalid, catalogCheckMismatch, sourcesOffAllowlist/);
 plant('a blocked row for a reason that is not one', corpusOf((c) => { c.blocked = [{ ecosystem: 'hex', reason: 'tooSmall', detail: 'x' }]; }), /blocked\[0\]\.reason is "tooSmall"/);
+plant('a blocked row for a registry that is not one', corpusOf((c) => { c.blocked = [{ ecosystem: 'conda', reason: 'coverageInvalid', detail: 'x' }]; }),
+  /blocked\[0\]\.ecosystem is "conda", not one of the eleven registries/);
+plant('a blocked row that does not say why', corpusOf((c) => { c.blocked = [{ ecosystem: 'hex', reason: 'coverageInvalid', detail: null }]; }), /blocked\[0\]\.detail is null, not text/);
 plant('blocked rows that are not a list', corpusOf((c) => { c.blocked = null; }), /corpus-2026-09-30\.json: blocked is null, not a list/);
 plant('a registry\'s coverage that is not the raw file\'s', corpusOf((c) => { c.coverage.byEcosystem.hex.scanned += 1; }), /coverage\.byEcosystem\.hex is not the coverage and enumeration of scan-results-hex\.json/);
 plant('a registry\'s enumeration that is not the raw file\'s', corpusOf((c) => { c.coverage.byEcosystem.go.enumeration = { requested: 1000, listed: 6, truncated: false, reason: null }; }), /coverage\.byEcosystem\.go is not the coverage and enumeration of scan-results-go\.json/);
@@ -1557,6 +1562,7 @@ plant('a corpus that counts a match no scan can observe', corpusOf((c) => {
   Object.assign(npmRaw(c).excludedNotCountable, { unitsWithOnlyNotCountableMatches: 0 });
 }), /byEcosystem\.npm\.anyManifestMatch\.raw\.matched is \{"count":5,"k":4,"nullReason":null\}; recomputed/);
 plant('matches no scan can observe off by one', corpusOf((c) => { npmRaw(c).excludedNotCountable.matches = 2; }), /raw\.excludedNotCountable\.matches is 2; recomputed it is 1/);
+plant('matches no scan can observe that are not a count', corpusOf((c) => { npmRaw(c).excludedNotCountable.matches = 1.5; }), /raw\.excludedNotCountable\.matches is 1\.5, not a whole count/);
 plant('units whose only matches no scan can observe off by one', corpusOf((c) => { npmRaw(c).excludedNotCountable.unitsWithOnlyNotCountableMatches = 2; }), /excludedNotCountable\.unitsWithOnlyNotCountableMatches is 2; recomputed it is 1/);
 plant('an entry no scan can observe left out of its list', corpusOf((c) => { c.byEcosystem.go.anyManifestMatch.raw.excludedNotCountable.byEntry = []; }),
   /go\.anyManifestMatch\.raw\.excludedNotCountable\.byEntry is \[\]; recomputed it is .*every classified and not countable entry/);
@@ -1584,6 +1590,8 @@ plant('a direct figure above the manifest-match one', corpusOf((c) => { c.byEcos
 plant('figures without dev metadata for a registry that has none', corpusOf((c) => { c.byEcosystem.npm.excludingDevMetadata = c.byEcosystem.packagist.excludingDevMetadata; }), /byEcosystem\.npm\.excludingDevMetadata is .*\. It is kept for a registry read partly from dev metadata/);
 plant('no figures without dev metadata for Packagist', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata = null; }), /byEcosystem\.packagist\.excludingDevMetadata is null, not an object/);
 plant('coverage without dev metadata off by one', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata.coverage.scanned = 3; }), /excludingDevMetadata\.coverage\.scanned is 3; the ledger gives 2 without the packages read from dev metadata/);
+plant('coverage without dev metadata that is not a count', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata.coverage.scanned = -1; }),
+  /packagist\.excludingDevMetadata\.coverage\.scanned is -1, not a whole count/);
 plant('a figure without dev metadata off by one', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata.anyManifestMatch.raw.matched.count = 2; }), /packagist\.excludingDevMetadata\.anyManifestMatch\.raw\.matched is \{"count":2.*recomputed/);
 plant('a total that names the wrong rows as measurable', corpusOf((c) => { c.total.directUnconditional.raw.pqc.measurableIn = ['npm']; }), /total\.directUnconditional\.raw\.pqc is .*recomputed/);
 plant('a total whose measurable rows are not registries', corpusOf((c) => { c.total.directUnconditional.raw.pqc.measurableIn = ['npm', 'npm']; }), /total\.directUnconditional\.raw\.pqc\.measurableIn is \["npm","npm"\], not a list of distinct registries/);
@@ -1725,6 +1733,9 @@ const closedInTheCorpus = [
   ['a total cell', corpusOf((c) => { c.total.anyManifestMatch.raw.weak.note = 'x'; }), /total\.anyManifestMatch\.raw\.weak carries note/],
   ['a joint total cell', corpusOf((c) => { c.total.anyManifestMatch.raw.weakAndPqc.k = 2; }), /total\.anyManifestMatch\.raw\.weakAndPqc carries k/],
   ['what a block could not count', corpusOf((c) => { npmRaw(c).excludedNotCountable.note = 'x'; }), /raw\.excludedNotCountable carries note/],
+  ['the coverage without dev metadata', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata.coverage.note = 1; }), /packagist\.excludingDevMetadata\.coverage carries note/],
+  ['the dependents of a multi-purpose library', corpusOf((c) => { c.multiPurposeLibraries[0].dependents.note = 1; }), /multiPurposeLibraries\[0\]\.dependents carries note/],
+  ['the coverage of the manifest', manifestOf((m) => { m.coverage.note = 1; }), /MANIFEST\.json: coverage carries note/],
   ['a multi-purpose library', corpusOf((c) => { c.multiPurposeLibraries[0].total = 2; }), /multiPurposeLibraries\[0\] carries total/],
   ['its dependents', corpusOf((c) => { c.multiPurposeLibraries[0].dependents.anyManifestMatch.total = 2; }), /dependents\.anyManifestMatch carries total/],
 ];
@@ -1809,6 +1820,46 @@ test('an errata file whose dataset manifest is a link to a device is answered wi
   });
   assert.equal(result.code, 1, result.stdout);
   assert.match(firstProblem(result.stderr, ERRATA), /cannot be checked against datasets\/2026-09-30: its aggregate could not be read/, result.stderr);
+});
+
+test('past forty figures that differ from their recomputed values, the rest are counted, not listed', async () => {
+  const result = await validateOne(corpusOf((c) => {
+    for (const eco of ECOSYSTEMS) {
+      for (const definition of DEFINITIONS) for (const unit of UNITS) c.byEcosystem[eco][definition][unit].matched.k += 1;
+    }
+  }));
+  assert.equal(result.code, 1, result.stdout);
+  const listed = result.stderr.split('\n').filter((line) => line.startsWith(`  ${DATE}: `));
+  assert.match(listed[0], /byEcosystem\.npm\.anyManifestMatch\.raw\.matched is \{"count":4,"k":5,"nullReason":null\}; recomputed/, result.stderr);
+  assert.equal(listed.filter((line) => /; recomputed /.test(line)).length, 40, result.stderr);
+  assert.match(listed.at(-1), /corpus-2026-09-30\.json: 4 more figure\(s\) differ from their recomputed values/, result.stderr);
+});
+
+/** Make the copy of the validator throw where `at` begins, as a check that fails part way would. */
+const throwAt = (at) => (dir) => {
+  const path = join(dir, 'scripts', 'validate-dataset.mjs');
+  const source = readText(path);
+  if (source.split(at).length !== 2) throw new Error(`the validator no longer holds ${at}`);
+  writeFileSync(path, source.replace(at, `${at}\n  throw new Error('stopped here');`));
+};
+
+test('a check that stops part way is reported, and the problems found before it are still listed', async () => {
+  const result = await validateOne(scanOf('hex', (s) => { s.catalogCheck[0].status = 'ok'; }), throwAt('function checkCorpus(name, record, ctx, bad) {'));
+  assert.equal(result.code, 1, result.stdout);
+  const listed = result.stderr.split('\n').filter((line) => line.startsWith(`  ${DATE}: `));
+  assert.match(listed[0], /catalogCheck\[0\]\.status is "ok"/, result.stderr);
+  assert.match(listed.at(-1), /2026-09-30: could not be checked to the end: stopped here/, result.stderr);
+});
+
+test('an errata check that stops part way is reported for its file, and the run goes on', async () => {
+  const result = await validateOne({}, (dir) => {
+    throwAt('function validateRegenerations(label, date, list, manifest) {')(dir);
+    mkdirSync(join(dir, 'errata'));
+    writeFileSync(join(dir, ERRATA), errataFor());
+  });
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(firstProblem(result.stderr, ERRATA), /could not be checked to the end: stopped here/, result.stderr);
+  assert.match(result.stderr, /^1 problem\(s\) across 2 dataset\(s\) and 1 errata file\(s\):$/m, result.stderr);
 });
 
 // --- Files that would hang, or exhaust a reader ----------------------------------
