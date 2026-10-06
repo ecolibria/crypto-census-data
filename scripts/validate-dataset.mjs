@@ -78,9 +78,20 @@ const DIRECTIONS = ['understates', 'overstates', 'unknown'];
  * has a definition of, and a misspelt field would otherwise read as an absent
  * one.
  */
-const ERRATA_FIELDS = ['schemaVersion', 'kind', 'dataset', 'doi', 'issuedAt', 'issues'];
+const ERRATA_FIELDS = ['schemaVersion', 'kind', 'dataset', 'doi', 'issuedAt', 'issues', 'regenerations'];
 const ISSUE_FIELDS = ['defect', 'summary', 'affects', 'direction', 'magnitude', 'correctedIn', 'issuedAt'];
 const MAGNITUDE_FIELDS = ['value', 'of', 'unit'];
+
+/**
+ * A regeneration: the record that a published dataset's files were written
+ * again after the run its manifest names. It is a fact about bytes, with no
+ * figure, direction or magnitude, so it is not an issue: an errata file lists
+ * regenerations apart, under `regenerations`, and that list only grows too.
+ * Where nothing was regenerated the key is left out.
+ */
+const REGENERATION_FIELDS = ['issuedAt', 'namedRun', 'runOutputSha256', 'writtenBy', 'beforeSteps', 'summary'];
+const WRITTEN_BY_FIELDS = ['repository', 'pullRequest', 'commit'];
+const BEFORE_STEPS_FIELDS = ['fields', 'ecosystems'];
 
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 /**
@@ -355,18 +366,21 @@ function validateErrata(file) {
 
   // The figures an issue names are looked up in the dataset's own aggregate.
   let corpus;
+  let manifest;
   const manifestPath = join(DATASETS, date, 'MANIFEST.json');
   if (!existsSync(manifestPath)) {
     fail(label, `describes datasets/${date}, which is not a dataset in this repository`);
   } else {
     try {
-      const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+      manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
       corpus = JSON.parse(readFileSync(join(DATASETS, date, manifest.corpus.file), 'utf-8'));
     } catch {
       // What is wrong with the dataset is reported by its own validation.
       fail(label, `cannot be checked against datasets/${date}: its aggregate could not be read`);
     }
   }
+
+  if (Object.hasOwn(errata, 'regenerations')) validateRegenerations(label, date, errata.regenerations, isObject(manifest) ? manifest : undefined);
 
   if (!Array.isArray(errata.issues) || errata.issues.length === 0) {
     fail(label, 'lists no issues. An errata file with nothing in it reads as a dataset checked and cleared.');
@@ -476,6 +490,134 @@ function validateErrata(file) {
         if (!isText(m.unit)) fail(label, `${where} has no magnitude.unit, so its numbers count nothing a reader can name`);
       }
     }
+  });
+}
+
+/**
+ * The regenerations of an errata file. Each says which run's output the
+ * published files were written from, what wrote them again, and which fields
+ * of which files were written before steps that came later, so a reader
+ * holding the manifest's run knows which of its bytes that run did not write.
+ */
+function validateRegenerations(label, date, list, manifest) {
+  if (!Array.isArray(list) || list.length === 0) {
+    fail(label, 'has regenerations that are not a list with a regeneration in it. Where nothing was regenerated the key is left out.');
+    return;
+  }
+  const run = manifest && isObject(manifest.provenance) ? manifest.provenance.workflowRun : undefined;
+  const rawFiles = new Map();
+  /** The dataset's raw file for one registry, parsed, or the reason it cannot be read. */
+  const rawFile = (ecosystem) => {
+    if (rawFiles.has(ecosystem)) return rawFiles.get(ecosystem);
+    let found;
+    const entry = Array.isArray(manifest.ecosystems) ? manifest.ecosystems.find((e) => isObject(e) && e.ecosystem === ecosystem) : undefined;
+    if (!entry || typeof entry.file !== 'string' || !/^[^/\\]+$/.test(entry.file) || entry.file === '..') {
+      found = { problem: `has no raw file in datasets/${date}` };
+    } else {
+      const path = join(DATASETS, date, entry.file);
+      try {
+        if (!lstatSync(path).isFile()) throw new Error('not a regular file');
+        found = { file: entry.file, value: JSON.parse(readStrict(path)) };
+      } catch {
+        found = { problem: `has a raw file, ${entry.file}, that cannot be read` };
+      }
+    }
+    rawFiles.set(ecosystem, found);
+    return found;
+  };
+  let previousIssued = null;
+  list.forEach((regeneration, index) => {
+    const at = `regeneration ${index + 1}`;
+    if (!isObject(regeneration)) {
+      fail(label, `${at} is not an object`);
+      return;
+    }
+    const undefinedHere = unknownFields(regeneration, REGENERATION_FIELDS);
+    if (undefinedHere.length > 0) fail(label, `${at} carries ${undefinedHere.join(', ')}, which a regeneration does not define`);
+
+    // The date of issue, under the rule an issue's date follows.
+    if (!isCalendarDate(regeneration.issuedAt)) {
+      fail(label, `${at} has issuedAt ${JSON.stringify(regeneration.issuedAt)}, not a YYYY-MM-DD date. A regeneration with no date of issue is a draft.`);
+    } else {
+      if (regeneration.issuedAt < date) {
+        fail(label, `${at} has issuedAt ${regeneration.issuedAt}, before the dataset it describes was collected`);
+      }
+      if (regeneration.issuedAt > TODAY) {
+        fail(label, `${at} has issuedAt ${regeneration.issuedAt}, after today (${TODAY})`);
+      }
+      if (previousIssued !== null && regeneration.issuedAt < previousIssued) {
+        fail(label, `${at} has issuedAt ${regeneration.issuedAt}, earlier than the regeneration before it (${previousIssued}). ` +
+          'Regenerations are listed in the order they were added.');
+      }
+      previousIssued = regeneration.issuedAt;
+    }
+
+    if (!isText(regeneration.namedRun)) {
+      fail(label, `${at} has namedRun ${JSON.stringify(regeneration.namedRun)}, not the run the manifest names`);
+    } else if (manifest !== undefined && regeneration.namedRun !== run) {
+      fail(label, `${at} names the run ${regeneration.namedRun}, and datasets/${date}/MANIFEST.json names ${JSON.stringify(run ?? null)}. ` +
+        'A regeneration qualifies the run the manifest names, so the two are one.');
+    }
+    if (typeof regeneration.runOutputSha256 !== 'string' || !/^[0-9a-f]{64}$/.test(regeneration.runOutputSha256)) {
+      fail(label, `${at} has runOutputSha256 ${JSON.stringify(regeneration.runOutputSha256)}, not a SHA-256 digest in lower-case hex`);
+    }
+
+    if (!Array.isArray(regeneration.writtenBy) || regeneration.writtenBy.length === 0) {
+      fail(label, `${at} names nothing in writtenBy, so nothing says what wrote the files again`);
+    } else {
+      regeneration.writtenBy.forEach((change, number) => {
+        const where = `${at}, writtenBy ${number + 1},`;
+        if (!isObject(change) || unknownFields(change, WRITTEN_BY_FIELDS).length > 0 ||
+            !WRITTEN_BY_FIELDS.every((field) => Object.hasOwn(change, field))) {
+          fail(label, `${where} is not { repository, pullRequest, commit }`);
+          return;
+        }
+        if (!isText(change.repository) || !/^[^/\s]+\/[^/\s]+$/.test(change.repository)) {
+          fail(label, `${where} has repository ${JSON.stringify(change.repository)}, not owner/name`);
+        }
+        if (!Number.isSafeInteger(change.pullRequest) || change.pullRequest < 1) {
+          fail(label, `${where} has pullRequest ${JSON.stringify(change.pullRequest)}, not a pull request number`);
+        }
+        if (typeof change.commit !== 'string' || !/^[0-9a-f]{40}$/.test(change.commit)) {
+          fail(label, `${where} has commit ${JSON.stringify(change.commit)}, not a full commit id in lower-case hex`);
+        }
+      });
+    }
+
+    // Every field it names is in every file it names: a field that is not there names nothing.
+    const steps = regeneration.beforeSteps;
+    if (!isObject(steps) || unknownFields(steps, BEFORE_STEPS_FIELDS).length > 0 ||
+        !BEFORE_STEPS_FIELDS.every((field) => Object.hasOwn(steps, field))) {
+      fail(label, `${at} has beforeSteps ${JSON.stringify(steps)}, not { fields, ecosystems }`);
+    } else {
+      const listOf = (field, what) => {
+        const value = steps[field];
+        if (!Array.isArray(value) || value.length === 0 || !value.every(isText) || new Set(value).size !== value.length) {
+          fail(label, `${at} has beforeSteps.${field} ${JSON.stringify(value)}, not a list of distinct ${what}`);
+          return null;
+        }
+        return value;
+      };
+      const fields = listOf('fields', 'field paths');
+      const ecosystems = listOf('ecosystems', 'registries');
+      if (fields && ecosystems && manifest !== undefined) {
+        for (const ecosystem of ecosystems) {
+          const raw = rawFile(ecosystem);
+          if (raw.problem) {
+            fail(label, `${at} names ${ecosystem}, which ${raw.problem}`);
+            continue;
+          }
+          for (const field of fields) {
+            if (resolvePath(raw.value, field) === undefined) {
+              fail(label, `${at} names ${field}, which ${raw.file} does not have. A field that is not in the file names nothing.`);
+            }
+          }
+        }
+      }
+    }
+
+    if (!hasWords(regeneration.summary)) fail(label, `${at} is missing summary`);
+    else if (hasHiddenCharacters(regeneration.summary)) fail(label, `${at} has a control or format character in summary`);
   });
 }
 

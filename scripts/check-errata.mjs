@@ -20,7 +20,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
-import { chmodSync, cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -606,3 +606,109 @@ for (const [what, change, report, options] of forbidden) {
     assert.match(result.stderr, report);
   });
 }
+
+// --- Regenerations ----------------------------------------------------------
+//
+// An errata file may also record that a dataset's published files were
+// written again after the run its manifest names. The validator holds each
+// record to its fields, to the run the manifest names, and to the files and
+// fields it names; the immutability check lets the list grow and nothing else.
+
+/** The published dataset with raw files, so a regeneration has files to name. Its own errata file is read from this repository. */
+const RAW_PUBLISHED = '2026-08-03';
+const RUN = JSON.parse(readFileSync(join(ROOT, 'datasets', RAW_PUBLISHED, 'MANIFEST.json'), 'utf-8')).provenance.workflowRun;
+
+/** A regeneration of it. The run is the manifest's; the digest, repository and commit ids are examples. */
+const regeneration = () => ({
+  issuedAt: '2026-10-06',
+  namedRun: RUN,
+  runOutputSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+  writtenBy: [
+    { repository: 'example/instrument', pullRequest: 2, commit: '0123456789abcdef0123456789abcdef01234567' },
+    { repository: 'example/instrument', pullRequest: 1, commit: '89abcdef0123456789abcdef0123456789abcdef' },
+  ],
+  beforeSteps: {
+    fields: ['summary.noCrypto', 'summary.weakExposureRate', 'summary.pqcAdoptionRate'],
+    ecosystems: ['npm', 'pypi', 'go', 'maven', 'crates', 'packagist', 'nuget', 'rubygems', 'hex', 'pub'],
+  },
+  summary: 'The published files were written again after the run named in the manifest.',
+});
+
+/** Run a copy of the validator over a copy of that dataset and its errata file with regenerations added. */
+async function validateRegenerations(change) {
+  const dir = mkdtempSync(join(tmpdir(), 'census-regenerations-'));
+  try {
+    mkdirSync(join(dir, 'scripts'));
+    cpSync(join(ROOT, 'scripts', 'validate-dataset.mjs'), join(dir, 'scripts', 'validate-dataset.mjs'));
+    cpSync(join(ROOT, 'datasets', RAW_PUBLISHED), join(dir, 'datasets', RAW_PUBLISHED), { recursive: true });
+    mkdirSync(join(dir, 'errata'));
+    const errata = JSON.parse(readFileSync(join(ROOT, 'errata', `${RAW_PUBLISHED}.json`), 'utf-8'));
+    errata.regenerations = [regeneration()];
+    change(errata);
+    writeFileSync(join(dir, 'errata', `${RAW_PUBLISHED}.json`), `${JSON.stringify(errata, null, 2)}\n`);
+    return await run([join(dir, 'scripts', 'validate-dataset.mjs'), RAW_PUBLISHED], { env: {} });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('an errata file that records a regeneration validates', async () => {
+  const result = await validateRegenerations(() => {});
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, /1 dataset\(s\) validated: 2026-08-03/);
+  assert.match(result.stdout, /1 errata file\(s\) validated: 2026-08-03\.json/);
+});
+
+test('two regenerations in the order they were added validate', async () => {
+  const result = await validateRegenerations((e) => { e.regenerations.push({ ...regeneration(), beforeSteps: { fields: ['summary'], ecosystems: ['cocoapods'] } }); });
+  assert.equal(result.code, 0, result.stderr);
+});
+
+/** [what the regenerations have wrong, the change that makes it so, the problem reported, how many problems if not one]. */
+const refusedRegenerations = [
+  ['regenerations that are not a list', (e) => { e.regenerations = {}; }, /has regenerations that are not a list with a regeneration in it/],
+  ['an empty list of regenerations', (e) => { e.regenerations = []; }, /has regenerations that are not a list with a regeneration in it/],
+  ['a regeneration that is not an object', (e) => { e.regenerations[0] = 'see the issues'; }, /regeneration 1 is not an object/],
+  ['a field a regeneration does not define', (e) => { e.regenerations[0].severity = 'high'; }, /regeneration 1 carries severity, which a regeneration does not define/],
+  ['no date of issue', (e) => { delete e.regenerations[0].issuedAt; }, /regeneration 1 has issuedAt undefined, not a YYYY-MM-DD date/],
+  ['a date of issue that is not a day of the calendar', (e) => { e.regenerations[0].issuedAt = '2026-02-31'; }, /regeneration 1 has issuedAt "2026-02-31", not a YYYY-MM-DD date/],
+  ['a date of issue before the dataset was collected', (e) => { e.regenerations[0].issuedAt = '2026-08-02'; }, /regeneration 1 has issuedAt 2026-08-02, before the dataset it describes was collected/],
+  ['a date of issue in the future', (e) => { e.regenerations[0].issuedAt = '2999-01-01'; }, /regeneration 1 has issuedAt 2999-01-01, after today/],
+  ['a date of issue earlier than the regeneration before it', (e) => { e.regenerations.push({ ...regeneration(), issuedAt: '2026-10-05' }); },
+    /regeneration 2 has issuedAt 2026-10-05, earlier than the regeneration before it \(2026-10-06\)/],
+  ['a run other than the one the manifest names', (e) => { e.regenerations[0].namedRun = `${RUN}0`; },
+    /regeneration 1 names the run .*, and datasets\/2026-08-03\/MANIFEST\.json names ".*"\. A regeneration qualifies the run the manifest names/],
+  ['no run', (e) => { e.regenerations[0].namedRun = null; }, /regeneration 1 has namedRun null, not the run the manifest names/],
+  ['a digest that is not one', (e) => { e.regenerations[0].runOutputSha256 = 'E3B0'; }, /regeneration 1 has runOutputSha256 "E3B0", not a SHA-256 digest in lower-case hex/],
+  ['nothing that wrote the files again', (e) => { e.regenerations[0].writtenBy = []; }, /regeneration 1 names nothing in writtenBy/],
+  ['a change with a field of its own', (e) => { e.regenerations[0].writtenBy[0].branch = 'main'; }, /regeneration 1, writtenBy 1, is not \{ repository, pullRequest, commit \}/],
+  ['a change with a part missing', (e) => { delete e.regenerations[0].writtenBy[1].commit; }, /regeneration 1, writtenBy 2, is not \{ repository, pullRequest, commit \}/],
+  ['a repository that is not owner and name', (e) => { e.regenerations[0].writtenBy[0].repository = 'instrument'; }, /regeneration 1, writtenBy 1, has repository "instrument", not owner\/name/],
+  ['a pull request number that is not one', (e) => { e.regenerations[0].writtenBy[0].pullRequest = 0; }, /regeneration 1, writtenBy 1, has pullRequest 0, not a pull request number/],
+  ['a commit id that is not a full one', (e) => { e.regenerations[0].writtenBy[0].commit = '0123456'; }, /regeneration 1, writtenBy 1, has commit "0123456", not a full commit id/],
+  ['steps that are not { fields, ecosystems }', (e) => { e.regenerations[0].beforeSteps = { fields: ['summary.noCrypto'] }; }, /regeneration 1 has beforeSteps .*, not \{ fields, ecosystems \}/],
+  ['no field named', (e) => { e.regenerations[0].beforeSteps.fields = []; }, /regeneration 1 has beforeSteps\.fields \[\], not a list of distinct field paths/],
+  ['a registry named twice', (e) => { e.regenerations[0].beforeSteps.ecosystems = ['npm', 'npm']; }, /regeneration 1 has beforeSteps\.ecosystems \["npm","npm"\], not a list of distinct registries/],
+  ['a field one named file does not have', (e) => { e.regenerations[0].beforeSteps.fields.push('summary.unread'); },
+    /regeneration 1 names summary\.unread, which scan-results-npm-clean\.json does not have/, 10],
+  ['a registry with no raw file in the dataset', (e) => { e.regenerations[0].beforeSteps.ecosystems.push('conda'); },
+    /regeneration 1 names conda, which has no raw file in datasets\/2026-08-03/],
+  ['no summary', (e) => { e.regenerations[0].summary = ' '; }, /regeneration 1 is missing summary/],
+  ['a summary with a control character in it', (e) => { e.regenerations[0].summary = 'Written\u0007 again.'; }, /regeneration 1 has a control or format character in summary/],
+];
+
+for (const [what, change, problem, count = 1] of refusedRegenerations) {
+  test(`an errata file with ${what} is refused`, async () => {
+    const result = await validateRegenerations(change);
+    assert.equal(result.code, 1, result.stdout);
+    assert.match(result.stderr, new RegExp(`\\n${count} problem\\(s\\) across 1 dataset\\(s\\) and 1 errata file\\(s\\):`));
+    assert.match(result.stderr, problem);
+  });
+}
+
+test('a regeneration of a dataset whose manifest names no run, and has no raw files, is refused', async () => {
+  const result = await validateWith({ [`${PUBLISHED}.json`]: { ...wellFormed(), regenerations: [regeneration()] } });
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(result.stderr, /regeneration 1 names the run .*, and datasets\/2026-03-18\/MANIFEST\.json names null/);
+  assert.match(result.stderr, /regeneration 1 names npm, which has no raw file in datasets\/2026-03-18/);
+});
