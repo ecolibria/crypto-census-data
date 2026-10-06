@@ -447,6 +447,69 @@
       },
       "correctedIn": "Only a new scan can correct this.",
       "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "class-counts-leave-out-packages-the-processing-steps-removed",
+      "summary": "packages-whose-names-match-once-normalized-counted-as-one, packages-removed-by-a-name-pattern and packages-sharing-a-namespace-and-class-counted-as-one removed 19,287 matched packages, none in any class count: 84,973 less 65,686 in the published files' qcReport. Only the run's output gives the split, by row weak/modern-only/post-quantum: npm 1,842/12,040/56; Maven 1,205/780/0; Go 376/2,341/0; crates.io 98/470/4; PyPI 3/44/0; NuGet 1/6/0; RubyGems 0/12/0; Hex 0/4/0; pub.dev 0/4/0; Packagist 0/1/0. It is in the manifest's private provenance repository: evidence/runs/30839067824/corpus-raw-dataset.zip, commit 9b4504f70d03f2b29f4705b6b22cb13443f2bdfc, sha256 55ccfee44ac50c300c5cb66da6a16843de51cc133f907a0cc7ed8d2a719f20d5. Counts with a removal understate by it.",
+      "affects": [
+        "withWeakCrypto",
+        "withModernOnly",
+        "withPqcReady",
+        "byEcosystem.npm.weakExposed",
+        "byEcosystem.npm.modernOnly",
+        "byEcosystem.npm.pqcReady",
+        "byEcosystem.crates.weakExposed",
+        "byEcosystem.crates.modernOnly",
+        "byEcosystem.crates.pqcReady",
+        "byEcosystem.pypi.weakExposed",
+        "byEcosystem.pypi.modernOnly",
+        "byEcosystem.go.weakExposed",
+        "byEcosystem.go.modernOnly",
+        "byEcosystem.maven.weakExposed",
+        "byEcosystem.maven.modernOnly",
+        "byEcosystem.nuget.weakExposed",
+        "byEcosystem.nuget.modernOnly",
+        "byEcosystem.packagist.modernOnly",
+        "byEcosystem.rubygems.modernOnly",
+        "byEcosystem.hex.modernOnly",
+        "byEcosystem.pub.modernOnly"
+      ],
+      "direction": "understates",
+      "magnitude": {
+        "value": 19287,
+        "of": 84973,
+        "unit": "matched packages the three steps removed: 3,525 weak, 15,702 modern-classed only, 60 post-quantum"
+      },
+      "correctedIn": "Only a new scan can correct this.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "shares-computed-after-the-processing-steps",
+      "summary": "weakShareOfCryptoUsing (19) and pqcShareOfCryptoUsing (0.54) are percentages of the 65,686 the three steps left. Over all 84,973 that matched they are 18.8 and 0.49, by the split in the run's output (see class-counts-leave-out-packages-the-processing-steps-removed): both overstate on this account. Neither is a corrected share.",
+      "affects": [
+        "weakShareOfCryptoUsing",
+        "pqcShareOfCryptoUsing"
+      ],
+      "direction": "overstates",
+      "magnitude": {
+        "value": 19287,
+        "of": 84973,
+        "unit": "matched packages the three steps removed: 3,525 weak, 15,702 modern-classed only, 60 post-quantum"
+      },
+      "correctedIn": "Only a new scan can correct this.",
+      "issuedAt": "2026-10-06"
+    },
+    {
+      "defect": "top-lists-drawn-after-the-processing-steps",
+      "summary": "topExposedProjects (PyPI, RubyGems) and topPqcProjects (crates.io) were drawn after packages-whose-names-match-once-normalized-counted-as-one and packages-removed-by-a-name-pattern, which removed packages in all three rows. Only the run's output (see class-counts-leave-out-packages-the-processing-steps-removed) shows 3 removed PyPI packages counted as weak and 4 removed crates counted as post-quantum could have entered a list; whether either would differ is not verified.",
+      "affects": [
+        "topExposedProjects",
+        "topPqcProjects"
+      ],
+      "direction": "unknown",
+      "magnitude": null,
+      "correctedIn": "Only a new scan can correct this.",
+      "issuedAt": "2026-10-06"
     }
   ],
   "regenerations": [
