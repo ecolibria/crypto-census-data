@@ -136,6 +136,9 @@ function resolvePath(root, path) {
 
 const problems = [];
 const fail = (dataset, message) => problems.push(`${dataset}: ${message}`);
+/** What a reader should know and no rule refuses. Listed beside the result of every run, problems or none. */
+const notes = [];
+const note = (dataset, message) => notes.push(`${dataset}: ${message}`);
 
 /**
  * A name a manifest gives a file is read only as the name of a file in the
@@ -1405,7 +1408,7 @@ const COVERAGE_COUNTS = ['listed', 'scanned', 'absent', 'unresolved', 'unversion
 Object.assign(KEYS, {
   scan: ['schemaVersion', 'kind', 'ecosystem', 'startedAt', 'finishedAt', 'scanner', 'sources', 'catalog', 'method', 'enumeration',
     'versionYears', 'coverage', 'listing', 'catalogCheck', 'packagesWithMatch', 'packages'],
-  scanner: ['script', 'commit'],
+  scanner: ['script', 'commit', 'workflowRun'],
   scanCatalog: ['entries', 'matchSetSha256', 'matchRule'],
   method: ['versionSelection', 'readFrom', 'declarationKinds', 'notObservableWhen', 'limits'],
   enumeration: ['requested', 'listed', 'truncated', 'reason', 'unit', 'budgetMinutes', 'elapsedMinutes', 'frameSize', 'sampling', 'indexWindow'],
@@ -1722,6 +1725,10 @@ function checkScan(name, eco, record, catalog, found, bad) {
     if (!isText(s.scanner.commit)) {
       bad(`${at} scanner.commit is ${describe(s.scanner.commit)}. A published scan names the instrument commit it ran; null ` +
         'belongs to a local run.');
+    }
+    if (!isText(s.scanner.workflowRun)) {
+      bad(`${at} scanner.workflowRun is ${describe(s.scanner.workflowRun)}. A published scan names the workflow run that wrote ` +
+        'it; null belongs to a local run.');
     }
   }
   checkSources(eco, s.sources, file, bad);
@@ -3346,6 +3353,25 @@ function validateVersion2Files(name, dir, bad) {
   const map = found.consolidation ? checkConsolidation(name, found.consolidation, scans, bad) : null;
   if (found.corpus) checkCorpus(name, found.corpus, { catalog, scans, ledgers, map, found }, bad);
   checkManifestAgainstFiles(manifest, found, scans, bad);
+  listRegeneratedScans(name, manifest, found);
+}
+
+/**
+ * Every scan written by a run other than the one the manifest names: its
+ * figures were aggregated again, later, without a new scan. That is allowed,
+ * and it is recorded each time the dataset is validated, never left implicit.
+ */
+function listRegeneratedScans(name, manifest, found) {
+  const run = isObject(manifest.provenance) ? manifest.provenance.workflowRun : null;
+  if (!isText(run)) return;
+  for (const eco of ECOSYSTEMS) {
+    const scan = found.scans[eco];
+    const scanRun = scan && isObject(scan.value.scanner) ? scan.value.scanner.workflowRun : null;
+    if (isText(scanRun) && scanRun !== run) {
+      note(name, `${scan.file} was written by the run ${scanRun}, not by ${run}, the run MANIFEST.json names: the dataset ` +
+        'aggregates it again, without a new scan.');
+    }
+  }
 }
 
 
@@ -3419,6 +3445,12 @@ for (const file of errataFiles) {
 
 const checked = `${names.length} dataset(s)` +
   (errataFiles.length > 0 ? ` and ${errataFiles.length} errata file(s)` : '');
+
+if (notes.length > 0) {
+  process.stdout.write(`\nRecorded, not refused (${notes.length}):\n\n`);
+  for (const n of notes) process.stdout.write(`  ${n}\n`);
+  process.stdout.write('\n');
+}
 
 if (problems.length > 0) {
   process.stderr.write(`\n${problems.length} problem(s) across ${checked}:\n\n`);

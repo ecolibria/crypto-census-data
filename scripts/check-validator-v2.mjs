@@ -65,6 +65,7 @@ const INCLUDES = Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, KINDS[eco].fil
 // Example values. The commit id has the right form and names nothing; the URLs
 // are in reserved example domains.
 const COMMIT = '0123456789abcdef0123456789abcdef01234567';
+const RUN_URL = 'https://ci.example/runs/1';
 
 /**
  * The snapshot's two digests, computed here from its entries: JSON with keys
@@ -650,7 +651,7 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
     scans[eco] = {
       schemaVersion: 2, kind: 'censusScan', ecosystem: eco,
       startedAt: `${date}T00:00:00.000Z`, finishedAt: `${date}T06:00:00.000Z`,
-      scanner: { script: `scripts/scan-${eco}.mjs`, commit: COMMIT },
+      scanner: { script: `scripts/scan-${eco}.mjs`, commit: COMMIT, workflowRun: RUN_URL },
       sources: structuredClone(ADMITTED_SOURCES[eco]),
       catalog: { entries: r.entries.length, matchSetSha256: MATCH_SET, matchRule: `${eco}Name/1` },
       method: { versionSelection: 'latest', readFrom: r.method.readFrom, declarationKinds: [...KINDS[eco]], notObservableWhen: r.method.notObservableWhen, limits: r.method.limits },
@@ -749,7 +750,7 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
     collectedAt: date,
     generatedAt: `${date}T13:00:00.000Z`,
     license: 'CC-BY-4.0',
-    provenance: { sourceRepository: 'example/census', sourceCommit: COMMIT, workflowRun: 'https://ci.example/runs/1' },
+    provenance: { sourceRepository: 'example/census', sourceCommit: COMMIT, workflowRun: RUN_URL },
     files: listing.map((item) => ({ ...item, bytes: Buffer.byteLength(files[item.file]), sha256: sha256(files[item.file]), schemaVersion: 2 })),
     coverage: Object.fromEntries(COVERAGE.map((field) => [field, sum(ECOSYSTEMS.map((eco) => scans[eco].coverage[field]))])),
     ecosystems: ECOSYSTEMS.map((eco) => structuredClone({ ecosystem: eco, coverage: scans[eco].coverage, enumeration: scans[eco].enumeration, sources: scans[eco].sources })),
@@ -1092,6 +1093,23 @@ plant('a scan of another registry', scanOf('hex', (s) => { s.ecosystem = 'pub'; 
 plant('a scan with no start', scanOf('hex', (s) => { s.startedAt = null; }), /startedAt is null, not a time as toISOString\(\) writes it, or a date/);
 plant('a scan with no instrument commit', scanOf('hex', (s) => { s.scanner.commit = null; }), /scanner\.commit is null\. A published scan names the instrument commit/);
 plant('a scan with no script', scanOf('hex', (s) => { s.scanner.script = ''; }), /scanner\.script is ""/);
+plant('a scan that names no run', scanOf('hex', (s) => { s.scanner.workflowRun = null; }), /scanner\.workflowRun is null\. A published scan names the workflow run that wrote it/);
+plant('a scan without its run', scanOf('hex', (s) => { delete s.scanner.workflowRun; }), /scanner is missing workflowRun/);
+
+test('a scan written by another run than the manifest names is listed, not refused', async () => {
+  const result = await validateOne(scanOf('npm', (s) => { s.scanner.workflowRun = 'https://ci.example/runs/0'; }));
+  assert.equal(result.code, 0, result.stderr);
+  const listed = result.stdout.split('\n').filter((line) => line.startsWith(`  ${DATE}: `));
+  assert.equal(listed.length, 1, result.stdout);
+  assert.match(listed[0], /scan-results-npm\.json was written by the run https:\/\/ci\.example\/runs\/0, not by https:\/\/ci\.example\/runs\/1, the run MANIFEST\.json names/);
+  assert.match(result.stdout, /^Recorded, not refused \(1\):$/m);
+});
+
+test('a dataset whose scans were all written by the run its manifest names lists nothing', async () => {
+  const result = await validateOne();
+  assert.equal(result.code, 0, result.stderr);
+  assert.doesNotMatch(result.stdout, /Recorded, not refused/);
+});
 plant('a source off the allowlist', scanOf('go', (s) => { s.sources.manifests = 'http://127.0.0.1:8080'; }),
   /sources\.manifests is "http:\/\/127\.0\.0\.1:8080", not https:\/\/proxy\.golang\.org, the base URL admitted for go\. Sources are compared as exact text/);
 plant('a source that only begins with the admitted URL', scanOf('go', (s) => { s.sources.manifests = 'https://proxy.golang.org/cached-only'; }),
@@ -1803,7 +1821,7 @@ function errataFor(fn = () => {}) {
     issues: [{ ...knownIssue(), affects: ['byEcosystem.npm.anyManifestMatch.raw.weak.count'], issuedAt: '2026-10-01' }],
     regenerations: [{
       issuedAt: '2026-10-01',
-      namedRun: 'https://ci.example/runs/1',
+      namedRun: RUN_URL,
       runOutputSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
       writtenBy: [{ repository: 'example/census', pullRequest: 1, commit: COMMIT }],
       beforeSteps: { fields: ['coverage.scanned'], ecosystems: ['npm', 'hex'] },
