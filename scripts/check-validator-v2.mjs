@@ -62,10 +62,13 @@ const KINDS = {
 const INCLUDES = Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, KINDS[eco].filter((kind) =>
   !(eco === 'maven' && ['managed', 'plugin'].includes(kind)) && !(eco === 'packagist' && kind === 'suggest'))]));
 
-// Example values. The commit id has the right form and names nothing; the URLs
-// are in reserved example domains.
+// Example values. The commit id has the right form and names nothing. The run
+// is in the form the contract gives a run of the instrument, and its id names
+// no run; every other URL is in a reserved example domain.
 const COMMIT = '0123456789abcdef0123456789abcdef01234567';
-const RUN_URL = 'https://ci.example/runs/1';
+const RUN_ID = '1';
+const runUrl = (id) => `https://github.com/opena2a-org/crypto-census/actions/runs/${id}`;
+const RUN_URL = runUrl(RUN_ID);
 
 /**
  * The snapshot's two digests, computed here from its entries: JSON with keys
@@ -155,7 +158,6 @@ function registries() {
   return {
     npm: {
       method: { readFrom: ['release'], notObservableWhen: [], limits: [] },
-      sampling: { method: 'seededShuffle', seed: 'example-seed', draw: 'package', pageRows: null },
       entries: [
         pqc('npm', '@noble/post-quantum'),
         unclassified('npm', '@types/bcryptjs', 'noCryptographicCode'),
@@ -269,7 +271,8 @@ function registries() {
     },
     maven: {
       method: { readFrom: ['release'], notObservableWhen: [], limits: ['parentPomNotFollowed'] },
-      sampling: { method: 'seededShuffle', seed: 'example-page-seed', draw: 'page', pageRows: 20 },
+      // The search found 400 rows: two pages of 200, both drawn and read (the ledger's pages 0 and 1).
+      frameSize: 400,
       entries: [
         unclassified('maven', 'commons-codec:commons-codec', 'primaryFunctionNotCryptography'),
         pqc('maven', 'org.bouncycastle:bcpqc-jdk18on', { registryAbsent: { ...ABSENT } }),
@@ -404,7 +407,6 @@ function registries() {
     },
     hex: {
       method: { readFrom: ['release'], notObservableWhen: [], limits: [] },
-      sampling: { method: 'all', seed: null, draw: null, pageRows: null },
       entries: [entry('hex', 'enacl')],
       rows: [scanned('acme_hex', [match('enacl', { kind: 'requirement', optional: true })])],
       units: [],
@@ -659,9 +661,14 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
       sources: structuredClone(ADMITTED_SOURCES[eco]),
       catalog: { entries: r.entries.length, matchSetSha256: MATCH_SET, matchRule: `${eco}Name/1` },
       method: { versionSelection: 'latest', readFrom: r.method.readFrom, declarationKinds: [...KINDS[eco]], notObservableWhen: r.method.notObservableWhen, limits: r.method.limits },
+      // Every row is read as the population rule sets it: whole, or a seeded draw of its size whose seed is the run's id.
+      // A frame smaller than the size is read whole, so a draw lists its frame.
       enumeration: {
-        requested: r.sampling?.method === 'all' ? null : 1000, listed: coverage.listed, truncated: false, reason: null, unit: 'packages', budgetMinutes: null,
-        elapsedMinutes: 1.5, frameSize: null, sampling: r.sampling ?? { method: 'registryOrder', seed: null, draw: 'package', pageRows: null },
+        requested: RULED_POPULATION[eco].rule === 'listing' ? null : RULED_POPULATION[eco].size, listed: coverage.listed, truncated: false,
+        reason: null, unit: 'packages', budgetMinutes: null, elapsedMinutes: 1.5, frameSize: r.frameSize ?? coverage.listed,
+        sampling: RULED_POPULATION[eco].rule === 'listing'
+          ? { method: 'all', seed: null, draw: null, pageRows: null }
+          : { method: 'seededShuffle', seed: RUN_ID, draw: RULED_POPULATION[eco].draw, pageRows: RULED_POPULATION[eco].pageRows ?? null },
         indexWindow: eco === 'go' ? { since: '2026-09-01T00:00:00.000Z', until: `${date}T00:00:00.000Z` } : null,
       },
       versionYears: eco === 'go' ? { 2024: 2, 2025: 3 } : null,
@@ -812,6 +819,28 @@ const ADMITTED_SOURCES_JSON = `{
 }`;
 const ADMITTED_SOURCES = JSON.parse(ADMITTED_SOURCES_JSON);
 const ADMITTED_SOURCES_SHA256 = 'dc3da855b33e5ef92470b0647f54da194006bf1fc6c71a46348e63b4f4b78a05';
+
+/**
+ * The population rule, this file's own copy of the instrument's `POPULATION`
+ * (lib/census/population.mjs at 56078ea, lines 59 to 71, with its three
+ * constants written out), as JSON text. Every scan the fixture writes is read
+ * under it, and the digest below pins both copies.
+ */
+const RULED_POPULATION_JSON = `{
+  "pypi": {"rule": "listing", "source": "https://pypi.org/simple/"},
+  "packagist": {"rule": "listing", "source": "https://packagist.org/packages/list.json"},
+  "rubygems": {"rule": "listing", "source": "https://index.rubygems.org/names"},
+  "nuget": {"rule": "listing", "source": "https://api.nuget.org/v3/catalog0/index.json"},
+  "hex": {"rule": "listing", "source": "https://hex.pm/api/packages"},
+  "pub": {"rule": "listing", "source": "https://pub.dev/api/package-names"},
+  "crates": {"rule": "listing", "source": "https://github.com/rust-lang/crates.io-index.git"},
+  "cocoapods": {"rule": "listing", "source": "https://cdn.cocoapods.org/all_pods.txt"},
+  "npm": {"rule": "sample", "source": "https://replicate.npmjs.com/_all_docs", "size": 385000, "draw": "package"},
+  "go": {"rule": "sample", "source": "https://index.golang.org/index", "size": 385000, "draw": "package", "frameDays": 365},
+  "maven": {"rule": "sample", "source": "https://search.maven.org/solrsearch/select", "size": 385000, "draw": "page", "pageRows": 200}
+}`;
+const RULED_POPULATION = JSON.parse(RULED_POPULATION_JSON);
+const RULED_POPULATION_SHA256 = 'afab7c7dffb7018d7dbc96adb76601f451f496d660000bcf8895508f791b8c43';
 
 /**
  * Write a repository holding a copy of the validator, a copy of the smaller
@@ -1111,12 +1140,18 @@ plant('a scan with no script', scanOf('hex', (s) => { s.scanner.script = ''; }),
 plant('a scan that names no run', scanOf('hex', (s) => { s.scanner.workflowRun = null; }), /scanner\.workflowRun is null\. A published scan names the workflow run that wrote it/);
 plant('a scan without its run', scanOf('hex', (s) => { delete s.scanner.workflowRun; }), /scanner is missing workflowRun/);
 
+/** A scan written by an earlier run, aggregated again by the run the manifest names: drawn, if it is a draw, with its own run's id. */
+const writtenByRun = (eco, id) => scanOf(eco, (s) => {
+  s.scanner.workflowRun = runUrl(id);
+  if (s.enumeration.sampling.seed !== null) s.enumeration.sampling.seed = id;
+});
+
 test('a scan written by another run than the manifest names is listed, not refused', async () => {
-  const result = await validateOne(scanOf('npm', (s) => { s.scanner.workflowRun = 'https://ci.example/runs/0'; }));
+  const result = await validateOne(writtenByRun('npm', '2'));
   assert.equal(result.code, 0, result.stderr);
   const listed = result.stdout.split('\n').filter((line) => line.startsWith(`  ${DATE}: `));
   assert.equal(listed.length, 1, result.stdout);
-  assert.match(listed[0], /scan-results-npm\.json was written by the run https:\/\/ci\.example\/runs\/0, not by https:\/\/ci\.example\/runs\/1, the run MANIFEST\.json names/);
+  assert.match(listed[0], /scan-results-npm\.json was written by the run https:\/\/github\.com\/opena2a-org\/crypto-census\/actions\/runs\/2, not by https:\/\/github\.com\/opena2a-org\/crypto-census\/actions\/runs\/1, the run MANIFEST\.json names/);
   assert.match(result.stdout, /^Recorded, not refused \(1\):$/m);
 });
 
@@ -1162,6 +1197,14 @@ test('these tests read from the admitted allowlist, read without running them', 
   assert.equal(digestOf(ADMITTED_SOURCES), ADMITTED_SOURCES_SHA256);
 });
 
+test('these tests build every scan under the population rule, read without running them', () => {
+  assert.equal(digestOf(allowlistIn(readText(fileURLToPath(import.meta.url)), 'RULED_POPULATION_JSON')), RULED_POPULATION_SHA256);
+  assert.equal(digestOf(RULED_POPULATION), RULED_POPULATION_SHA256);
+  assert.deepEqual(Object.keys(RULED_POPULATION).sort(), [...ECOSYSTEMS].sort());
+  // Each frame is read from the base the allowlist admits for enumeration.
+  for (const eco of ECOSYSTEMS) assert.equal(RULED_POPULATION[eco].source, ADMITTED_SOURCES[eco].enumeration, eco);
+});
+
 plant('a scan matched against another number of entries', scanOf('hex', (s) => { s.catalog.entries = 2; }), /catalog\.entries is 2, and the catalogue snapshot has 1 hex entries/);
 plant('a scan matched against another set of names', scanOf('hex', (s) => { s.catalog.matchSetSha256 = sha256('other'); }), /catalog\.matchSetSha256 differs from the catalogue snapshot's/);
 plant('a scan with another match rule', scanOf('hex', (s) => { s.catalog.matchRule = 'hexName/2'; }), /catalog\.matchRule is "hexName\/2", and the catalogue snapshot's rule for hex is "hexName\/1"/);
@@ -1183,7 +1226,11 @@ plant('an elapsed time left out', scanOf('hex', (s) => { s.enumeration.elapsedMi
 plant('a frame size that is not a count', scanOf('hex', (s) => { s.enumeration.frameSize = 2.5; }), /enumeration\.frameSize is 2\.5, not a whole count or null/);
 plant('a sampling method that is not one', scanOf('hex', (s) => { s.enumeration.sampling.method = 'random'; }), /enumeration\.sampling\.method is "random"/);
 plant('a shuffled sample with no seed', scanOf('npm', (s) => { s.enumeration.sampling.seed = null; }), /enumeration\.sampling\.seed is null\. A shuffled sample names its seed/);
-plant('a seed for a sample that shuffles nothing', scanOf('pub', (s) => { s.enumeration.sampling.seed = 'abc'; }), /enumeration\.sampling\.seed is "abc" for registryOrder, which shuffles nothing/);
+plant('a seed for a sample that shuffles nothing', scanOf('pub', (s) => {
+  s.enumeration.requested = 1000;
+  s.enumeration.sampling = { method: 'registryOrder', seed: 'abc', draw: 'package', pageRows: null };
+}), /enumeration\.sampling\.seed is "abc" for registryOrder, which shuffles nothing/);
+plant('a seed for a row read whole', scanOf('pub', (s) => { s.enumeration.sampling.seed = 'abc'; }), /enumeration\.sampling\.seed is "abc" for all, which shuffles nothing/);
 plant('a registry read whole that names a draw', scanOf('hex', (s) => { s.enumeration.sampling.draw = 'package'; }), /enumeration\.sampling\.draw is "package", and a registry read whole draws nothing/);
 plant('a sample that does not say what it drew', scanOf('npm', (s) => { s.enumeration.sampling.draw = null; }), /enumeration\.sampling\.draw is null, not package or page/);
 plant('a draw by page with no page size', scanOf('maven', (s) => { s.enumeration.sampling.pageRows = null; }), /enumeration\.sampling\.pageRows is null; a draw by page says how many rows a page holds/);
@@ -2027,8 +2074,8 @@ for (const [what, fn, problem] of [
     (e) => { e.regenerations[0].beforeSteps.fields = ['summary.noCrypto']; },
     /regeneration 1 names summary\.noCrypto, which scan-results-npm\.json does not have/],
   ['a regeneration naming a run other than the version 2 manifest\'s',
-    (e) => { e.regenerations[0].namedRun = 'https://ci.example/runs/2'; },
-    /regeneration 1 names the run https:\/\/ci\.example\/runs\/2, and datasets\/2026-09-30\/MANIFEST\.json names "https:\/\/ci\.example\/runs\/1"/],
+    (e) => { e.regenerations[0].namedRun = runUrl('2'); },
+    /regeneration 1 names the run https:\/\/github\.com\/opena2a-org\/crypto-census\/actions\/runs\/2, and datasets\/2026-09-30\/MANIFEST\.json names "https:\/\/github\.com\/opena2a-org\/crypto-census\/actions\/runs\/1"/],
 ]) {
   test(`${what} is refused`, async () => {
     const result = await withErrata(fn);
