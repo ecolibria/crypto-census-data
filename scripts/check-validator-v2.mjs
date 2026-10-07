@@ -1971,7 +1971,7 @@ test('a later dataset marked comparable with an earlier one whose instrument dif
     [DATE]: [DATE, {}, [{ dataset: FIRST_SHAPE, version: 1 }, { dataset: EARLIER_V2, version: 2 }]],
   });
   assert.equal(result.code, 1, result.stdout);
-  assert.match(firstProblem(result.stderr), /2026-09-15 is marked comparable, and these differ between the two datasets: the npm scanner's method\. Two datasets are comparable only when/, result.stderr);
+  assert.match(firstProblem(result.stderr), /2026-09-15 is marked comparable, and these differ between the two datasets: the npm scanner's method\.versionSelection \(versionSelection\)\. Two datasets are comparable only when/, result.stderr);
 });
 test('a later dataset marked comparable with an earlier one matched against another match set is refused', async () => {
   // One more alias in the earlier snapshot: its match set digest differs, and nothing else about its instrument does.
@@ -1980,18 +1980,7 @@ test('a later dataset marked comparable with an earlier one matched against anot
     [DATE]: [DATE, {}, [{ dataset: FIRST_SHAPE, version: 1 }, { dataset: EARLIER_V2, version: 2 }]],
   });
   assert.equal(result.code, 1, result.stdout);
-  assert.match(firstProblem(result.stderr), /2026-09-15 is marked comparable, and these differ between the two datasets: the match set\. Two datasets are comparable only when/, result.stderr);
-});
-test('a later dataset marked comparable with an earlier one read under other definition ids is refused', async () => {
-  // The earlier corpus names a unit definition these rules do not know, which refuses it on its own; the comparison
-  // reads the ids as written and refuses the later dataset too.
-  const result = await validate({
-    [EARLIER_V2]: [EARLIER_V2, corpusOf((c) => { c.definitions.raw.id = 'census.unit.package/2'; })],
-    [DATE]: [DATE, {}, [{ dataset: FIRST_SHAPE, version: 1 }, { dataset: EARLIER_V2, version: 2 }]],
-  });
-  assert.equal(result.code, 1, result.stdout);
-  assert.match(firstProblem(result.stderr, EARLIER_V2), /definitions\.raw\.id is "census\.unit\.package\/2", not census\.unit\.package\/1/, result.stderr);
-  assert.match(firstProblem(result.stderr), /2026-09-15 is marked comparable, and these differ between the two datasets: the definition ids\. Two datasets are comparable only when/, result.stderr);
+  assert.match(firstProblem(result.stderr), /2026-09-15 is marked comparable, and these differ between the two datasets: the catalogue snapshot's matchSetSha256 \(matchSet\)\. Two datasets are comparable only when/, result.stderr);
 });
 test('a later dataset that names what changed in the instrument passes', async () => {
   const result = await validate({
@@ -2345,8 +2334,85 @@ for (const [what, earlier, later] of [
     const result = await validate(comparedWith(earlier, later));
     assert.equal(result.code, 1, result.stdout);
     assert.match(firstProblem(result.stderr), new RegExp('2026-09-15 is marked comparable, and these differ between the two datasets: ' +
-      'the npm scanner\'s method\\. Two datasets are comparable only when the match set, the definition ids and the method of ' +
-      'every scanner both read are the same\\.$'), result.stderr);
+      'the npm scanner\'s method\\.versionSelection \\(versionSelection\\)\\. Two datasets are comparable only when these rules ' +
+      'recompute no change code between them and the dataset names none\\.$'), result.stderr);
+  });
+}
+
+// Every compared field belongs to one change code and is compared only as that code compares it (contract 4.7). Of a
+// scanner's method, for a registry both read: versionSelection by value, and declarationKinds and the three fields of
+// manifestReader (readFrom, notObservableWhen and limits) each as a set, so that an order is never a change. Of the
+// definitions: the package unit's id under consolidationRule, and the multi-purpose table's under classDefinition.
+// Comparable is true exactly when no code is recomputed and none is named; enumerationFrame, which no field carries,
+// may be named and is never recomputed.
+for (const [what, earlier] of [
+  ['npm\'s declaration kinds are listed in another order', { scans: (s) => { s.npm.method.declarationKinds.reverse(); } }],
+  ['Packagist\'s read sources are listed in another order', { fixture: (f) => { f.packagist.method.readFrom.reverse(); } }],
+]) {
+  test(`a later dataset marked comparable with an earlier one passes when ${what}`, async () => {
+    const result = await validate(comparedWith(earlier, {}));
+    assert.equal(result.code, 0, result.stderr);
+  });
+}
+test('a list of a method in another order is not named as a change', async () => {
+  const result = await validate(comparedWith({ scans: (s) => { s.npm.method.declarationKinds.reverse(); } }, {}, ['declarationKinds']));
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(firstProblem(result.stderr),
+    /comparability\[1\]\.changes is \["declarationKinds"\]; recomputed from the fields each code names, the two datasets differ in \[\] /, result.stderr);
+});
+
+for (const [field, value] of [
+  ['readFrom', ['release', 'taggedRelease']],
+  ['notObservableWhen', ['manifestHasNoDependencyFields']],
+  ['limits', ['developmentDependenciesNotExposed']],
+]) {
+  const earlier = { fixture: (f) => { f.npm.method[field] = value; } };
+  test(`npm's method.${field} differing between two datasets refuses them as comparable, under manifestReader`, async () => {
+    const result = await validate(comparedWith(earlier, {}));
+    assert.equal(result.code, 1, result.stdout);
+    assert.match(firstProblem(result.stderr), new RegExp('2026-09-15 is marked comparable, and these differ between the two datasets: ' +
+      `the npm scanner's method\\.${field} \\(manifestReader\\)\\. Two datasets are comparable only when`), result.stderr);
+  });
+  test(`npm's method.${field} differing between two datasets is named as manifestReader, and passes`, async () => {
+    const result = await validate(comparedWith(earlier, {}, ['manifestReader']));
+    assert.equal(result.code, 0, result.stderr);
+  });
+  test(`npm's method.${field} differing between two datasets is refused as a change of enumerationFrame alone`, async () => {
+    const result = await validate(comparedWith(earlier, {}, ['enumerationFrame']));
+    assert.equal(result.code, 1, result.stdout);
+    assert.match(firstProblem(result.stderr),
+      /comparability\[1\]\.changes is \["enumerationFrame"\]; recomputed from the fields each code names, the two datasets differ in \["manifestReader"\]/, result.stderr);
+  });
+}
+
+test('a change code named that the two datasets do not differ in, other than enumerationFrame, is refused', async () => {
+  const result = await validate(comparedWith(npmVersionSelection, {}, ['versionSelection', 'manifestReader']));
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(firstProblem(result.stderr), new RegExp('comparability\\[1\\]\\.changes is \\["versionSelection","manifestReader"\\]; recomputed from ' +
+    'the fields each code names, the two datasets differ in \\["versionSelection"\\] \\(and enumerationFrame, which no field carries, is not ' +
+    'recomputed\\)$'), result.stderr);
+});
+
+// The earlier corpus names an id these rules do not know, which refuses it on its own; the comparison reads the ids as
+// written. Under the code it belongs to, the later dataset names the change and passes, and marked comparable it is refused.
+for (const [key, id, code, own] of [
+  ['raw', 'census.unit.package/2', 'consolidationRule', /definitions\.raw\.id is "census\.unit\.package\/2", not census\.unit\.package\/1/],
+  ['multiPurposeLibrary', 'census.table.multiPurposeLibrary/2', 'classDefinition',
+    /definitions\.multiPurposeLibrary\.id is "census\.table\.multiPurposeLibrary\/2", not census\.table\.multiPurposeLibrary\/1/],
+]) {
+  const earlier = corpusOf((c) => { c.definitions[key].id = id; });
+  test(`a later dataset marked comparable with an earlier one under another ${key} id is refused, under ${code}`, async () => {
+    const result = await validate(comparedWith(earlier, {}));
+    assert.equal(result.code, 1, result.stdout);
+    assert.match(firstProblem(result.stderr, EARLIER_V2), own, result.stderr);
+    assert.match(firstProblem(result.stderr), new RegExp('2026-09-15 is marked comparable, and these differ between the two datasets: ' +
+      `definitions\\.${key} \\(${code}\\)\\. Two datasets are comparable only when`), result.stderr);
+  });
+  test(`a later dataset that names ${code} for an earlier one under another ${key} id passes`, async () => {
+    const result = await validate(comparedWith(earlier, {}, [code]));
+    assert.equal(result.code, 1, result.stdout);
+    assert.match(firstProblem(result.stderr, EARLIER_V2), own, result.stderr);
+    assert.equal(firstProblem(result.stderr), '', result.stderr);
   });
 }
 

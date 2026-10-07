@@ -3083,23 +3083,71 @@ function checkDefinitions(d, file, bad) {
  */
 const readByBoth = (a, b) => ECOSYSTEMS.filter((eco) => a.withScanFile.has(eco) && b.withScanFile.has(eco));
 
-/** The change codes these rules recompute, each from the fields it names, for two version 2 datasets. */
-const CHANGES_CHECKED = {
-  versionSelection: (a, b) => readByBoth(a, b).some((eco) => !sameValue(a.methods[eco]?.versionSelection, b.methods[eco]?.versionSelection)),
-  declarationKinds: (a, b) => readByBoth(a, b).some((eco) => !sameSet(a.methods[eco]?.declarationKinds ?? [], b.methods[eco]?.declarationKinds ?? [])),
-  matchRule: (a, b) => !sameValue(a.matchRules, b.matchRules),
-  matchSet: (a, b) => a.matchSetSha256 !== b.matchSetSha256,
-  coverageDefinition: (a, b) => a.definitionIds.coverage !== b.definitionIds.coverage,
-  matchDefinition: (a, b) => a.definitionIds.anyManifestMatch !== b.definitionIds.anyManifestMatch ||
-    a.definitionIds.directUnconditional !== b.definitionIds.directUnconditional,
-  classDefinition: (a, b) => !sameValue(a.definitionIds.classes, b.definitionIds.classes),
-  classification: (a, b) => a.classificationSha256 !== b.classificationSha256,
-  consolidationRule: (a, b) => a.definitionIds.consolidated !== b.definitionIds.consolidated,
+/** Two lists with the same members, in any order; a value that is not a list is compared as it is. */
+const sameMembers = (a, b) => (Array.isArray(a) && Array.isArray(b)
+  ? sameSet([...new Set(a.map(canonical))], b.map(canonical))
+  : sameValue(a, b));
+
+/**
+ * Every field two version 2 datasets are compared on, under the one change code it belongs to, and compared only as
+ * that code compares it (contract 4.7). Per registry both read, from the scanner's method: versionSelection by value,
+ * and declarationKinds and the three fields of manifestReader (where a manifest is read from, when it cannot show
+ * dependencies, and what its reader cannot see) each as a set, so that an order is never a change.
+ */
+const METHOD_CODES = {
+  versionSelection: ['versionSelection', sameValue],
+  readFrom: ['manifestReader', sameMembers],
+  declarationKinds: ['declarationKinds', sameMembers],
+  notObservableWhen: ['manifestReader', sameMembers],
+  limits: ['manifestReader', sameMembers],
 };
-// not checked yet: enumerationFrame and manifestReader, for which the
-// schema version 2 contract names no field to compare. A dataset may name
-// them or not.
-const UNCHECKED_CHANGES = ['enumerationFrame', 'manifestReader'];
+/** Dataset-wide, by value: the catalogue snapshot's match set, match rules and classification (2.5). */
+const CATALOG_CODES = { matchSetSha256: 'matchSet', matchRules: 'matchRule', classificationSha256: 'classification' };
+/**
+ * Dataset-wide, by value: the ids of the definitions (4.2). The package unit is a unit rule beside the consolidated
+ * one, and the multi-purpose table holds what the classes keep out of pqc.
+ */
+const DEFINITION_CODES = {
+  coverage: 'coverageDefinition',
+  anyManifestMatch: 'matchDefinition',
+  directUnconditional: 'matchDefinition',
+  raw: 'consolidationRule',
+  consolidated: 'consolidationRule',
+  classes: 'classDefinition',
+  multiPurposeLibrary: 'classDefinition',
+};
+/** The one code no field carries. A dataset may name it, and it is never recomputed. */
+const UNCHECKED_CHANGES = ['enumerationFrame'];
+
+// A field is admitted to method, and an id to definitions, only with its code, and every other code is carried by a
+// field: no field is compared under no code, and no code can be named that nothing recomputes.
+if (!sameSet(Object.keys(METHOD_CODES), KEYS.method) ||
+    !sameSet(Object.keys(DEFINITION_CODES), KEYS.definitions.filter((key) => key !== 'unresolvedCeiling')) ||
+    !sameSet([...new Set([...Object.values(METHOD_CODES).map(([code]) => code), ...Object.values(CATALOG_CODES),
+      ...Object.values(DEFINITION_CODES), ...UNCHECKED_CHANGES])], CHANGE_CODES)) {
+  throw new Error('Every field of method and every id of definitions belongs to one change code, and every change code but enumerationFrame to a field.');
+}
+
+/**
+ * The change codes recomputed between two version 2 instruments, in the order of CHANGE_CODES, each with the fields
+ * that differ under it.
+ */
+function changesBetween(a, b) {
+  const differ = new Map();
+  const add = (code, field) => differ.set(code, [...(differ.get(code) ?? []), field]);
+  for (const eco of readByBoth(a, b)) {
+    for (const [field, [code, same]] of Object.entries(METHOD_CODES)) {
+      if (!same(a.methods[eco]?.[field], b.methods[eco]?.[field])) add(code, `the ${eco} scanner's method.${field}`);
+    }
+  }
+  for (const [field, code] of Object.entries(CATALOG_CODES)) {
+    if (!sameValue(a[field], b[field])) add(code, `the catalogue snapshot's ${field}`);
+  }
+  for (const [key, code] of Object.entries(DEFINITION_CODES)) {
+    if (!sameValue(a.definitionIds[key], b.definitionIds[key])) add(code, `definitions.${key}`);
+  }
+  return CHANGE_CODES.filter((code) => differ.has(code)).map((code) => ({ code, fields: differ.get(code) }));
+}
 
 /**
  * A file read from beside what is being validated (an earlier dataset, or the
@@ -3132,8 +3180,9 @@ const definitionIds = (d) => ({
 });
 
 /**
- * What two version 2 datasets have to share to be comparable: the match set, the definition ids, and the method of
- * every scanner both read. Only the scan files the manifest lists are read; a registry with none has no method.
+ * The fields of a version 2 dataset that the change codes compare: the catalogue snapshot's digests and rules, the
+ * definition ids, and the method of every scanner it read. Only the scan files the manifest lists are read; a
+ * registry with none has no method.
  */
 function instrumentOf(dataset) {
   try {
@@ -3228,23 +3277,22 @@ function checkComparability(name, list, corpus, ctx, file, bad) {
           'whether it is comparable nor the changes named can be checked');
         return;
       }
+      // The change codes, recomputed from the fields each one names. Comparable is true exactly when none is recomputed
+      // and the dataset names none; otherwise the dataset names those recomputed, and may name enumerationFrame.
+      const changes = changesBetween(theirs, ours);
+      const computed = changes.map(({ code }) => code);
       if (item.comparable) {
-        const differ = [];
-        if (!sameValue(theirs.matchSetSha256, ours.matchSetSha256)) differ.push('the match set');
-        if (!sameValue(theirs.definitionIds, ours.definitionIds)) differ.push('the definition ids');
-        for (const eco of readByBoth(theirs, ours)) if (!sameValue(theirs.methods[eco], ours.methods[eco])) differ.push(`the ${eco} scanner's method`);
-        if (differ.length > 0) {
-          bad(`${at}: ${item.dataset} is marked comparable, and these differ between the two datasets: ${differ.join(', ')}. Two ` +
-            'datasets are comparable only when the match set, the definition ids and the method of every scanner both read are ' +
-            'the same.');
+        if (computed.length > 0) {
+          bad(`${at}: ${item.dataset} is marked comparable, and these differ between the two datasets: ` +
+            `${changes.flatMap(({ code, fields }) => fields.map((field) => `${field} (${code})`)).join(', ')}. Two datasets are ` +
+            'comparable only when these rules recompute no change code between them and the dataset names none.');
         }
-      }
-      // The change codes, recomputed from the fields each one names.
-      const computed = Object.keys(CHANGES_CHECKED).filter((code) => CHANGES_CHECKED[code](theirs, ours));
-      const stated = item.changes.filter((code) => !UNCHECKED_CHANGES.includes(code));
-      if (!sameSet(stated, computed)) {
-        bad(`${at}.changes is ${describe(item.changes)}; recomputed from the fields each code names, the two datasets differ in ` +
-          `${describe(computed)}${UNCHECKED_CHANGES.length ? ` (and ${UNCHECKED_CHANGES.join(' and ')} are not recomputed)` : ''}`);
+      } else {
+        const stated = item.changes.filter((code) => !UNCHECKED_CHANGES.includes(code));
+        if (!sameSet(stated, computed)) {
+          bad(`${at}.changes is ${describe(item.changes)}; recomputed from the fields each code names, the two datasets differ in ` +
+            `${describe(computed)} (and ${UNCHECKED_CHANGES.join(', ')}, which no field carries, is not recomputed)`);
+        }
       }
     } else if (version === null) {
       bad(`${at}: ${item.dataset} has no manifest these rules can read, so whether it is comparable cannot be checked`);
