@@ -3139,10 +3139,11 @@ test('past fifty problems in one file, the rest are counted, not listed', async 
 // --- What the immutability check prints -------------------------------------------
 //
 // check-immutable.mjs runs in steps that do not stop commands, so a path or an errata key a change chooses would be
-// read by the runner if it were printed as it is: a line break in it starts a line it chose, and `##[` is read
-// anywhere in a line. Each is printed through one rule. Every case below is planted in a repository of its own,
-// published and then changed, at one place the check prints such a name, and is reported there; no line of either
-// stream begins with `::`, its leading space trimmed, or holds `##[`.
+// read by the runner if it were printed as it is: a line break in it starts a line it chose, a name that begins with
+// `::` begins its line once the runner trims the indent, and `##[` is read anywhere in a line. Each is printed through
+// one rule. Every case below is planted in a repository of its own, published and then changed, at one place the
+// check prints such a name, and is reported there; no line of either stream begins with `::`, its leading space
+// trimmed, or holds `##[`.
 
 /** git with no configuration but its own defaults, and an identity that exists only in the repository a cell makes. */
 const GIT_ENV = {
@@ -3161,6 +3162,8 @@ for (const [what, change, said] of [
     /^\nThis tree holds an attribute file:\n\n {2}"notes\\n::error::y\/\.gitattributes"\n\n/],
   ['an attribute file under a directory named ##[error]', (r) => r.write('##[error]y/.gitattributes', '* text\n'),
     /^\nThis tree holds an attribute file:\n\n {2}"\\u0023\\u0023\[error\]y\/\.gitattributes"\n\n/],
+  ['an attribute file under a directory named ::error::y', (r) => r.enter('::error::y/.gitattributes', '* text\n'),
+    /^\nThis tree holds an attribute file:\n\n {2}"::error::y\/\.gitattributes"\n\n/],
   ['a file directly under datasets/ named ##[error]', (r) => r.write('datasets/##[error]x.json', '{}\n'),
     /\n {2}"datasets\/\\u0023\\u0023\[error\]x\.json" is not a dataset directory\n/],
   ['a link in a new dataset named ##[error]', (r) => r.link('datasets/2026-10-05/##[error]y', 'MANIFEST.json'),
@@ -3186,13 +3189,19 @@ for (const [what, change, said] of [
       symlinkSync(target, join(dir, path));
       git('add', '--', path);
     };
+    // `git add` reads a name that begins with `:` as pathspec magic, so such a file is entered in the index by its
+    // blob, with nothing written to the work tree.
+    const enter = (path, text) => {
+      const blob = execFileSync('git', ['hash-object', '-w', '--stdin'], { cwd: dir, env: GIT_ENV, input: text, encoding: 'utf-8' }).trim();
+      git('update-index', '--add', '--cacheinfo', `100644,${blob},${path}`);
+    };
     try {
       git('init', '--quiet', '--initial-branch=work');
       write(`datasets/${FIRST_SHAPE}/MANIFEST.json`, '{}\n');
       write(`errata/${FIRST_SHAPE}.json`, json({ issues: [] }));
       git('commit', '--quiet', '--message', 'published');
       git('branch', 'published');
-      change({ write, link });
+      change({ write, link, enter });
       git('commit', '--quiet', '--message', 'change');
       const result = await run([join(ROOT, 'scripts', 'check-immutable.mjs'), 'published'], { cwd: dir, env: GIT_ENV });
       assert.equal(result.code, 1, `${result.stdout}${result.stderr}`);
