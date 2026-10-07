@@ -799,9 +799,10 @@ function firstProblem(stderr, dataset = DATE) {
   return stderr.split('\n').find((line) => line.startsWith(`  ${dataset}: `)) ?? '';
 }
 
+/** Run a copy of the validator. A run that is killed, by a timeout here or by a crash, has no exit code and a signal. */
 const run = (args, options) => new Promise((done) => {
   execFile(process.execPath, args, { ...options, maxBuffer: 64 * 1024 * 1024 },
-    (error, stdout, stderr) => done({ code: error ? error.code : 0, stdout, stderr }));
+    (error, stdout, stderr) => done({ code: error ? error.code : 0, signal: error ? error.signal ?? null : null, stdout, stderr }));
 });
 
 /**
@@ -851,9 +852,10 @@ const RULED_POPULATION_SHA256 = 'afab7c7dffb7018d7dbc96adb76601f451f496d660000bc
  * Write a repository holding a copy of the validator, a copy of the smaller
  * published dataset, and the version 2 datasets given, and run the copy.
  * `datasets` maps a directory name to [date, change, earlier]; `prepare` runs
- * on the directory before the validator does.
+ * on the directory before the validator does; `options` go to the run, for
+ * a `timeout` in milliseconds after which the validator is killed.
  */
-async function validate(datasets, prepare) {
+async function validate(datasets, prepare, options = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'census-v2-'));
   try {
     mkdirSync(join(dir, 'scripts'));
@@ -865,14 +867,14 @@ async function validate(datasets, prepare) {
       for (const [name, bytes] of Object.entries(buildDataset(date, change, earlier))) writeFileSync(join(target, name), bytes);
     }
     if (prepare) await prepare(dir);
-    return await run([join(dir, 'scripts', 'validate-dataset.mjs')], { env: {} });
+    return await run([join(dir, 'scripts', 'validate-dataset.mjs')], { env: {}, ...options });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 }
 
 /** The usual case: one version 2 dataset, under its own date, beside the published one. */
-const validateOne = (change = {}, prepare = undefined) => validate({ [DATE]: [DATE, change] }, prepare);
+const validateOne = (change = {}, prepare = undefined, options = {}) => validate({ [DATE]: [DATE, change] }, prepare, options);
 const datasetDir = (dir) => join(dir, 'datasets', DATE);
 
 // --- Version, manifest and files ----------------------------------------------
@@ -2030,12 +2032,21 @@ const closedInTheCorpus = [
 ];
 for (const [level, change, problem] of closedInTheCorpus) plant(`a field the contract does not define, in ${level}`, change, problem);
 
-test('more malformed rows than are listed one by one are counted after the first five', async () => {
+test('five malformed rows are listed one by one, and a ledger with a sixth is refused there', async () => {
   const result = await validateOne(ledgerOf('npm', (lines) => lines.map((line, i) => (i === 0 ? line : line.replace(/^([^\t]+)\t[^\t]+\t/, '$1\tgone\t')))));
   assert.equal(result.code, 1, result.stdout);
   assert.match(firstProblem(result.stderr), /listing-npm\.tsv\.gz: row 2 has the disposition "gone"/, result.stderr);
-  assert.equal(result.stderr.split('\n').filter((line) => / listing-npm\.tsv\.gz: row \d+ /.test(line)).length, 5, result.stderr);
-  assert.match(result.stderr, /listing-npm\.tsv\.gz: 3 more row\(s\) are malformed/);
+  assert.equal(result.stderr.split('\n').filter((line) => / listing-npm\.tsv\.gz: row \d+ has the disposition/.test(line)).length, 5, result.stderr);
+  assert.match(result.stderr, /listing-npm\.tsv\.gz: row 7 is the sixth malformed row, so the ledger is refused and the rows after it are not read/);
+  assert.doesNotMatch(result.stderr, /more row\(s\) are malformed/);
+});
+
+test('a ledger with exactly five malformed rows is read to its end', async () => {
+  // Five rows given a disposition that is not one; the rest of the npm ledger is left as it is.
+  const result = await validateOne(ledgerOf('npm', (lines) => lines.map((line, i) => (i >= 1 && i <= 5 ? line.replace(/^([^\t]+)\t[^\t]+\t/, '$1\tgone\t') : line))));
+  assert.equal(result.code, 1, result.stdout);
+  assert.equal(result.stderr.split('\n').filter((line) => / listing-npm\.tsv\.gz: row \d+ has the disposition/.test(line)).length, 5, result.stderr);
+  assert.doesNotMatch(result.stderr, /is the sixth malformed row/);
 });
 
 // --- Withheld rows ---------------------------------------------------------------
@@ -2342,6 +2353,18 @@ plant('a manifest nested deeper than any version 2 file', {}, /MANIFEST\.json ne
 plant('a listed file nested deeper than any version 2 file', {}, /corpus-2026-09-30\.json nests values more than 32 deep/, (dir) => {
   const text = readText(join(datasetDir(dir), 'corpus-2026-09-30.json'));
   rehash('corpus-2026-09-30.json', text.replace(/"comparability": \[[\s\S]*?\n {2}\],\n/, `"comparability": ${deep(20000)},\n`))(dir);
+});
+
+// A ledger of a thousand million empty rows: a valid header, then 10^9 newlines, about a megabyte of gzip written
+// as members of a million newlines each. It is refused at its sixth row, so the run ends in seconds; a run that
+// read every row would take minutes and is killed by the timeout here, which leaves it no exit code.
+test('a ledger of a thousand million empty rows is refused at its sixth row, within a minute', { timeout: 120000 }, async () => {
+  const member = gzipSync(Buffer.alloc(1_000_000, 10));
+  const result = await validateOne({ ledgers: (l) => { l.hex = Buffer.concat([gzipSync(`${l.hex[0]}\n`), ...Array(1000).fill(member)]); } },
+    undefined, { timeout: 60_000 });
+  assert.equal(result.code, 1, `exit ${result.code}, signal ${result.signal}:\n${result.stdout}${result.stderr.slice(-1500)}`);
+  assert.match(firstProblem(result.stderr), /listing-hex\.tsv\.gz: row 2 has 1 columns/, result.stderr);
+  assert.match(result.stderr, /listing-hex\.tsv\.gz: row 7 is the sixth malformed row, so the ledger is refused and the rows after it are not read/, result.stderr);
 });
 
 // A key, a file name and a manifest field with a line break and `::notice` in them. Each is printed through

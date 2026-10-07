@@ -1868,6 +1868,13 @@ const LEDGER_REASONS = {
   unversioned: ['noRelease', 'allYanked', 'noDefaultBranch'],
 };
 
+/**
+ * The malformed rows a ledger is read past. The first five are listed; at the
+ * sixth the ledger is refused and the rest is not read, so a ledger of a
+ * billion malformed rows costs the time to read six of them, not all of them.
+ */
+const MAX_LEDGER_ROW_PROBLEMS = 5;
+
 /** Read one ledger: decompressed within the bound, one row per listed package, sorted by name in byte order. */
 function readLedger(eco, listing, scan, bad) {
   const file = listing.file;
@@ -1890,15 +1897,19 @@ function readLedger(eco, listing, scan, bad) {
   // Maven's draw is of search pages: the distinct pages its rows were drawn from are the pages it read.
   const pages = new Set();
   const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
-  let problems = 0;
+  let malformed = 0;
+  let flagged = 0;
   const rowBad = (line, message) => {
-    problems += 1;
-    if (problems <= 5) bad(`${file}: row ${line} ${message}`);
+    if (line !== flagged) {
+      flagged = line;
+      malformed += 1;
+    }
+    if (malformed <= MAX_LEDGER_ROW_PROBLEMS) bad(`${file}: row ${line} ${message}`);
   };
   let position = 0;
   let line = 0;
   let previous = null;
-  while (position < data.length) {
+  while (position < data.length && malformed <= MAX_LEDGER_ROW_PROBLEMS) {
     let end = data.indexOf(10, position);
     if (end === -1) end = data.length;
     const bytes = data.subarray(position, end);
@@ -1984,8 +1995,12 @@ function readLedger(eco, listing, scan, bad) {
     bad(`${file} is empty. A ledger has a header row and one row per listed package.`);
     return null;
   }
-  if (problems > 5) bad(`${file}: ${problems - 5} more row(s) are malformed`);
-  return { file, counts, byReadFrom, hiddenByReadFrom, matched, pages, sound: problems === 0 };
+  if (malformed > MAX_LEDGER_ROW_PROBLEMS) {
+    bad(`${file}: row ${flagged} is the sixth malformed row, so the ledger is refused and the rows after it are not read. ` +
+      'Five malformed rows are listed; a ledger with more is written again, not read to its end.');
+    return null;
+  }
+  return { file, counts, byReadFrom, hiddenByReadFrom, matched, pages, sound: malformed === 0 };
 }
 
 /** The scan file against its ledger: coverage is recomputed from the rows, and the matched rows are the packages listed. */
