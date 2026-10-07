@@ -2440,14 +2440,15 @@ test('a manifest of 95,000,000 bytes nested 47,499,988 deep is refused with a pr
 });
 
 // A manifest as wide as the largest scan file, about thirty million empty objects: within the nesting bound, so it is
-// parsed, once. The version 2 rules read the value validate() parsed; a second parse beside it exhausted a heap of 2 GB.
-test('a manifest of 95,000,000 bytes holding thirty million values is parsed once and refused with a problem list, within a heap of 2 GB', { timeout: 180000 }, async () => {
+// parsed, once. The version 2 rules read the value validate() parsed. On one machine one parse ran out of a heap of
+// 1,792 MB and fitted in 1,920 MB, and two parses ran out of 3,584 MB, so a bound of 2,816 MB sits between them.
+test('a manifest of 95,000,000 bytes holding thirty million values is parsed once and refused with a problem list, within a heap of 2,816 MB', { timeout: 180000 }, async () => {
   const result = await validateOne({}, (dir) => {
     const head = '{"schemaVersion":2,"x":[';
     const tail = ']}';
     const count = Math.floor((95_000_000 - head.length - tail.length + 1) / 3);
     writeFileSync(join(datasetDir(dir), 'MANIFEST.json'), `${head}${'{},'.repeat(count - 1)}{}${tail}`);
-  }, { env: { NODE_OPTIONS: '--max-old-space-size=2048' } });
+  }, { env: { NODE_OPTIONS: '--max-old-space-size=2816' } });
   assert.equal(result.code, 1, `exit ${result.code}, signal ${result.signal}:\n${result.stdout}${result.stderr.slice(-1500)}`);
   assert.match(firstProblem(result.stderr), /MANIFEST\.json is not a version 2 manifest: it lacks dataset, /, result.stderr);
   assert.doesNotMatch(result.stderr, /heap out of memory|could not be checked to the end/);
