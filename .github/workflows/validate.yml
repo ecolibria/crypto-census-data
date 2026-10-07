@@ -43,7 +43,8 @@ jobs:
       # node --test in the same run: the job's three problem matchers removed,
       # then the stop line with a fresh token. From there on the runner reads
       # a test's name, and what a failing test prints, as text, whatever they
-      # hold. The step's result is node --test's own.
+      # hold. An opener that exits non-zero ends the step on its own code
+      # before node --test runs; otherwise the step's result is node --test's.
 
       # The validator's own rules, run against copies in a temporary directory.
       - name: Check the validator
