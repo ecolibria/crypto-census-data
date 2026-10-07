@@ -53,6 +53,19 @@ const fileAt = (commit, path) =>
     execFileSync('git', ['show', `${commit}:${path}`], { cwd: top, maxBuffer: MAX_OUTPUT, stdio: ['ignore', 'pipe', 'ignore'] })
   );
 
+/**
+ * A path or a key a change chose, as it is printed. The runner reads a line
+ * that begins with `::`, leading space aside, or that holds `##[` anywhere, as
+ * a command, and a line break in a name would start a line the name chose.
+ * So a name with a character JSON escapes in it, or `##[`, or that does not
+ * begin with a letter, a digit, `.`, `_`, `-` or `~`, is printed as JSON text
+ * with each `#` escaped; any other is printed as itself.
+ */
+const shown = (name) => {
+  const text = JSON.stringify(name);
+  return text === `"${name}"` && /^[A-Za-z0-9._~-]/.test(name) && !name.includes('##[') ? name : text.replace(/#/g, '\\u0023');
+};
+
 // The base has to be a commit this checkout can read. If it is not, nothing
 // below can tell a rewritten tree from an untouched one, and a check that
 // cannot look must not pass. A misspelt ref and a deleted branch arrive here,
@@ -94,13 +107,13 @@ const entries = (...args) =>
 const isRegular = (entry) => entry.type === 'blob' && REGULAR.includes(entry.mode);
 const irregular = [
   ...['datasets', 'errata'].flatMap((directory) => entries('HEAD', directory))
-    .filter((entry) => entry.type !== 'tree').map((entry) => `  ${entry.path} is not a directory`),
+    .filter((entry) => entry.type !== 'tree').map((entry) => `  ${shown(entry.path)} is not a directory`),
   ...[...entries('-r', 'HEAD', 'datasets/'), ...entries('HEAD', 'errata/')]
-    .filter((entry) => !isRegular(entry)).map((entry) => `  ${entry.path} is not a regular file`),
+    .filter((entry) => !isRegular(entry)).map((entry) => `  ${shown(entry.path)} is not a regular file`),
   // A file directly under datasets/ belongs to no dataset: the validator reads
   // dataset directories, and nothing else reads it.
   ...entries('HEAD', 'datasets/')
-    .filter((entry) => isRegular(entry)).map((entry) => `  ${entry.path} is not a dataset directory`),
+    .filter((entry) => isRegular(entry)).map((entry) => `  ${shown(entry.path)} is not a dataset directory`),
 ];
 
 // An attribute file can change what an archive of this repository holds without
@@ -133,7 +146,7 @@ const reportIrregular = () => {
   if (attributeFiles.length > 0) {
     process.stderr.write(
       '\nThis tree holds an attribute file:\n\n' +
-      attributeFiles.map((path) => `  ${path}`).join('\n') +
+      attributeFiles.map((path) => `  ${shown(path)}`).join('\n') +
       '\n\nAn attribute file can leave a published file out of an archive of this\n' +
       'repository, or change its bytes on checkout, with no change to the file\n' +
       'itself. Remove it.\n\n'
@@ -191,12 +204,12 @@ for (const change of changesUnder('datasets')) {
   // of a published dataset into a new directory is only a file added to the
   // new one, and the dataset it left is rewritten unseen.
   if (change.status === 'R') {
-    if (published(change.from)) violations.push(`  renamed ${change.from}`);
-    else if (published(change.path)) violations.push(`  added a file to ${change.path}`);
+    if (published(change.from)) violations.push(`  renamed ${shown(change.from)}`);
+    else if (published(change.path)) violations.push(`  added a file to ${shown(change.path)}`);
     continue;
   }
   if (!published(change.path)) continue; // new dataset, free to add files
-  violations.push(`  ${VERBS[change.status] || change.status} ${change.path}`);
+  violations.push(`  ${VERBS[change.status] || change.status} ${shown(change.path)}`);
 }
 
 // --- Errata -----------------------------------------------------------------
@@ -224,7 +237,7 @@ for (const change of changesUnder('errata')) {
   if (change.status === 'A') continue; // a new errata file; the validator reads it
   if (change.status !== 'M') {
     const verb = { D: 'deleted', R: 'renamed' }[change.status] || `changed (${change.status})`;
-    edits.push(`  ${verb} ${change.from}`);
+    edits.push(`  ${verb} ${shown(change.from)}`);
     continue;
   }
 
@@ -234,11 +247,11 @@ for (const change of changesUnder('errata')) {
     was = JSON.parse(fileAt(mergeBase, change.path));
     is = JSON.parse(fileAt('HEAD', change.path));
   } catch {
-    edits.push(`  ${change.path} cannot be compared with what was published: one of the two does not parse`);
+    edits.push(`  ${shown(change.path)} cannot be compared with what was published: one of the two does not parse`);
     continue;
   }
   if (!isObject(was) || !isObject(is) || !Array.isArray(was.issues) || !Array.isArray(is.issues)) {
-    edits.push(`  ${change.path} cannot be compared with what was published: one of the two is not an errata file`);
+    edits.push(`  ${shown(change.path)} cannot be compared with what was published: one of the two is not an errata file`);
     continue;
   }
 
@@ -248,15 +261,15 @@ for (const change of changesUnder('errata')) {
   const own = (object, key) => (Object.hasOwn(object, key) ? object[key] : undefined);
   for (const field of new Set([...Object.keys(was), ...Object.keys(is)])) {
     if (field === 'issues' || field === 'regenerations') continue;
-    if (canonical(own(was, field)) !== canonical(own(is, field))) edits.push(`  changed ${field} in ${change.path}`);
+    if (canonical(own(was, field)) !== canonical(own(is, field))) edits.push(`  changed ${shown(field)} in ${shown(change.path)}`);
   }
   if (is.issues.length < was.issues.length) {
-    edits.push(`  removed ${was.issues.length - is.issues.length} issue(s) from ${change.path}`);
+    edits.push(`  removed ${was.issues.length - is.issues.length} issue(s) from ${shown(change.path)}`);
   }
   was.issues.forEach((issue, index) => {
     if (index >= is.issues.length || canonical(issue) === canonical(is.issues[index])) return;
-    const name = isObject(issue) && typeof issue.defect === 'string' ? ` (${issue.defect})` : '';
-    edits.push(`  issue ${index + 1}${name} of ${change.path} is no longer what was published`);
+    const name = isObject(issue) && typeof issue.defect === 'string' ? ` (${shown(issue.defect)})` : '';
+    edits.push(`  issue ${index + 1}${name} of ${shown(change.path)} is no longer what was published`);
   });
 
   // Regenerations grow the same way. Absent from the published file, the list
@@ -266,18 +279,18 @@ for (const change of changesUnder('errata')) {
   const has = Object.hasOwn(is, 'regenerations');
   const isList = (value) => Array.isArray(value) && value.length > 0;
   if (had && !has) {
-    edits.push(`  dropped regenerations from ${change.path}`);
+    edits.push(`  dropped regenerations from ${shown(change.path)}`);
   } else if ((had && !isList(was.regenerations)) || (has && !isList(is.regenerations))) {
-    edits.push(`  ${change.path} cannot be compared with what was published: regenerations is not a list with a regeneration in it`);
+    edits.push(`  ${shown(change.path)} cannot be compared with what was published: regenerations is not a list with a regeneration in it`);
   } else {
     const before = had ? was.regenerations : [];
     const after = has ? is.regenerations : [];
     if (after.length < before.length) {
-      edits.push(`  removed ${before.length - after.length} regeneration(s) from ${change.path}`);
+      edits.push(`  removed ${before.length - after.length} regeneration(s) from ${shown(change.path)}`);
     }
     before.forEach((regeneration, index) => {
       if (index >= after.length || canonical(regeneration) === canonical(after[index])) return;
-      edits.push(`  regeneration ${index + 1} of ${change.path} is no longer what was published`);
+      edits.push(`  regeneration ${index + 1} of ${shown(change.path)} is no longer what was published`);
     });
   }
 }

@@ -3136,6 +3136,75 @@ test('past fifty problems in one file, the rest are counted, not listed', async 
   assert.match(listed.at(-1), /scan-results-hex\.json: \d+ more problem\(s\) in this file are not listed/);
 });
 
+// --- What the immutability check prints -------------------------------------------
+//
+// check-immutable.mjs runs in steps that do not stop commands, so a path or an errata key a change chooses would be
+// read by the runner if it were printed as it is: a line break in it starts a line it chose, and `##[` is read
+// anywhere in a line. Each is printed through one rule. Every case below is planted in a repository of its own,
+// published and then changed, at one place the check prints such a name, and is reported there; no line of either
+// stream begins with `::`, its leading space trimmed, or holds `##[`.
+
+/** git with no configuration but its own defaults, and an identity that exists only in the repository a cell makes. */
+const GIT_ENV = {
+  PATH: process.env.PATH,
+  GIT_CONFIG_GLOBAL: '/dev/null',
+  GIT_CONFIG_NOSYSTEM: '1',
+  GIT_AUTHOR_NAME: 'check-validator-v2',
+  GIT_AUTHOR_EMAIL: 'check-validator-v2@example.invalid',
+  GIT_COMMITTER_NAME: 'check-validator-v2',
+  GIT_COMMITTER_EMAIL: 'check-validator-v2@example.invalid',
+};
+
+for (const [what, change, said] of [
+  ['an attribute file under a directory whose name holds a line break and ::error::',
+    (r) => r.write('notes\n::error::y/.gitattributes', '* text\n'),
+    /^\nThis tree holds an attribute file:\n\n {2}"notes\\n::error::y\/\.gitattributes"\n\n/],
+  ['an attribute file under a directory named ##[error]', (r) => r.write('##[error]y/.gitattributes', '* text\n'),
+    /^\nThis tree holds an attribute file:\n\n {2}"\\u0023\\u0023\[error\]y\/\.gitattributes"\n\n/],
+  ['a file directly under datasets/ named ##[error]', (r) => r.write('datasets/##[error]x.json', '{}\n'),
+    /\n {2}"datasets\/\\u0023\\u0023\[error\]x\.json" is not a dataset directory\n/],
+  ['a link in a new dataset named ##[error]', (r) => r.link('datasets/2026-10-05/##[error]y', 'MANIFEST.json'),
+    /\n {2}"datasets\/2026-10-05\/\\u0023\\u0023\[error\]y" is not a regular file\n/],
+  ['a file added to a published dataset, named ##[warning]', (r) => r.write(`datasets/${FIRST_SHAPE}/##[warning]y.json`, '{}\n'),
+    /\n {2}added a file to "datasets\/2026-03-18\/\\u0023\\u0023\[warning\]y\.json"\n/],
+  ['an errata key holding a line break and ::warning::', (r) => r.write(`errata/${FIRST_SHAPE}.json`, json({ issues: [], 'x\n::warning::y': 1 })),
+    /\n {2}changed "x\\n::warning::y" in errata\/2026-03-18\.json\n/],
+  ['an errata key holding ##[error]', (r) => r.write(`errata/${FIRST_SHAPE}.json`, json({ issues: [], '##[error]y': 1 })),
+    /\n {2}changed "\\u0023\\u0023\[error\]y" in errata\/2026-03-18\.json\n/],
+]) {
+  test(`the immutability check prints ${what} on no line the runner reads as a command`, async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'census-immutable-'));
+    const git = (...args) => execFileSync('git', args, { cwd: dir, env: GIT_ENV, stdio: ['ignore', 'pipe', 'pipe'] });
+    const place = (path) => mkdirSync(dirname(join(dir, path)), { recursive: true });
+    const write = (path, text) => {
+      place(path);
+      writeFileSync(join(dir, path), text);
+      git('add', '--', path);
+    };
+    const link = (path, target) => {
+      place(path);
+      symlinkSync(target, join(dir, path));
+      git('add', '--', path);
+    };
+    try {
+      git('init', '--quiet', '--initial-branch=work');
+      write(`datasets/${FIRST_SHAPE}/MANIFEST.json`, '{}\n');
+      write(`errata/${FIRST_SHAPE}.json`, json({ issues: [] }));
+      git('commit', '--quiet', '--message', 'published');
+      git('branch', 'published');
+      change({ write, link });
+      git('commit', '--quiet', '--message', 'change');
+      const result = await run([join(ROOT, 'scripts', 'check-immutable.mjs'), 'published'], { cwd: dir, env: GIT_ENV });
+      assert.equal(result.code, 1, `${result.stdout}${result.stderr}`);
+      assert.match(result.stderr, said, result.stderr);
+      const commands = `${result.stdout}${result.stderr}`.split('\n').filter((line) => line.trimStart().startsWith('::') || line.includes('##['));
+      assert.deepEqual(commands, [], result.stderr);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
 // --- Running the planted defects -------------------------------------------------
 
 for (const [what, change, problem, prepare] of defects) {
