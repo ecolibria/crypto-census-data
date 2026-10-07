@@ -3188,6 +3188,51 @@ const GIT_ENV = {
   GIT_COMMITTER_EMAIL: 'check-validator-v2@example.invalid',
 };
 
+/**
+ * A repository of its own: one dataset and its errata file published in a first commit, with whatever `publish` adds
+ * to it, then changed by `change` in a second, and the immutability check run on it with the first commit as its
+ * base. Both get write, link and enter, and git itself.
+ */
+async function checkedAfterChange(change, publish = () => {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'census-immutable-'));
+  const git = (...args) => execFileSync('git', args, { cwd: dir, env: GIT_ENV, stdio: ['ignore', 'pipe', 'pipe'] });
+  const place = (path) => mkdirSync(dirname(join(dir, path)), { recursive: true });
+  const write = (path, text) => {
+    place(path);
+    writeFileSync(join(dir, path), text);
+    git('add', '--', path);
+  };
+  const link = (path, target) => {
+    place(path);
+    symlinkSync(target, join(dir, path));
+    git('add', '--', path);
+  };
+  // `git add` reads a name that begins with `:` as pathspec magic, so such a file, like one whose name a file system
+  // may refuse, is entered in the index by its blob, with nothing written to the work tree.
+  const enter = (path, text) => {
+    const blob = execFileSync('git', ['hash-object', '-w', '--stdin'], { cwd: dir, env: GIT_ENV, input: text, encoding: 'utf-8' }).trim();
+    git('update-index', '--add', '--cacheinfo', `100644,${blob},${path}`);
+  };
+  const repository = { write, link, enter, git };
+  try {
+    git('init', '--quiet', '--initial-branch=work');
+    write(`datasets/${FIRST_SHAPE}/MANIFEST.json`, '{}\n');
+    write(`errata/${FIRST_SHAPE}.json`, json({ issues: [] }));
+    publish(repository);
+    git('commit', '--quiet', '--message', 'published');
+    git('branch', 'published');
+    change(repository);
+    git('commit', '--quiet', '--message', 'change');
+    return await run([join(ROOT, 'scripts', 'check-immutable.mjs'), 'published'], { cwd: dir, env: GIT_ENV });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** The lines of both streams of a run that the runner, acting on commands, could read as one. */
+const commandLinesOf = (result) =>
+  `${result.stdout}${result.stderr}`.split('\n').filter((line) => line.trimStart().startsWith('::') || line.includes('##['));
+
 for (const [what, change, said] of [
   ['an attribute file under a directory whose name holds a line break and ::error::',
     (r) => r.write('notes\n::error::y/.gitattributes', '* text\n'),
@@ -3208,41 +3253,59 @@ for (const [what, change, said] of [
     /\n {2}changed "\\u0023\\u0023\[error\]y" in errata\/2026-03-18\.json\n/],
 ]) {
   test(`the immutability check prints ${what} on no line the runner reads as a command`, async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'census-immutable-'));
-    const git = (...args) => execFileSync('git', args, { cwd: dir, env: GIT_ENV, stdio: ['ignore', 'pipe', 'pipe'] });
-    const place = (path) => mkdirSync(dirname(join(dir, path)), { recursive: true });
-    const write = (path, text) => {
-      place(path);
-      writeFileSync(join(dir, path), text);
-      git('add', '--', path);
-    };
-    const link = (path, target) => {
-      place(path);
-      symlinkSync(target, join(dir, path));
-      git('add', '--', path);
-    };
-    // `git add` reads a name that begins with `:` as pathspec magic, so such a file is entered in the index by its
-    // blob, with nothing written to the work tree.
-    const enter = (path, text) => {
-      const blob = execFileSync('git', ['hash-object', '-w', '--stdin'], { cwd: dir, env: GIT_ENV, input: text, encoding: 'utf-8' }).trim();
-      git('update-index', '--add', '--cacheinfo', `100644,${blob},${path}`);
-    };
-    try {
-      git('init', '--quiet', '--initial-branch=work');
-      write(`datasets/${FIRST_SHAPE}/MANIFEST.json`, '{}\n');
-      write(`errata/${FIRST_SHAPE}.json`, json({ issues: [] }));
-      git('commit', '--quiet', '--message', 'published');
-      git('branch', 'published');
-      change({ write, link, enter });
-      git('commit', '--quiet', '--message', 'change');
-      const result = await run([join(ROOT, 'scripts', 'check-immutable.mjs'), 'published'], { cwd: dir, env: GIT_ENV });
-      assert.equal(result.code, 1, `${result.stdout}${result.stderr}`);
-      assert.match(result.stderr, said, result.stderr);
-      const commands = `${result.stdout}${result.stderr}`.split('\n').filter((line) => line.trimStart().startsWith('::') || line.includes('##['));
-      assert.deepEqual(commands, [], result.stderr);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
+    const result = await checkedAfterChange(change);
+    assert.equal(result.code, 1, `${result.stdout}${result.stderr}`);
+    assert.match(result.stderr, said, result.stderr);
+    assert.deepEqual(commandLinesOf(result), [], result.stderr);
+  });
+}
+
+// The problem matchers setup-node registers read every line the runner does not take as a command, and the steps that
+// run the immutability check keep them. Printed as itself, a name holding `: line 1, col 2, Error - x (y)` is read by
+// eslint-compact as an error, and an indented line beginning `1:2 error x  y` by eslint-stylish's second pattern; the
+// tsc pattern takes a line that begins with no space, and the check indents every name. So a name is printed as itself
+// only when every character of it is an ASCII letter, a digit, `.`, `_`, `~`, `/` or `-`, and as JSON text otherwise.
+// Each case below plants such a name at one place the check prints one, and reads both streams through the three
+// patterns of actions/setup-node at the commit the workflows pin (.github/tsc.json, eslint-compact.json and
+// eslint-stylish.json). Stylish's first pattern takes any line that is not blank, as the file the lines after it
+// belong to; it needs no case of its own.
+
+/** The three patterns, as the matcher files give them, each read against one line. */
+const SETUP_NODE_PATTERNS = {
+  tsc: /^([^\s].*)[\(:](\d+)[,:](\d+)(?:\):\s+|\s+-\s+)(error|warning|info)\s+TS(\d+)\s*:\s*(.*)$/,
+  'eslint-compact': /^(.+):\sline\s(\d+),\scol\s(\d+),\s([Ee]rror|[Ww]arning|[Ii]nfo)\s-\s(.+)\s\((.+)\)$/,
+  'eslint-stylish': /^\s+(\d+):(\d+)\s+(error|warning|info)\s+(.*)\s\s+(.*)$/,
+};
+const COMPACT_LINE = ': line 1, col 2, Error - x (y)';
+const STYLISH_LINE = '1:2 error x  y';
+
+for (const [what, change, said, publish] of [
+  ['an attribute file under a directory named as an eslint-stylish line', (r) => r.enter(`${STYLISH_LINE}/.gitattributes`, '* text\n'),
+    /^\nThis tree holds an attribute file:\n\n {2}"1:2 error x {2}y\/\.gitattributes"\n\n/],
+  ['a file moved into a published dataset from one the base no longer holds, named as an eslint-compact line', (r) => {
+    // The base went on without the dataset the file came from, so there the file belongs to no published dataset, and
+    // the change moves it, unchanged, into one: a rename to the check, and a file added to the published dataset.
+    r.git('checkout', '--quiet', 'published');
+    r.git('rm', '--quiet', '--', 'datasets/2026-01-01/notes.json');
+    r.git('commit', '--quiet', '--message', 'withdrawn');
+    r.git('checkout', '--quiet', 'work');
+    r.git('rm', '--quiet', '--cached', '--', 'datasets/2026-01-01/notes.json');
+    r.enter(`datasets/${FIRST_SHAPE}/x${COMPACT_LINE}`, 'notes\n');
+  }, /\n {2}added a file to "datasets\/2026-03-18\/x: line 1, col 2, Error - x \(y\)"\n/,
+  (r) => r.write('datasets/2026-01-01/notes.json', 'notes\n')],
+  ['a file added to a published dataset, named as an eslint-compact line', (r) => r.enter(`datasets/${FIRST_SHAPE}/x${COMPACT_LINE}`, '{}\n'),
+    /\n {2}added a file to "datasets\/2026-03-18\/x: line 1, col 2, Error - x \(y\)"\n/],
+]) {
+  test(`the immutability check prints ${what} as JSON text, on no line setup-node's matchers read as an error`, async () => {
+    const result = await checkedAfterChange(change, publish);
+    assert.equal(result.code, 1, `${result.stdout}${result.stderr}`);
+    const lines = `${result.stdout}${result.stderr}`.split('\n');
+    for (const [owner, pattern] of Object.entries(SETUP_NODE_PATTERNS)) {
+      const read = lines.find((line) => pattern.test(line));
+      assert.equal(read, undefined, `${owner} reads a line as an error: ${JSON.stringify(read)}`);
     }
+    assert.match(result.stderr, said, result.stderr);
+    assert.deepEqual(commandLinesOf(result), [], result.stderr);
   });
 }
 
