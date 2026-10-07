@@ -26,8 +26,22 @@
 import { readFileSync, readdirSync, existsSync, statSync, lstatSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
+
+/**
+ * The first line of stdout and of stderr is `::stop-commands::<token>`,
+ * written before any byte of a dataset is read. From that line on the GitHub
+ * runner acts on no workflow command, whatever text a dataset puts into a
+ * key, a file name or a parser's message, and nothing resumes them: no line
+ * this writes, on any path, is `::<token>::`, and the token is drawn afresh
+ * for each run, so no dataset can write that line either. The step stays
+ * stopped for the rest of the validator's output; the validator runs alone in
+ * its step.
+ */
+const STOP_TOKEN = randomBytes(16).toString('hex');
+process.stdout.write(`::stop-commands::${STOP_TOKEN}\n`);
+process.stderr.write(`::stop-commands::${STOP_TOKEN}\n`);
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DATASETS = join(ROOT, 'datasets');
@@ -108,7 +122,8 @@ const hasHiddenCharacters = (v) => /[\p{Cc}\p{Cf}]/u.test(v);
 const isText = (v) => hasWords(v) && !hasHiddenCharacters(v);
 
 /** Read a file as UTF-8 and refuse bytes that are not: a decoder that substitutes a character hides the difference. */
-const readStrict = (path) => new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(readFileSync(path));
+const decodeStrict = (bytes) => new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+const readStrict = (path) => decodeStrict(readFileSync(path));
 
 /** The day this run happens on, in UTC. A date of issue cannot be later. */
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -142,10 +157,12 @@ const note = (dataset, message) => notes.push(`${dataset}: ${message}`);
 
 /**
  * A name a manifest gives a file is read only as the name of a file in the
- * dataset's own directory: no separator, and not a step up or in place. A path
- * would have these checks read, and report on, a file outside it.
+ * dataset's own directory: no separator, not a step up or in place, and no
+ * control or format character. A path would have these checks read, and
+ * report on, a file outside it; a name with a line break in it would print
+ * as two lines, the second of which the name chose.
  */
-const isFileName = (name) => typeof name === 'string' && /^[^/\\]+$/.test(name) && name !== '..' && name !== '.';
+const isFileName = (name) => typeof name === 'string' && /^[^/\\]+$/.test(name) && !hasHiddenCharacters(name) && name !== '..' && name !== '.';
 
 function validate(name) {
   const dir = join(DATASETS, name);
@@ -168,9 +185,24 @@ function validate(name) {
     return;
   }
 
+  // Read and parsed once. A version 2 manifest is handed on as this text and
+  // this value, and read strictly as UTF-8 there, so no second copy of it is
+  // ever built beside the first.
+  const bytes = readFileSync(manifestPath);
+  let strictText = null;
+  try {
+    strictText = decodeStrict(bytes);
+  } catch {
+    // Not UTF-8. The first file shape is read as it always was; the version 2 rules refuse it.
+  }
+  const text = strictText ?? bytes.toString('utf-8');
+  if (textNestsDeeperThan(text, MAX_NESTING)) {
+    fail(name, `MANIFEST.json ${NESTED_PAST_LIMIT}`);
+    return;
+  }
   let manifest;
   try {
-    manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+    manifest = JSON.parse(text);
   } catch (err) {
     fail(name, `MANIFEST.json does not parse: ${err.message}`);
     return;
@@ -192,7 +224,7 @@ function validate(name) {
       fail(name, `schemaVersion is 2, and ${name} is one of the datasets published in the first file shape, which declares ` +
         'no version. A version 2 manifest under that name is not the dataset that was published.');
     } else {
-      validateVersion2(name, dir);
+      validateVersion2(name, dir, { text: strictText, manifest });
     }
     return;
   }
@@ -232,7 +264,7 @@ function validate(name) {
     listed.add(entry.file);
     const path = join(dir, entry.file);
     if (!existsSync(path)) {
-      fail(name, `${entry.file} is listed in MANIFEST.json but is not in the dataset`);
+      fail(name, `${describe(entry.file)} is listed in MANIFEST.json but is not in the dataset`);
       continue;
     }
     if (!lstatSync(path).isFile()) {
@@ -240,15 +272,15 @@ function validate(name) {
       continue;
     }
     if (!entry.sha256) {
-      fail(name, `${entry.file} carries no sha256, so nothing about it can be verified after transit`);
+      fail(name, `${describe(entry.file)} carries no sha256, so nothing about it can be verified after transit`);
       continue;
     }
     const actual = sha256(path);
     if (actual !== entry.sha256) {
-      fail(name, `${entry.file} does not match its recorded hash\n    recorded ${entry.sha256}\n    actual   ${actual}`);
+      fail(name, `${describe(entry.file)} does not match its recorded hash\n    recorded ${describe(entry.sha256)}\n    actual   ${actual}`);
     }
     if (typeof entry.bytes === 'number' && entry.bytes !== statSync(path).size) {
-      fail(name, `${entry.file} is ${statSync(path).size} bytes, manifest says ${entry.bytes}`);
+      fail(name, `${describe(entry.file)} is ${statSync(path).size} bytes, manifest says ${entry.bytes}`);
     }
   }
 
@@ -256,7 +288,7 @@ function validate(name) {
   const present = readdirSync(dir).filter((f) => f.endsWith('.json') && f !== 'MANIFEST.json');
   const strays = present.filter((f) => !listed.has(f));
   if (strays.length > 0) {
-    fail(name, `present but not listed in MANIFEST.json: ${strays.join(', ')}. ` +
+    fail(name, `present but not listed in MANIFEST.json: ${strays.map(describe).join(', ')}. ` +
       'An unlisted file is one no reader can attribute and no hash covers.');
   }
 
@@ -281,7 +313,7 @@ function validate(name) {
   // absent measurement.
   if (kind.requiresRaw && manifest.complete !== true && !manifest.partialReason) {
     fail(name, `complete is ${JSON.stringify(manifest.complete)} and no partialReason is given. ` +
-      `The dataset covers ${manifest.ecosystemCount} ecosystem(s); a reader comparing its total ` +
+      `The dataset covers ${describe(manifest.ecosystemCount)} ecosystem(s); a reader comparing its total ` +
       'against a previous dataset would read the missing ones as a drop rather than as a gap.');
   }
 
@@ -306,9 +338,14 @@ function validate(name) {
   if (!isFileName(manifest.corpus.file)) return;
   const corpusPath = join(dir, manifest.corpus.file);
   if (!existsSync(corpusPath) || !lstatSync(corpusPath).isFile()) return;
+  const corpusText = readFileSync(corpusPath, 'utf-8');
+  if (textNestsDeeperThan(corpusText, MAX_NESTING)) {
+    fail(name, `${manifest.corpus.file} ${NESTED_PAST_LIMIT}`);
+    return;
+  }
   let corpus;
   try {
-    corpus = JSON.parse(readFileSync(corpusPath, 'utf-8'));
+    corpus = JSON.parse(corpusText);
   } catch (err) {
     fail(name, `${manifest.corpus.file} does not parse: ${err.message}`);
     return;
@@ -339,10 +376,10 @@ function validate(name) {
   for (const [eco, row] of Object.entries(byEco)) {
     if (!row.knownIssue) continue;
     for (const field of ['defect', 'summary', 'affects', 'direction', 'correctedIn']) {
-      if (!row.knownIssue[field]) fail(name, `${eco}.knownIssue is missing ${field}`);
+      if (!row.knownIssue[field]) fail(name, `${describe(eco)}.knownIssue is missing ${field}`);
     }
     if (!DIRECTIONS.includes(row.knownIssue.direction)) {
-      fail(name, `${eco}.knownIssue.direction is ${JSON.stringify(row.knownIssue.direction)}, ` +
+      fail(name, `${describe(eco)}.knownIssue.direction is ${JSON.stringify(row.knownIssue.direction)}, ` +
         'which tells a reader nothing about which way to read the figure');
     }
   }
@@ -378,6 +415,15 @@ function validateErrata(file) {
   let errata;
   try {
     text = readStrict(join(ERRATA, file));
+  } catch (err) {
+    fail(label, `does not parse: ${err.message}`);
+    return;
+  }
+  if (textNestsDeeperThan(text, MAX_NESTING)) {
+    fail(label, NESTED_PAST_LIMIT);
+    return;
+  }
+  try {
     errata = JSON.parse(text);
   } catch (err) {
     fail(label, `does not parse: ${err.message}`);
@@ -764,18 +810,38 @@ const startsWithVersion = (text) => /^\s*\{\s*"schemaVersion"\s*:/.test(text);
 
 /**
  * The deepest a version 2 file nests: a corpus cell sits about nine levels
- * down. Anything deeper is refused before a reader that recurses meets it.
+ * down. Anything deeper, in any file these checks parse, is refused on its
+ * text, before a parser builds anything from it.
  */
 const MAX_NESTING = 32;
 
-/** Whether a parsed value nests deeper than the limit, found without recursion. */
-function nestsDeeperThan(value, limit) {
-  const stack = [[value, 1]];
-  while (stack.length > 0) {
-    const [node, depth] = stack.pop();
-    if (node === null || typeof node !== 'object') continue;
-    if (depth > limit) return true;
-    for (const child of Array.isArray(node) ? node : Object.values(node)) stack.push([child, depth + 1]);
+/** What is said of a file nested past the limit, after its name. */
+const NESTED_PAST_LIMIT = `nests values more than ${MAX_NESTING} deep. No file published here nests so deep, and one that ` +
+  'does is refused on its text, before a parser builds anything from it.';
+
+/**
+ * Whether JSON text nests deeper than the limit, counted on the text itself:
+ * each `[` or `{` outside a string opens a level and each `]` or `}` closes
+ * one, and the count stops at the first level past the limit. For text that
+ * parses, this is the nesting of the value it parses to; a deep file costs one
+ * pass over its characters, and the parser nothing.
+ */
+function textNestsDeeperThan(text, limit) {
+  let depth = 0;
+  let inString = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text.charCodeAt(i);
+    if (inString) {
+      if (c === 0x5c) i += 1; // a backslash: the character after it is escaped
+      else if (c === 0x22) inString = false;
+    } else if (c === 0x22) {
+      inString = true;
+    } else if (c === 0x5b || c === 0x7b) {
+      depth += 1;
+      if (depth > limit) return true;
+    } else if (c === 0x5d || c === 0x7d) {
+      depth -= 1;
+    }
   }
   return false;
 }
@@ -801,9 +867,9 @@ function closed(value, keys, where, bad) {
   for (const key of Object.keys(value)) {
     if (keys.includes(key)) continue;
     bad(looksLikeShare(key, value[key])
-      ? `${where} carries ${key}, a stored share. No share is stored in a version 2 file: one is computed where it is shown, ` +
+      ? `${where} carries ${describe(key)}, a stored share. No share is stored in a version 2 file: one is computed where it is shown, ` +
         'from two counts of the same block, so its denominator is never left to the reader.'
-      : `${where} carries ${key}, which the schema version 2 contract does not define. Every object is closed, so a stale or ` +
+      : `${where} carries ${describe(key)}, which the schema version 2 contract does not define. Every object is closed, so a stale or ` +
         'misspelt field fails instead of being ignored.');
   }
   const missing = keys.filter((key) => !Object.hasOwn(value, key));
@@ -823,6 +889,10 @@ function parseVersion2(buffer, file, bad) {
     bad(`${file} is not UTF-8. A decoder that substitutes a character would hide the difference from every check here.`);
     return null;
   }
+  if (textNestsDeeperThan(text, MAX_NESTING)) {
+    bad(`${file} ${NESTED_PAST_LIMIT}`);
+    return null;
+  }
   let value;
   try {
     value = JSON.parse(text);
@@ -832,11 +902,6 @@ function parseVersion2(buffer, file, bad) {
   }
   if (!isObject(value)) {
     bad(`${file} is not a JSON object`);
-    return null;
-  }
-  if (nestsDeeperThan(value, MAX_NESTING)) {
-    bad(`${file} nests values more than ${MAX_NESTING} deep. No version 2 file is nested so deep, and reading one that is ` +
-      'could exhaust the stack of whoever checks it.');
     return null;
   }
   if (!Object.hasOwn(value, 'schemaVersion')) {
@@ -878,20 +943,15 @@ function readDatasetFile(dir, file, bad, limit = FILE_LIMIT) {
 
 // --- MANIFEST.json --------------------------------------------------------------
 
-/** The manifest, read strictly. One that is not a version 2 manifest in shape is reported once, since nothing else can be read from it. */
-function readManifest2(dir, bad) {
-  const path = join(dir, 'MANIFEST.json');
-  let text;
-  try {
-    text = readStrict(path);
-  } catch {
+/**
+ * The manifest, read strictly: the text and the value validate() read and
+ * parsed once, its nesting already bounded, with the text null when the bytes
+ * are not UTF-8. One that is not a version 2 manifest in shape is reported
+ * once, since nothing else can be read from it.
+ */
+function readManifest2({ text, manifest }, bad) {
+  if (text === null) {
     bad('MANIFEST.json is not UTF-8. A decoder that substitutes a character would hide the difference from every check here.');
-    return null;
-  }
-  const manifest = JSON.parse(text);
-  if (nestsDeeperThan(manifest, MAX_NESTING)) {
-    bad(`MANIFEST.json nests values more than ${MAX_NESTING} deep. No version 2 file is nested so deep, and reading one that is ` +
-      'could exhaust the stack of whoever checks it.');
     return null;
   }
   const missing = KEYS.manifest.filter((key) => !Object.hasOwn(manifest, key));
@@ -899,7 +959,7 @@ function readManifest2(dir, bad) {
   if (missing.length > 0 || extra.length > 0) {
     const parts = [];
     if (missing.length > 0) parts.push(`it lacks ${missing.join(', ')}`);
-    if (extra.length > 0) parts.push(`it carries ${extra.join(', ')}, which a version 2 manifest does not define`);
+    if (extra.length > 0) parts.push(`it carries ${extra.map(describe).join(', ')}, which a version 2 manifest does not define`);
     bad(`schemaVersion is 2, but MANIFEST.json is not a version 2 manifest: ${parts.join('; ')}. A file is read as version 2 ` +
       'by the fields it has, not by its marker alone.');
     return null;
@@ -1057,7 +1117,7 @@ function readListedFiles(name, dir, manifest, bad) {
 
   const strays = readdirSync(dir).filter((entry) => entry !== 'MANIFEST.json' && !listed.has(entry)).sort();
   if (strays.length > 0) {
-    bad(`present but not listed in MANIFEST.json: ${strays.join(', ')}. An unlisted file is one no reader can attribute ` +
+    bad(`present but not listed in MANIFEST.json: ${strays.map(describe).join(', ')}. An unlisted file is one no reader can attribute ` +
       'and no hash covers.');
   }
   return found;
@@ -1274,7 +1334,7 @@ function checkCatalog(name, record, bad) {
   let sound = true;
   let previous = null;
   c.entries.forEach((entry, index) => {
-    const label = isObject(entry) && isText(entry.name) ? ` (${entry.ecosystem}:${entry.name})` : '';
+    const label = isObject(entry) && isText(entry.name) && isText(entry.ecosystem) ? ` (${entry.ecosystem}:${entry.name})` : '';
     const where = `${file}: entries[${index}]${label}`;
     if (!checkEntry(entry, where, bad)) {
       sound = false;
@@ -1293,17 +1353,20 @@ function checkCatalog(name, record, bad) {
   });
   for (const eco of ECOSYSTEMS) {
     const registry = byEco[eco];
+    // Every alias is kept with every entry that gives it, a colliding one too: the collision is refused here, once,
+    // and a check or a match by an alias its entry does have is not refused again for it.
     for (const entry of registry.entries) {
       for (const alias of entry.aliases) {
+        const owners = registry.aliasOf.get(alias.name);
         if (registry.byName.has(alias.name)) {
           bad(`${file}: ${eco}:${entry.name} has the alias ${alias.name}, which is also the name of an entry. A declared name ` +
             'counts as one entry.');
-        } else if (registry.aliasOf.has(alias.name)) {
-          bad(`${file}: the alias ${alias.name} belongs to both ${registry.aliasOf.get(alias.name)} and ${entry.name} in ${eco}. ` +
+        } else if (owners) {
+          bad(`${file}: the alias ${alias.name} belongs to both ${owners.values().next().value} and ${entry.name} in ${eco}. ` +
             'A declared name counts as one entry.');
-        } else {
-          registry.aliasOf.set(alias.name, entry.name);
         }
+        if (owners) owners.add(entry.name);
+        else registry.aliasOf.set(alias.name, new Set([entry.name]));
       }
     }
     measure(registry);
@@ -1600,7 +1663,8 @@ function checkCatalogCheck(eco, rows, catalog, file, bad) {
       bad(`${where} checks ${describe(row.entry)}, which is not a ${eco} entry of the catalogue snapshot`);
       return;
     }
-    if (row.alias !== null && !entry.aliases.some((alias) => alias.name === row.alias)) {
+    // The snapshot's alias map answers in one step, however many aliases an entry has.
+    if (row.alias !== null && !registry.aliasOf.get(row.alias)?.has(entry.name)) {
       bad(`${where} checks the alias ${describe(row.alias)}, which ${entry.name} does not have in the catalogue snapshot`);
       return;
     }
@@ -1608,13 +1672,13 @@ function checkCatalogCheck(eco, rows, catalog, file, bad) {
     if (row.alias !== null) return;
     if (entry.unmatchable !== null) {
       if (!['notApplicable', 'absent'].includes(row.status)) {
-        bad(`${where}: ${entry.name} is tagged unmatchable, and the registry check finds it ${row.status}. A name a manifest ` +
+        bad(`${where}: ${entry.name} is tagged unmatchable, and the registry check finds it ${describe(row.status)}. A name a manifest ` +
           'cannot declare is notApplicable or absent; present means the tag is wrong.');
       }
       return;
     }
     if ((row.status === 'absent') !== (entry.registryAbsent !== null)) {
-      bad(`${where}: the scan's own registry check finds ${entry.name} ${row.status}, and the catalogue snapshot ` +
+      bad(`${where}: the scan's own registry check finds ${entry.name} ${describe(row.status)}, and the catalogue snapshot ` +
         `${entry.registryAbsent === null ? 'does not tag it registryAbsent' : 'tags it registryAbsent'}. The two have to agree, ` +
         'since the tag decides whether the entry counts toward K.');
     }
@@ -1716,7 +1780,7 @@ function checkPackages(eco, packages, method, catalog, file, bad) {
         wrong(`${there}.entry is ${describe(m.entry)}, which is not a ${eco} entry of the catalogue snapshot`);
       } else if (entry && m.matchedBy === 'exact' && m.declaredName !== m.entry) {
         wrong(`${there} is matched exactly, but the declared name ${describe(m.declaredName)} is not the entry's name ${describe(m.entry)}`);
-      } else if (entry && m.matchedBy === 'alias' && !entry.aliases.some((alias) => alias.name === m.declaredName)) {
+      } else if (entry && m.matchedBy === 'alias' && !registry.aliasOf.get(m.declaredName)?.has(entry.name)) {
         wrong(`${there} is matched by alias, but ${describe(m.declaredName)} is not an alias of ${m.entry} in the catalogue snapshot`);
       }
       if (!checkDeclarations(eco, m.declarations, there, bad)) sound = false;
@@ -1866,6 +1930,13 @@ const LEDGER_REASONS = {
   unversioned: ['noRelease', 'allYanked', 'noDefaultBranch'],
 };
 
+/**
+ * The malformed rows a ledger is read past. The first five are listed; at the
+ * sixth the ledger is refused and the rest is not read, so a ledger of a
+ * billion malformed rows costs the time to read six of them, not all of them.
+ */
+const MAX_LEDGER_ROW_PROBLEMS = 5;
+
 /** Read one ledger: decompressed within the bound, one row per listed package, sorted by name in byte order. */
 function readLedger(eco, listing, scan, bad) {
   const file = listing.file;
@@ -1882,21 +1953,26 @@ function readLedger(eco, listing, scan, bad) {
   }
   const readFrom = scan.method ? scan.method.readFrom : null;
   const counts = { listed: 0, scanned: 0, absent: 0, unresolved: 0, unversioned: 0, dependenciesNotObservable: 0 };
-  const byReadFrom = {};
-  const hiddenByReadFrom = {};
+  // No prototype: a source is a key like any other, `__proto__` included.
+  const byReadFrom = Object.create(null);
+  const hiddenByReadFrom = Object.create(null);
   const matched = new Map();
   // Maven's draw is of search pages: the distinct pages its rows were drawn from are the pages it read.
   const pages = new Set();
   const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
-  let problems = 0;
+  let malformed = 0;
+  let flagged = 0;
   const rowBad = (line, message) => {
-    problems += 1;
-    if (problems <= 5) bad(`${file}: row ${line} ${message}`);
+    if (line !== flagged) {
+      flagged = line;
+      malformed += 1;
+    }
+    if (malformed <= MAX_LEDGER_ROW_PROBLEMS) bad(`${file}: row ${line} ${message}`);
   };
   let position = 0;
   let line = 0;
   let previous = null;
-  while (position < data.length) {
+  while (position < data.length && malformed <= MAX_LEDGER_ROW_PROBLEMS) {
     let end = data.indexOf(10, position);
     if (end === -1) end = data.length;
     const bytes = data.subarray(position, end);
@@ -1982,8 +2058,12 @@ function readLedger(eco, listing, scan, bad) {
     bad(`${file} is empty. A ledger has a header row and one row per listed package.`);
     return null;
   }
-  if (problems > 5) bad(`${file}: ${problems - 5} more row(s) are malformed`);
-  return { file, counts, byReadFrom, hiddenByReadFrom, matched, pages, sound: problems === 0 };
+  if (malformed > MAX_LEDGER_ROW_PROBLEMS) {
+    bad(`${file}: row ${flagged} is the sixth malformed row, so the ledger is refused and the rows after it are not read. ` +
+      'Five malformed rows are listed; a ledger with more is written again, not read to its end.');
+    return null;
+  }
+  return { file, counts, byReadFrom, hiddenByReadFrom, matched, pages, sound: malformed === 0 };
 }
 
 /** The scan file against its ledger: coverage is recomputed from the rows, and the matched rows are the packages listed. */
@@ -1998,10 +2078,10 @@ function compareLedger(eco, ledger, scan, bad) {
       }
     }
     for (const source of new Set([...Object.keys(scan.coverage.scannedByReadFrom), ...Object.keys(ledger.byReadFrom)])) {
-      const stored = scan.coverage.scannedByReadFrom[source] ?? 0;
-      const counted = ledger.byReadFrom[source] ?? 0;
+      const stored = Object.hasOwn(scan.coverage.scannedByReadFrom, source) ? scan.coverage.scannedByReadFrom[source] : 0;
+      const counted = Object.hasOwn(ledger.byReadFrom, source) ? ledger.byReadFrom[source] : 0;
       if (stored !== counted) {
-        bad(`${file}: coverage.scannedByReadFrom.${source} is ${stored}, and ${ledger.file} gives ${counted}`);
+        bad(`${file}: coverage.scannedByReadFrom gives ${stored} for ${describe(source)}, and ${ledger.file} gives ${counted}`);
       }
     }
   }
@@ -2098,7 +2178,7 @@ function checkConsolidation(name, record, scans, withScanFile, bad) {
     return null;
   }
   for (const key of Object.keys(c.byEcosystem)) {
-    if (!ECOSYSTEMS.includes(key)) bad(`${file}: byEcosystem carries ${key}, which is not one of the eleven registries`);
+    if (!ECOSYSTEMS.includes(key)) bad(`${file}: byEcosystem carries ${describe(key)}, which is not one of the eleven registries`);
   }
   for (const eco of ECOSYSTEMS) {
     const unitOf = new Map();
@@ -2981,9 +3061,9 @@ const UNCHECKED_CHANGES = ['enumerationFrame', 'manifestReader'];
 function readBounded(path) {
   const stat = lstatSync(path, { throwIfNoEntry: false });
   if (!stat || !stat.isFile() || stat.size > MAX_FILE_BYTES) throw new Error(`${path} is not a regular file of a size these rules read`);
-  const value = JSON.parse(readStrict(path));
-  if (nestsDeeperThan(value, MAX_NESTING)) throw new Error(`${path} nests too deep`);
-  return value;
+  const text = readStrict(path);
+  if (textNestsDeeperThan(text, MAX_NESTING)) throw new Error(`${path} nests too deep`);
+  return JSON.parse(text);
 }
 
 /** The version of an earlier dataset, read from its manifest: 1 when it declares none. */
@@ -3621,8 +3701,11 @@ function checkManifestAgainstFiles(manifest, found, scans, withheld, bad) {
   checkKnownIssues(manifest.knownIssues, corpus, bad);
 }
 
-/** Every rule of a version 2 dataset, in the order its files depend on each other. */
-function validateVersion2(name, dir) {
+/**
+ * Every rule of a version 2 dataset, in the order its files depend on each
+ * other. `read` is the manifest as validate() read it: its text and its value.
+ */
+function validateVersion2(name, dir, read) {
   const counted = new Map();
   const bad = (message) => {
     const file = (/^([A-Za-z0-9.-]+\.(?:json|gz))[: ]/.exec(message) ?? [])[1] ?? '';
@@ -3631,7 +3714,7 @@ function validateVersion2(name, dir) {
     if (file === '' || count <= MAX_PROBLEMS_PER_FILE) fail(name, message);
   };
   try {
-    validateVersion2Files(name, dir, bad);
+    validateVersion2Files(name, dir, bad, read);
   } finally {
     for (const [file, count] of counted) {
       if (file !== '' && count > MAX_PROBLEMS_PER_FILE) fail(name, `${file}: ${count - MAX_PROBLEMS_PER_FILE} more problem(s) in this file are not listed`);
@@ -3639,8 +3722,8 @@ function validateVersion2(name, dir) {
   }
 }
 
-function validateVersion2Files(name, dir, bad) {
-  const manifest = readManifest2(dir, bad);
+function validateVersion2Files(name, dir, bad, read) {
+  const manifest = readManifest2(read, bad);
   if (manifest === null) return;
   checkManifest2(name, manifest, bad);
   const found = readListedFiles(name, dir, manifest, bad);
@@ -3686,88 +3769,116 @@ function listRegeneratedScans(name, manifest, found) {
 
 // ---------------------------------------------------------------------------
 
-if (!existsSync(DATASETS)) {
-  process.stderr.write('No datasets/ directory.\n');
-  process.exit(2);
-}
+/**
+ * One problem or note, every line of it indented, so that a problem of
+ * several lines, a parser's message among them, reads as one item of the list.
+ */
+const indented = (text) => `  ${text.replace(/\r\n|\r|\n/g, '\n  ')}\n`;
 
-const requested = process.argv[2];
-// Everything directly under datasets/ is a dataset directory. A file there is
-// read by none of these checks, so it would be published unchecked. Names that
-// begin with a dot are left to the check that reads the committed tree: an
-// operating system can leave one in a working copy.
-for (const entry of readdirSync(DATASETS)) {
-  if (!entry.startsWith('.') && !lstatSync(join(DATASETS, entry)).isDirectory()) {
-    fail('datasets', `${entry} is not a dataset directory. A file directly under datasets/ is read by none of these checks.`);
-  }
-}
-const all = readdirSync(DATASETS).filter((f) => statSync(join(DATASETS, f), { throwIfNoEntry: false })?.isDirectory());
-const names = requested ? [requested] : all;
-
-if (requested && !all.includes(requested)) {
-  process.stderr.write(`No dataset datasets/${requested}\n`);
-  process.exit(2);
-}
-
-// With no dataset named, every entry of errata/ is read, whatever it is
-// called: a file passed over for its name is a file nothing has checked. With
-// one dataset named, only that dataset's errata file is read.
-let allErrata = [];
-// errata/ is asked about itself and not about what it may point at: a link to
-// a directory reads like one, while the files live where the append-only
-// check does not look.
-const errataEntry = lstatSync(ERRATA, { throwIfNoEntry: false });
-if (errataEntry) {
-  if (errataEntry.isDirectory()) allErrata = readdirSync(ERRATA).sort();
-  else fail('errata', 'is not a directory. A link would keep the errata files somewhere the checks do not look.');
-}
-const errataFiles = requested ? allErrata.filter((f) => f === `${requested}.json`) : allErrata;
-
-// An empty repository is a valid state (nothing published yet), but a run that
-// validated nothing must say so rather than print a checkmark.
-if (names.length === 0 && errataFiles.length === 0 && problems.length === 0) {
-  process.stdout.write('No datasets published yet. Nothing to validate.\n');
-  process.exit(0);
-}
-
-for (const name of names) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(name)) {
-    fail(name, 'directory name is not a YYYY-MM-DD collection date');
-    continue;
-  }
-  // A check that throws reports where it stopped, and the problems found before it are still listed.
+/** What a thrown value says about itself, or that it says nothing printable. */
+function errorText(err) {
   try {
-    validate(name);
-  } catch (err) {
-    fail(name, `could not be checked to the end: ${err.message}`);
+    return String(err instanceof Error ? err.stack ?? err.message : err);
+  } catch {
+    return 'a value that cannot be printed';
   }
 }
 
-for (const file of errataFiles) {
-  try {
-    validateErrata(file);
-  } catch (err) {
-    fail(`errata/${file}`, `could not be checked to the end: ${err.message}`);
+/** Every check above, over what was asked for. Returns the exit code: 0 passed, 1 refused, 2 nothing to read. */
+function main() {
+  if (!existsSync(DATASETS)) {
+    process.stderr.write('No datasets/ directory.\n');
+    return 2;
   }
+
+  const requested = process.argv[2];
+  // Everything directly under datasets/ is a dataset directory. A file there is
+  // read by none of these checks, so it would be published unchecked. Names that
+  // begin with a dot are left to the check that reads the committed tree: an
+  // operating system can leave one in a working copy.
+  for (const entry of readdirSync(DATASETS)) {
+    if (!entry.startsWith('.') && !lstatSync(join(DATASETS, entry)).isDirectory()) {
+      fail('datasets', `${entry} is not a dataset directory. A file directly under datasets/ is read by none of these checks.`);
+    }
+  }
+  const all = readdirSync(DATASETS).filter((f) => statSync(join(DATASETS, f), { throwIfNoEntry: false })?.isDirectory());
+  const names = requested ? [requested] : all;
+
+  if (requested && !all.includes(requested)) {
+    process.stderr.write(`No dataset datasets/${requested}\n`);
+    return 2;
+  }
+
+  // With no dataset named, every entry of errata/ is read, whatever it is
+  // called: a file passed over for its name is a file nothing has checked. With
+  // one dataset named, only that dataset's errata file is read.
+  let allErrata = [];
+  // errata/ is asked about itself and not about what it may point at: a link to
+  // a directory reads like one, while the files live where the append-only
+  // check does not look.
+  const errataEntry = lstatSync(ERRATA, { throwIfNoEntry: false });
+  if (errataEntry) {
+    if (errataEntry.isDirectory()) allErrata = readdirSync(ERRATA).sort();
+    else fail('errata', 'is not a directory. A link would keep the errata files somewhere the checks do not look.');
+  }
+  const errataFiles = requested ? allErrata.filter((f) => f === `${requested}.json`) : allErrata;
+
+  // An empty repository is a valid state (nothing published yet), but a run that
+  // validated nothing must say so rather than print a checkmark.
+  if (names.length === 0 && errataFiles.length === 0 && problems.length === 0) {
+    process.stdout.write('No datasets published yet. Nothing to validate.\n');
+    return 0;
+  }
+
+  for (const name of names) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(name)) {
+      fail(describe(name), 'directory name is not a YYYY-MM-DD collection date');
+      continue;
+    }
+    // A check that throws reports where it stopped, and the problems found before it are still listed.
+    try {
+      validate(name);
+    } catch (err) {
+      fail(name, `could not be checked to the end: ${err.message}`);
+    }
+  }
+
+  for (const file of errataFiles) {
+    try {
+      validateErrata(file);
+    } catch (err) {
+      fail(`errata/${file}`, `could not be checked to the end: ${err.message}`);
+    }
+  }
+
+  const checked = `${names.length} dataset(s)` +
+    (errataFiles.length > 0 ? ` and ${errataFiles.length} errata file(s)` : '');
+
+  if (notes.length > 0) {
+    process.stdout.write(`\nRecorded, not refused (${notes.length}):\n\n`);
+    for (const n of notes) process.stdout.write(indented(n));
+    process.stdout.write('\n');
+  }
+
+  if (problems.length > 0) {
+    process.stderr.write(`\n${problems.length} problem(s) across ${checked}:\n\n`);
+    for (const p of problems) process.stderr.write(indented(p));
+    process.stderr.write('\n');
+    return 1;
+  }
+
+  process.stdout.write(`${names.length} dataset(s) validated: ${names.join(', ')}\n`);
+  if (errataFiles.length > 0) {
+    process.stdout.write(`${errataFiles.length} errata file(s) validated: ${errataFiles.join(', ')}\n`);
+  }
+  return 0;
 }
 
-const checked = `${names.length} dataset(s)` +
-  (errataFiles.length > 0 ? ` and ${errataFiles.length} errata file(s)` : '');
-
-if (notes.length > 0) {
-  process.stdout.write(`\nRecorded, not refused (${notes.length}):\n\n`);
-  for (const n of notes) process.stdout.write(`  ${n}\n`);
-  process.stdout.write('\n');
-}
-
-if (problems.length > 0) {
-  process.stderr.write(`\n${problems.length} problem(s) across ${checked}:\n\n`);
-  for (const p of problems) process.stderr.write(`  ${p}\n`);
-  process.stderr.write('\n');
-  process.exit(1);
-}
-
-process.stdout.write(`${names.length} dataset(s) validated: ${names.join(', ')}\n`);
-if (errataFiles.length > 0) {
-  process.stdout.write(`${errataFiles.length} errata file(s) validated: ${errataFiles.join(', ')}\n`);
+// The exit code is set rather than exited with, so what is written is written
+// out before the process ends.
+try {
+  process.exitCode = main();
+} catch (err) {
+  process.stderr.write(`\nThe checks stopped on an error they do not handle:\n\n${indented(errorText(err))}\n`);
+  process.exitCode = 1;
 }
