@@ -2381,13 +2381,17 @@ for (const [what, earlier, later] of [
 // manifestReader (readFrom, notObservableWhen and limits) each as a set, so that an order is never a change. Of the
 // definitions: the package unit's id under consolidationRule, and the multi-purpose table's under classDefinition.
 // Comparable is true exactly when no code is recomputed and none is named; enumerationFrame, which no field carries,
-// may be named and is never recomputed.
-for (const [what, earlier] of [
+// may be named and is never recomputed. npm's method lists no condition and no limit, so for those two fields each
+// dataset lists the same two codes, the earlier one in the other order.
+for (const [what, earlier, later = {}] of [
   ['npm\'s declaration kinds are listed in another order', { scans: (s) => { s.npm.method.declarationKinds.reverse(); } }],
   ['Packagist\'s read sources are listed in another order', { fixture: (f) => { f.packagist.method.readFrom.reverse(); } }],
+  ...['notObservableWhen', 'limits'].map((field) => [`npm's method.${field} is listed in another order`,
+    { fixture: (f) => { f.npm.method[field] = ['bCode', 'aCode']; } },
+    { fixture: (f) => { f.npm.method[field] = ['aCode', 'bCode']; } }]),
 ]) {
   test(`a later dataset marked comparable with an earlier one passes when ${what}`, async () => {
-    const result = await validate(comparedWith(earlier, {}));
+    const result = await validate(comparedWith(earlier, later));
     assert.equal(result.code, 0, result.stderr);
   });
 }
