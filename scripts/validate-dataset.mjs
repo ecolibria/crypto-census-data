@@ -30,28 +30,18 @@ import { createHash, randomBytes } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 
 /**
- * Everything this prints sits inside an envelope the GitHub runner honours.
  * The first line of stdout and of stderr is `::stop-commands::<token>`,
- * written before any byte of a dataset is read: from there the runner reads
- * no line as a workflow command, whatever text a dataset puts into a key, a
- * file name or a parser's message, until a line is `::<token>::`, the last
- * line of both streams. The token is drawn afresh for each run, so no dataset
- * can write the line that ends it. A run ends through closeEnvelope() on
- * every path it can take: the end of this file, a thrown error, and a
- * process.exit() anywhere. A run that is killed, or that the engine aborts,
- * ends with the envelope open, and the runner then reads no command from it.
+ * written before any byte of a dataset is read. From that line on the GitHub
+ * runner acts on no workflow command, whatever text a dataset puts into a
+ * key, a file name or a parser's message, and nothing resumes them: no line
+ * this writes, on any path, is `::<token>::`, and the token is drawn afresh
+ * for each run, so no dataset can write that line either. The step stays
+ * stopped for the rest of the validator's output; the validator runs alone in
+ * its step.
  */
 const STOP_TOKEN = randomBytes(16).toString('hex');
 process.stdout.write(`::stop-commands::${STOP_TOKEN}\n`);
 process.stderr.write(`::stop-commands::${STOP_TOKEN}\n`);
-let envelopeOpen = true;
-function closeEnvelope() {
-  if (!envelopeOpen) return;
-  envelopeOpen = false;
-  process.stderr.write(`::${STOP_TOKEN}::\n`);
-  process.stdout.write(`::${STOP_TOKEN}::\n`);
-}
-process.on('exit', closeEnvelope);
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DATASETS = join(ROOT, 'datasets');
@@ -3884,14 +3874,11 @@ function main() {
   return 0;
 }
 
-// The run ends here on every path but a kill: the exit code is set rather than
-// exited with, so what is written is written out before the process ends, and
-// the envelope's last line comes after it.
+// The exit code is set rather than exited with, so what is written is written
+// out before the process ends.
 try {
   process.exitCode = main();
 } catch (err) {
   process.stderr.write(`\nThe checks stopped on an error they do not handle:\n\n${indented(errorText(err))}\n`);
   process.exitCode = 1;
-} finally {
-  closeEnvelope();
 }
