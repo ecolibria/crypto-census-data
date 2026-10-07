@@ -2782,6 +2782,34 @@ test('a raw file an errata file names is not read where the errata file and the 
   assert.doesNotMatch(result.stderr, /a dataset may hold|heap out of memory|could not be checked to the end/, result.stderr);
 });
 
+// The same with the errata file one byte smaller, which leaves exactly room for that raw file: with it, 150,000,000
+// bytes are held, which the bound admits. The raw file is read, and its zero bytes after the text do not parse, so the
+// regeneration's problem is listed alone, with no problem for the bound before it.
+test('a raw file an errata file names is read where the errata file and the manifest and corpus it holds leave exactly room for it', { timeout: 180000 }, async () => {
+  const result = await validateOne({}, (dir) => {
+    const target = datasetDir(dir);
+    const grow = (file, bytes) => {
+      const text = readText(join(target, file));
+      writeFileSync(join(target, file), `${text}${' '.repeat(bytes - Buffer.byteLength(text))}`);
+    };
+    truncateSync(join(target, 'scan-results-npm.json'), 20_000_000);
+    grow(`corpus-${DATE}.json`, 94_000_000);
+    grow('MANIFEST.json', lstatSync(join(target, 'MANIFEST.json')).size + 140_000_000 - datasetTotal(target));
+    assert.equal(datasetTotal(target), 140_000_000);
+    // 130,000,000 held with the errata file: exactly room for 20,000,000.
+    const errataBytes = 130_000_000 - lstatSync(join(target, 'MANIFEST.json')).size - 94_000_000;
+    const summary = 'The raw files were written again after the run.';
+    const shortest = Buffer.byteLength(errataFor((e) => { e.regenerations[0].summary = summary; }));
+    mkdirSync(join(dir, 'errata'));
+    writeFileSync(join(dir, ERRATA), errataFor((e) => { e.regenerations[0].summary = `${summary}${'x'.repeat(errataBytes - shortest)}`; }));
+    assert.equal(lstatSync(join(dir, ERRATA)).size, errataBytes);
+  }, HEAP_4096);
+  assert.equal(result.code, 1, `exit ${result.code}, signal ${result.signal}:\n${result.stderr.slice(-1500)}`);
+  assert.deepEqual(linesOf(result.stderr, ERRATA),
+    [`  ${ERRATA}: regeneration 1 names npm, which has a raw file, scan-results-npm.json, that cannot be read`], result.stderr);
+  assert.doesNotMatch(result.stderr, /was not read|a dataset may hold|heap out of memory|could not be checked to the end/, result.stderr);
+});
+
 // The errata input of the round 6 review: three raw files of 94,000,000 bytes, each one list of empty objects, which
 // parsed together exhaust a heap of 4,096 MB. The dataset is past its own bound and none of its files is parsed; the
 // errata file names the three, and each is read alone, for the field named, and released before the next is read.
