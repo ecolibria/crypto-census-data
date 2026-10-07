@@ -14,6 +14,8 @@ $ node scripts/validate-dataset.mjs
 1 errata file(s) validated: 2026-08-03.json
 ```
 
+The validator's stdout and stderr each open with four lines for the CI runner, inert elsewhere and omitted above: three `::remove-matcher` lines, then `::stop-commands::` and a fresh token.
+
 Every file is verified against the SHA-256 recorded in its `MANIFEST.json`, so a
 dataset that was altered in transit or after publication fails rather than
 reading as valid.

@@ -30,18 +30,31 @@ import { createHash, randomBytes } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 
 /**
- * The first line of stdout and of stderr is `::stop-commands::<token>`,
- * written before any byte of a dataset is read. From that line on the GitHub
- * runner acts on no workflow command, whatever text a dataset puts into a
- * key, a file name or a parser's message, and nothing resumes them: no line
- * this writes, on any path, is `::<token>::`, and the token is drawn afresh
- * for each run, so no dataset can write that line either. The step stays
- * stopped for the rest of the validator's output; the validator runs alone in
- * its step.
+ * The first three lines of stdout and of stderr remove the problem matchers
+ * setup-node registers for the job, by their owners (actions/setup-node at
+ * 49933ea, the commit the workflows pin, adds .github/tsc.json,
+ * eslint-stylish.json and eslint-compact.json at src/main.ts:72-78). A
+ * matcher reads every line the runner does not take as a command, commands
+ * stopped or not, so a line a dataset chose could otherwise be read as an
+ * error or a warning. The runner keeps one stop state for both streams and
+ * handles the stderr lines it has read before the stdout lines, so each
+ * stream removes all three before its own stop line: whichever stop line is
+ * handled first, the three were removed before it.
+ *
+ * The next line of each is `::stop-commands::<token>`, written before any
+ * byte of a dataset is read, and nothing else precedes it. From that line on
+ * the GitHub runner acts on no workflow command, whatever text a dataset puts
+ * into a key, a file name or a parser's message, and nothing resumes them: no
+ * line this writes, on any path, is `::<token>::` in any letter case, and the
+ * token is drawn afresh for each run, so no dataset can write that line
+ * either. The step stays stopped for the rest of the validator's output; the
+ * validator runs alone in its step.
  */
 const STOP_TOKEN = randomBytes(16).toString('hex');
-process.stdout.write(`::stop-commands::${STOP_TOKEN}\n`);
-process.stderr.write(`::stop-commands::${STOP_TOKEN}\n`);
+const SETUP_NODE_MATCHERS = ['tsc', 'eslint-stylish', 'eslint-compact'];
+const OPENING = `${SETUP_NODE_MATCHERS.map((owner) => `::remove-matcher owner=${owner}::\n`).join('')}::stop-commands::${STOP_TOKEN}\n`;
+process.stdout.write(OPENING);
+process.stderr.write(OPENING);
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DATASETS = join(ROOT, 'datasets');
@@ -224,7 +237,7 @@ function validate(name) {
       fail(name, `schemaVersion is 2, and ${name} is one of the datasets published in the first file shape, which declares ` +
         'no version. A version 2 manifest under that name is not the dataset that was published.');
     } else {
-      validateVersion2(name, dir, { text: strictText, manifest });
+      validateVersion2(name, dir, { text: strictText, manifest, size: manifestStat.size });
     }
     return;
   }
@@ -769,6 +782,15 @@ const FILE_LIMIT = {
 };
 
 /**
+ * The most MANIFEST.json and the files it lists, the ledgers aside, may hold
+ * together. Every one of them is parsed and held until the corpus is checked,
+ * and parsed JSON of small objects takes many times its size in memory, so
+ * several files each within the bound above can still exhaust it. Their sizes
+ * on disk are summed before any listed file is read.
+ */
+const MAX_DATASET_JSON_BYTES = 150_000_000;
+
+/**
  * What the generator checks, each a list of refusals that must be empty. A
  * missing scan file and an unresolved share above the ceiling are not checks:
  * each withholds the row and refuses nothing, and a withheld row is recorded
@@ -1027,16 +1049,18 @@ const fileNameFor = (role, eco, date) => ({
  * limit, and hashing to what was recorded. Every other file in the directory
  * is a stray, whatever its name. Returns the parsed files by role, and the
  * registries whose scan file the manifest lists: the scan files the corpus read.
+ * Every entry is checked first and every file read after, so that the sizes of
+ * the files to be parsed are known, together, before any of them is.
  */
-function readListedFiles(name, dir, manifest, bad) {
+function readListedFiles(name, dir, manifest, manifestBytes, bad) {
   if (!Array.isArray(manifest.files)) {
     bad(`MANIFEST.json: files is ${describe(manifest.files)}, not a list of the dataset's files`);
     return null;
   }
   const found = { scans: {}, listings: {}, corpus: null, catalog: null, consolidation: null, hashes: new Map(), withScanFile: new Set() };
   const listed = new Set();
-  let ledgerBytes = 0;
   const roles = new Set();
+  const toRead = [];
   manifest.files.forEach((entry, index) => {
     const where = `MANIFEST.json: files[${index}]`;
     if (!closed(entry, KEYS.file, where, bad)) return;
@@ -1070,13 +1094,29 @@ function readListedFiles(name, dir, manifest, bad) {
     }
     if (!isCount(entry.bytes)) bad(`${where}.bytes is ${describe(entry.bytes)}, not a size in bytes`);
     if (!isSha256(entry.sha256)) bad(`${where}.sha256 is ${describe(entry.sha256)}, not a SHA-256 digest in lower-case hex`);
+    toRead.push(entry);
+  });
 
-    if (entry.role === 'listing') {
-      const stat = lstatSync(join(dir, entry.file), { throwIfNoEntry: false });
-      if (stat && stat.isFile()) ledgerBytes += stat.size;
-    }
+  // The sizes on disk of the files to be read, before any is: the ledgers', for their own bound below, and every
+  // other file's, which is parsed, with the manifest's. Only a regular file is read, so only one is counted.
+  let ledgerBytes = 0;
+  let jsonBytes = manifestBytes;
+  for (const entry of toRead) {
+    const stat = lstatSync(join(dir, entry.file), { throwIfNoEntry: false });
+    if (!stat || !stat.isFile()) continue;
+    if (entry.role === 'listing') ledgerBytes += stat.size;
+    else jsonBytes += stat.size;
+  }
+  if (jsonBytes > MAX_DATASET_JSON_BYTES) {
+    bad(`MANIFEST.json and its listed files, ledgers aside, total ${jsonBytes.toLocaleString('en-US')} bytes, over the ` +
+      `${MAX_DATASET_JSON_BYTES.toLocaleString('en-US')} a dataset may hold; past that, small objects exhaust memory before any ` +
+      'problem is listed. Nothing listed was parsed.');
+    return null;
+  }
+
+  for (const entry of toRead) {
     const buffer = readDatasetFile(dir, entry.file, bad, entry.role === 'listing' ? LEDGER_LIMIT : FILE_LIMIT);
-    if (buffer === null) return;
+    if (buffer === null) continue;
     const actual = createHash('sha256').update(buffer).digest('hex');
     if (isSha256(entry.sha256) && actual !== entry.sha256) {
       bad(`${entry.file} does not match its recorded hash\n    recorded ${entry.sha256}\n    actual   ${actual}`);
@@ -1087,14 +1127,14 @@ function readListedFiles(name, dir, manifest, bad) {
     found.hashes.set(entry.file, actual);
     if (entry.role === 'listing') {
       found.listings[entry.ecosystem] = { file: entry.file, buffer, sha256: actual };
-      return;
+      continue;
     }
     const value = parseVersion2(buffer, entry.file, bad);
-    if (value === null) return;
+    if (value === null) continue;
     const record = { file: entry.file, value, sha256: actual };
     if (entry.role === 'scan') found.scans[entry.ecosystem] = record;
     else found[entry.role] = record;
-  });
+  }
 
   if (ledgerBytes > MAX_LEDGERS_BYTES) {
     bad(`listing ledgers: together they are ${ledgerBytes.toLocaleString('en-US')} bytes, over the ` +
@@ -3035,10 +3075,18 @@ function checkDefinitions(d, file, bad) {
   return usable ? d.anyManifestMatch.includes : null;
 }
 
+/**
+ * The registries two version 2 datasets both read: a scan file of each in both manifests. A registry read on one
+ * side only, or on neither, had no instrument applied to it there, so its scanner's method is compared with nothing
+ * and it names no change; the difference is one of population, which each corpus records in withheld and
+ * measurableIn.
+ */
+const readByBoth = (a, b) => ECOSYSTEMS.filter((eco) => a.withScanFile.has(eco) && b.withScanFile.has(eco));
+
 /** The change codes these rules recompute, each from the fields it names, for two version 2 datasets. */
 const CHANGES_CHECKED = {
-  versionSelection: (a, b) => ECOSYSTEMS.some((eco) => !sameValue(a.methods[eco]?.versionSelection, b.methods[eco]?.versionSelection)),
-  declarationKinds: (a, b) => ECOSYSTEMS.some((eco) => !sameSet(a.methods[eco]?.declarationKinds ?? [], b.methods[eco]?.declarationKinds ?? [])),
+  versionSelection: (a, b) => readByBoth(a, b).some((eco) => !sameValue(a.methods[eco]?.versionSelection, b.methods[eco]?.versionSelection)),
+  declarationKinds: (a, b) => readByBoth(a, b).some((eco) => !sameSet(a.methods[eco]?.declarationKinds ?? [], b.methods[eco]?.declarationKinds ?? [])),
   matchRule: (a, b) => !sameValue(a.matchRules, b.matchRules),
   matchSet: (a, b) => a.matchSetSha256 !== b.matchSetSha256,
   coverageDefinition: (a, b) => a.definitionIds.coverage !== b.definitionIds.coverage,
@@ -3083,7 +3131,10 @@ const definitionIds = (d) => ({
   raw: d.raw.id, consolidated: d.consolidated.id, classes: d.classes, multiPurposeLibrary: d.multiPurposeLibrary.id,
 });
 
-/** What two version 2 datasets have to share to be comparable: the match set, the definition ids, and every scanner's method. */
+/**
+ * What two version 2 datasets have to share to be comparable: the match set, the definition ids, and the method of
+ * every scanner both read. Only the scan files the manifest lists are read; a registry with none has no method.
+ */
 function instrumentOf(dataset) {
   try {
     const dir = join(DATASETS, dataset);
@@ -3094,12 +3145,14 @@ function instrumentOf(dataset) {
       return readBounded(join(dir, file));
     };
     const catalog = read('catalog');
+    const withScanFile = new Set(ECOSYSTEMS.filter((eco) => manifest.files.some((entry) => entry.role === 'scan' && entry.ecosystem === eco)));
     return {
       matchSetSha256: catalog.matchSetSha256,
       classificationSha256: catalog.classificationSha256,
       matchRules: catalog.matchRules,
       definitionIds: definitionIds(read('corpus').definitions),
-      methods: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, read('scan', eco).method])),
+      withScanFile,
+      methods: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, withScanFile.has(eco) ? read('scan', eco).method : null])),
     };
   } catch {
     return null;
@@ -3154,14 +3207,18 @@ function checkComparability(name, list, corpus, ctx, file, bad) {
       }
     } else if (version === 2) {
       const theirs = instrumentOf(item.dataset);
+      // This dataset's instrument, read as instrumentOf reads an earlier one: from every scan file the manifest lists,
+      // as parsed. A listed scan file that did not parse leaves its method unknown, not absent.
       let ours = null;
       try {
-        ours = ctx.catalog ? {
+        const { withScanFile, scans } = ctx.found;
+        ours = ctx.catalog && [...withScanFile].every((eco) => scans[eco]) ? {
           matchSetSha256: ctx.catalog.value.matchSetSha256,
           classificationSha256: ctx.catalog.value.classificationSha256,
           matchRules: ctx.catalog.value.matchRules,
           definitionIds: definitionIds(corpus.definitions),
-          methods: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, ctx.scans[eco] ? ctx.scans[eco].value.method : null])),
+          withScanFile,
+          methods: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, withScanFile.has(eco) ? scans[eco].value.method : null])),
         } : null;
       } catch {
         ours = null;
@@ -3175,10 +3232,11 @@ function checkComparability(name, list, corpus, ctx, file, bad) {
         const differ = [];
         if (!sameValue(theirs.matchSetSha256, ours.matchSetSha256)) differ.push('the match set');
         if (!sameValue(theirs.definitionIds, ours.definitionIds)) differ.push('the definition ids');
-        for (const eco of ECOSYSTEMS) if (!sameValue(theirs.methods[eco], ours.methods[eco])) differ.push(`the ${eco} scanner's method`);
+        for (const eco of readByBoth(theirs, ours)) if (!sameValue(theirs.methods[eco], ours.methods[eco])) differ.push(`the ${eco} scanner's method`);
         if (differ.length > 0) {
           bad(`${at}: ${item.dataset} is marked comparable, and these differ between the two datasets: ${differ.join(', ')}. Two ` +
-            'datasets are comparable only when the match set, the definition ids and every scanner\'s method are the same.');
+            'datasets are comparable only when the match set, the definition ids and the method of every scanner both read are ' +
+            'the same.');
         }
       }
       // The change codes, recomputed from the fields each one names.
@@ -3703,7 +3761,8 @@ function checkManifestAgainstFiles(manifest, found, scans, withheld, bad) {
 
 /**
  * Every rule of a version 2 dataset, in the order its files depend on each
- * other. `read` is the manifest as validate() read it: its text and its value.
+ * other. `read` is the manifest as validate() read it: its text, its value and
+ * its size on disk.
  */
 function validateVersion2(name, dir, read) {
   const counted = new Map();
@@ -3726,7 +3785,7 @@ function validateVersion2Files(name, dir, bad, read) {
   const manifest = readManifest2(read, bad);
   if (manifest === null) return;
   checkManifest2(name, manifest, bad);
-  const found = readListedFiles(name, dir, manifest, bad);
+  const found = readListedFiles(name, dir, manifest, read.size, bad);
   if (found === null) return;
   const catalog = found.catalog ? checkCatalog(name, found.catalog, bad) : null;
   const scans = {};
