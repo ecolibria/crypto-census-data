@@ -2396,6 +2396,21 @@ plant('a listed file nested deeper than any version 2 file', {}, /corpus-2026-09
   rehash('corpus-2026-09-30.json', text.replace(/"comparability": \[[\s\S]*?\n {2}\],\n/, `"comparability": ${deep(20000)},\n`))(dir);
 });
 
+// The nesting is counted on the text as JSON reads it: a quote after a backslash is inside its string, and a bracket
+// inside a string opens or closes nothing. A deep list after a string holding an escaped quote, or after a string of
+// closing brackets, is refused; a string of opening brackets nests nothing.
+const manifestText = (text) => (dir) => writeFileSync(join(datasetDir(dir), 'MANIFEST.json'), text);
+plant('a manifest nested 40 deep after a string holding an escaped quote', {}, /MANIFEST\.json nests values more than 32 deep/,
+  manifestText(`{"schemaVersion":2,"a":"\\"","x":${deep(40)}}`));
+plant('a manifest nested 40 deep after a string of twenty ]', {}, /MANIFEST\.json nests values more than 32 deep/,
+  manifestText(`{"schemaVersion":2,"a":"${']'.repeat(20)}","x":${deep(40)}}`));
+test('a flat manifest whose string holds forty [ is not refused for its nesting', async () => {
+  const result = await validateOne({}, manifestText(`{"schemaVersion":2,"a":"${'['.repeat(40)}"}`));
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(firstProblem(result.stderr), /MANIFEST\.json is not a version 2 manifest: it lacks dataset, /, result.stderr);
+  assert.doesNotMatch(result.stderr, /nests values more than/, result.stderr);
+});
+
 // A file wide rather than deep: the largest scan file allowed, holding one list of empty objects, about thirty
 // million values. The depth check walks it within the default heap, and the file is then refused as any other.
 test('a listed file of 95,000,000 bytes holding thirty million values is refused with a problem list, within the default heap', { timeout: 180000 }, async () => {
