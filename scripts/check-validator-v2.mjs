@@ -2065,10 +2065,19 @@ test('five malformed rows are listed one by one, and a ledger with a sixth is re
 });
 
 test('a ledger with exactly five malformed rows is read to its end', async () => {
-  // Five rows given a disposition that is not one; the rest of the npm ledger is left as it is.
-  const result = await validateOne(ledgerOf('npm', (lines) => lines.map((line, i) => (i >= 1 && i <= 5 ? line.replace(/^([^\t]+)\t[^\t]+\t/, '$1\tgone\t') : line))));
+  // Four rows at the top and the last row given a disposition that is not one; the rows between them are left as they
+  // are. A ledger with a malformed row is not compared with its scan file, so nothing else is printed of it: the last
+  // row listed is what shows the rows after the fourth were read, to the end.
+  let last = 0;
+  const result = await validateOne(ledgerOf('npm', (lines) => {
+    last = lines.length;
+    assert.ok(last > 7, 'well-formed rows lie between the fourth malformed row and the last');
+    return lines.map((line, i) => ((i >= 1 && i <= 4) || i === last - 1 ? line.replace(/^([^\t]+)\t[^\t]+\t/, '$1\tgone\t') : line));
+  }));
   assert.equal(result.code, 1, result.stdout);
-  assert.equal(result.stderr.split('\n').filter((line) => / listing-npm\.tsv\.gz: row \d+ has the disposition/.test(line)).length, 5, result.stderr);
+  const listed = result.stderr.split('\n').filter((line) => / listing-npm\.tsv\.gz: row \d+ has the disposition/.test(line))
+    .map((line) => Number(/ row (\d+) /.exec(line)[1]));
+  assert.deepEqual(listed, [2, 3, 4, 5, last], result.stderr);
   assert.doesNotMatch(result.stderr, /is the sixth malformed row/);
 });
 
@@ -2457,6 +2466,40 @@ test('a hundred thousand aliases of one entry, each checked and each matched, pa
     }
   } }, undefined, { timeout: 30_000 });
   assert.equal(result.code, 0, `exit ${result.code}, signal ${result.signal}:\n${result.stderr.slice(-1500)}`);
+});
+
+// An alias that collides is refused once, by the snapshot's own rule. Every alias is still kept with every entry that
+// gives it, so a check or a match by an alias its entry has is not refused a second time as one the entry lacks.
+const aliasOfGo = (aliasName, owners) => ({ fixture: (f) => {
+  for (const owner of owners) {
+    const e = f.go.entries.find((x) => x.name === owner);
+    e.aliases.push(alias(aliasName));
+    e.aliases.sort((a, b) => byteOrder(a.name, b.name));
+  }
+  // A match by the alias, of the last entry that gives it, in a manifest that matches that entry already.
+  f.go.rows.find((x) => x.name === 'example.com/lib').matches.push(matchAs(aliasName, owners.at(-1), 'alias', go(false)));
+} });
+for (const [what, change, refused] of [
+  ['an alias that is also the name of an entry', aliasOfGo('github.com/cloudflare/circl', ['golang.org/x/crypto']),
+    /go:golang\.org\/x\/crypto has the alias github\.com\/cloudflare\/circl, which is also the name of an entry/],
+  ['an alias given to two entries', aliasOfGo('example.com/shared', ['github.com/square/go-jose', 'golang.org/x/crypto']),
+    /the alias example\.com\/shared belongs to both github\.com\/square\/go-jose and golang\.org\/x\/crypto in go/],
+]) {
+  test(`${what} is refused once, and a check or a match by it is not refused again`, async () => {
+    const result = await validateOne(change);
+    assert.equal(result.code, 1, result.stdout);
+    assert.match(result.stderr, refused, result.stderr);
+    assert.doesNotMatch(result.stderr, /does not have in the catalogue snapshot|is not an alias of/, result.stderr);
+  });
+}
+
+// A read source named `__proto__`: the ledger counts its rows as any other source's, and the count is read as the
+// ledger's own, never from the prototype of an object.
+test('a read source named __proto__ is counted from the ledger like any other', async () => {
+  const result = await validateOne({ fixture: (f) => { f.hex.method.readFrom = ['__proto__']; } });
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(result.stderr, /scan-results-hex\.json: method\.readFrom is \["__proto__"\]/, result.stderr);
+  assert.doesNotMatch(result.stderr, /\[object Object\]|scannedByReadFrom gives \d+ for "__proto__"/, result.stderr);
 });
 
 // --- The envelope ---------------------------------------------------------------

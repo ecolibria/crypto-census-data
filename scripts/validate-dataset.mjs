@@ -1363,17 +1363,20 @@ function checkCatalog(name, record, bad) {
   });
   for (const eco of ECOSYSTEMS) {
     const registry = byEco[eco];
+    // Every alias is kept with every entry that gives it, a colliding one too: the collision is refused here, once,
+    // and a check or a match by an alias its entry does have is not refused again for it.
     for (const entry of registry.entries) {
       for (const alias of entry.aliases) {
+        const owners = registry.aliasOf.get(alias.name);
         if (registry.byName.has(alias.name)) {
           bad(`${file}: ${eco}:${entry.name} has the alias ${alias.name}, which is also the name of an entry. A declared name ` +
             'counts as one entry.');
-        } else if (registry.aliasOf.has(alias.name)) {
-          bad(`${file}: the alias ${alias.name} belongs to both ${registry.aliasOf.get(alias.name)} and ${entry.name} in ${eco}. ` +
+        } else if (owners) {
+          bad(`${file}: the alias ${alias.name} belongs to both ${owners.values().next().value} and ${entry.name} in ${eco}. ` +
             'A declared name counts as one entry.');
-        } else {
-          registry.aliasOf.set(alias.name, entry.name);
         }
+        if (owners) owners.add(entry.name);
+        else registry.aliasOf.set(alias.name, new Set([entry.name]));
       }
     }
     measure(registry);
@@ -1671,7 +1674,7 @@ function checkCatalogCheck(eco, rows, catalog, file, bad) {
       return;
     }
     // The snapshot's alias map answers in one step, however many aliases an entry has.
-    if (row.alias !== null && registry.aliasOf.get(row.alias) !== entry.name) {
+    if (row.alias !== null && !registry.aliasOf.get(row.alias)?.has(entry.name)) {
       bad(`${where} checks the alias ${describe(row.alias)}, which ${entry.name} does not have in the catalogue snapshot`);
       return;
     }
@@ -1787,7 +1790,7 @@ function checkPackages(eco, packages, method, catalog, file, bad) {
         wrong(`${there}.entry is ${describe(m.entry)}, which is not a ${eco} entry of the catalogue snapshot`);
       } else if (entry && m.matchedBy === 'exact' && m.declaredName !== m.entry) {
         wrong(`${there} is matched exactly, but the declared name ${describe(m.declaredName)} is not the entry's name ${describe(m.entry)}`);
-      } else if (entry && m.matchedBy === 'alias' && registry.aliasOf.get(m.declaredName) !== entry.name) {
+      } else if (entry && m.matchedBy === 'alias' && !registry.aliasOf.get(m.declaredName)?.has(entry.name)) {
         wrong(`${there} is matched by alias, but ${describe(m.declaredName)} is not an alias of ${m.entry} in the catalogue snapshot`);
       }
       if (!checkDeclarations(eco, m.declarations, there, bad)) sound = false;
@@ -1960,8 +1963,9 @@ function readLedger(eco, listing, scan, bad) {
   }
   const readFrom = scan.method ? scan.method.readFrom : null;
   const counts = { listed: 0, scanned: 0, absent: 0, unresolved: 0, unversioned: 0, dependenciesNotObservable: 0 };
-  const byReadFrom = {};
-  const hiddenByReadFrom = {};
+  // No prototype: a source is a key like any other, `__proto__` included.
+  const byReadFrom = Object.create(null);
+  const hiddenByReadFrom = Object.create(null);
   const matched = new Map();
   // Maven's draw is of search pages: the distinct pages its rows were drawn from are the pages it read.
   const pages = new Set();
@@ -2084,8 +2088,8 @@ function compareLedger(eco, ledger, scan, bad) {
       }
     }
     for (const source of new Set([...Object.keys(scan.coverage.scannedByReadFrom), ...Object.keys(ledger.byReadFrom)])) {
-      const stored = scan.coverage.scannedByReadFrom[source] ?? 0;
-      const counted = ledger.byReadFrom[source] ?? 0;
+      const stored = Object.hasOwn(scan.coverage.scannedByReadFrom, source) ? scan.coverage.scannedByReadFrom[source] : 0;
+      const counted = Object.hasOwn(ledger.byReadFrom, source) ? ledger.byReadFrom[source] : 0;
       if (stored !== counted) {
         bad(`${file}: coverage.scannedByReadFrom gives ${stored} for ${describe(source)}, and ${ledger.file} gives ${counted}`);
       }
