@@ -770,16 +770,25 @@ const startsWithVersion = (text) => /^\s*\{\s*"schemaVersion"\s*:/.test(text);
  */
 const MAX_NESTING = 32;
 
-/** Whether a parsed value nests deeper than the limit, found without recursion. */
+/**
+ * Whether a parsed value nests deeper than the limit. The walk descends one
+ * frame per level and turns back at the first value past the limit, so it
+ * holds at most `limit` + 1 frames at a time and allocates nothing per value:
+ * a file of millions of values costs its parse, never a second copy of the
+ * tree beside it.
+ */
 function nestsDeeperThan(value, limit) {
-  const stack = [[value, 1]];
-  while (stack.length > 0) {
-    const [node, depth] = stack.pop();
-    if (node === null || typeof node !== 'object') continue;
+  const deeper = (node, depth) => {
+    if (node === null || typeof node !== 'object') return false;
     if (depth > limit) return true;
-    for (const child of Array.isArray(node) ? node : Object.values(node)) stack.push([child, depth + 1]);
-  }
-  return false;
+    if (Array.isArray(node)) {
+      for (let i = 0; i < node.length; i += 1) if (deeper(node[i], depth + 1)) return true;
+      return false;
+    }
+    for (const key in node) if (Object.hasOwn(node, key) && deeper(node[key], depth + 1)) return true;
+    return false;
+  };
+  return deeper(value, 1);
 }
 
 /** The most problems listed for one file of a dataset; past it, the rest are counted. */

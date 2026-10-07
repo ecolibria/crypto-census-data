@@ -2355,6 +2355,20 @@ plant('a listed file nested deeper than any version 2 file', {}, /corpus-2026-09
   rehash('corpus-2026-09-30.json', text.replace(/"comparability": \[[\s\S]*?\n {2}\],\n/, `"comparability": ${deep(20000)},\n`))(dir);
 });
 
+// A file wide rather than deep: the largest scan file allowed, holding one list of empty objects, about thirty
+// million values. The depth check walks it within the default heap, and the file is then refused as any other.
+test('a listed file of 95,000,000 bytes holding thirty million values is refused with a problem list, within the default heap', { timeout: 180000 }, async () => {
+  const result = await validateOne({}, (dir) => {
+    const head = '{"schemaVersion":2,"kind":"censusScan","x":[';
+    const tail = ']}\n';
+    const count = Math.floor((95_000_000 - head.length - tail.length + 1) / 3);
+    rehash('scan-results-hex.json', `${head}${'{},'.repeat(count - 1)}{}${tail}`)(dir);
+  });
+  assert.equal(result.code, 1, `exit ${result.code}, signal ${result.signal}:\n${result.stdout}${result.stderr.slice(-1500)}`);
+  assert.match(firstProblem(result.stderr), /scan-results-hex\.json carries "x", which the schema version 2 contract does not define/, result.stderr);
+  assert.doesNotMatch(result.stderr, /heap out of memory|could not be checked to the end/);
+});
+
 // A ledger of a thousand million empty rows: a valid header, then 10^9 newlines, about a megabyte of gzip written
 // as members of a million newlines each. It is refused at its sixth row, so the run ends in seconds; a run that
 // read every row would take minutes and is killed by the timeout here, which leaves it no exit code.
