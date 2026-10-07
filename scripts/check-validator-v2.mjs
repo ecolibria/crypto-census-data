@@ -1772,6 +1772,8 @@ plant('a blocked row for a reason that is not one', corpusOf((c) => { c.blocked 
 plant('a blocked row for a registry that is not one', corpusOf((c) => { c.blocked = [{ ecosystem: 'conda', reason: 'coverageInvalid', detail: 'x' }]; }),
   /blocked\[0\]\.ecosystem is "conda", not one of the eleven registries/);
 plant('a blocked row that does not say why', corpusOf((c) => { c.blocked = [{ ecosystem: 'hex', reason: 'coverageInvalid', detail: null }]; }), /blocked\[0\]\.detail is null, not text/);
+plant('a blocked row missing a field', corpusOf((c) => { c.blocked = [{ ecosystem: 'hex', reason: 'coverageInvalid' }]; }), /blocked\[0\] is missing detail\. Every field of a version 2 file is written out/);
+plant('a blocked row that is not an object', corpusOf((c) => { c.blocked = ['hex']; }), /blocked\[0\] is "hex", not an object/);
 plant('blocked rows that are not a list', corpusOf((c) => { c.blocked = null; }), /corpus-2026-09-30\.json: blocked is null, not a list/);
 plant('a registry\'s coverage that is not the raw file\'s', corpusOf((c) => { c.coverage.byEcosystem.hex.scanned += 1; }), /coverage\.byEcosystem\.hex is not the coverage, enumeration and sources of scan-results-hex\.json/);
 plant('a registry\'s enumeration that is not the raw file\'s', corpusOf((c) => { c.coverage.byEcosystem.go.enumeration = { requested: 1000, listed: 6, truncated: false, reason: null }; }), /coverage\.byEcosystem\.go is not the coverage, enumeration and sources of scan-results-go\.json/);
@@ -1936,6 +1938,26 @@ test('a later dataset marked comparable with an earlier one whose instrument dif
   assert.equal(result.code, 1, result.stdout);
   assert.match(firstProblem(result.stderr), /2026-09-15 is marked comparable, and these differ between the two datasets: the npm scanner's method\. Two datasets are comparable only when/, result.stderr);
 });
+test('a later dataset marked comparable with an earlier one matched against another match set is refused', async () => {
+  // One more alias in the earlier snapshot: its match set digest differs, and nothing else about its instrument does.
+  const result = await validate({
+    [EARLIER_V2]: [EARLIER_V2, { fixture: (f) => { f.go.entries.find((e) => e.name === 'golang.org/x/crypto').aliases.push(alias('example.com/x/crypto')); } }],
+    [DATE]: [DATE, {}, [{ dataset: FIRST_SHAPE, version: 1 }, { dataset: EARLIER_V2, version: 2 }]],
+  });
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(firstProblem(result.stderr), /2026-09-15 is marked comparable, and these differ between the two datasets: the match set\. Two datasets are comparable only when/, result.stderr);
+});
+test('a later dataset marked comparable with an earlier one read under other definition ids is refused', async () => {
+  // The earlier corpus names a unit definition these rules do not know, which refuses it on its own; the comparison
+  // reads the ids as written and refuses the later dataset too.
+  const result = await validate({
+    [EARLIER_V2]: [EARLIER_V2, corpusOf((c) => { c.definitions.raw.id = 'census.unit.package/2'; })],
+    [DATE]: [DATE, {}, [{ dataset: FIRST_SHAPE, version: 1 }, { dataset: EARLIER_V2, version: 2 }]],
+  });
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(firstProblem(result.stderr, EARLIER_V2), /definitions\.raw\.id is "census\.unit\.package\/2", not census\.unit\.package\/1/, result.stderr);
+  assert.match(firstProblem(result.stderr), /2026-09-15 is marked comparable, and these differ between the two datasets: the definition ids\. Two datasets are comparable only when/, result.stderr);
+});
 test('a later dataset that names what changed in the instrument passes', async () => {
   const result = await validate({
     [EARLIER_V2]: [EARLIER_V2, { scans: (s) => { s.npm.method.versionSelection = 'distTagLatest'; } }],
@@ -2069,6 +2091,15 @@ test('a withheld row with a multi-purpose library publishes none of its dependen
 
 plant('a withheld row whose figures are published', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.byEcosystem.rubygems = structuredClone(c.byEcosystem.hex); })),
   /byEcosystem\.rubygems is set; rubygems is withheld, so its row is null and none of its figures is published/);
+// A withheld row and each of its reasons is a closed object: one with a field missing, or that is no object, is refused there.
+plant('a withheld row missing a field', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { delete c.withheld[0].coverage; })),
+  /withheld\[0\] is missing coverage\. Every field of a version 2 file is written out/);
+plant('a withheld row that is not an object', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld = ['rubygems']; })),
+  /withheld\[0\] is "rubygems", not an object/);
+plant('a reason a row is withheld missing a field', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { delete c.withheld[0].reasons[0].detail; })),
+  /withheld\[0\]\.reasons\[0\] is missing detail\. Every field of a version 2 file is written out/);
+plant('a reason a row is withheld that is not an object', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].reasons = ['notUnderPopulationRule']; })),
+  /withheld\[0\]\.reasons\[0\] is "notUnderPopulationRule", not an object/);
 plant('a withheld row whose coverage is published', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.coverage.byEcosystem.rubygems = structuredClone(c.coverage.byEcosystem.hex); })),
   /coverage\.byEcosystem\.rubygems is \{.*; rubygems is withheld, so it is null/);
 plant('a total that still sums a withheld row', { withhold: [{ ecosystem: 'rubygems', reasons: NOT_UNDER_RULE }], ...readAsAHead('rubygems') },
