@@ -30,18 +30,31 @@ import { createHash, randomBytes } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 
 /**
- * The first line of stdout and of stderr is `::stop-commands::<token>`,
- * written before any byte of a dataset is read. From that line on the GitHub
- * runner acts on no workflow command, whatever text a dataset puts into a
- * key, a file name or a parser's message, and nothing resumes them: no line
- * this writes, on any path, is `::<token>::`, and the token is drawn afresh
- * for each run, so no dataset can write that line either. The step stays
- * stopped for the rest of the validator's output; the validator runs alone in
- * its step.
+ * The first three lines of stdout and of stderr remove the problem matchers
+ * setup-node registers for the job, by their owners (actions/setup-node at
+ * 49933ea, the commit the workflows pin, adds .github/tsc.json,
+ * eslint-stylish.json and eslint-compact.json at src/main.ts:72-78). A
+ * matcher reads every line the runner does not take as a command, commands
+ * stopped or not, so a line a dataset chose could otherwise be read as an
+ * error or a warning. The runner keeps one stop state for both streams and
+ * handles the stderr lines it has read before the stdout lines, so each
+ * stream removes all three before its own stop line: whichever stop line is
+ * handled first, the three were removed before it.
+ *
+ * The next line of each is `::stop-commands::<token>`, written before any
+ * byte of a dataset is read, and nothing else precedes it. From that line on
+ * the GitHub runner acts on no workflow command, whatever text a dataset puts
+ * into a key, a file name or a parser's message, and nothing resumes them: no
+ * line this writes, on any path, is `::<token>::` in any letter case, and the
+ * token is drawn afresh for each run, so no dataset can write that line
+ * either. The step stays stopped for the rest of the validator's output; the
+ * validator runs alone in its step.
  */
 const STOP_TOKEN = randomBytes(16).toString('hex');
-process.stdout.write(`::stop-commands::${STOP_TOKEN}\n`);
-process.stderr.write(`::stop-commands::${STOP_TOKEN}\n`);
+const SETUP_NODE_MATCHERS = ['tsc', 'eslint-stylish', 'eslint-compact'];
+const OPENING = `${SETUP_NODE_MATCHERS.map((owner) => `::remove-matcher owner=${owner}::\n`).join('')}::stop-commands::${STOP_TOKEN}\n`;
+process.stdout.write(OPENING);
+process.stderr.write(OPENING);
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DATASETS = join(ROOT, 'datasets');
