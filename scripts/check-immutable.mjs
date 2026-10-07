@@ -56,15 +56,15 @@ const fileAt = (commit, path) =>
 /**
  * A path or a key a change chose, as it is printed. The runner reads a line
  * that begins with `::`, leading space aside, or that holds `##[` anywhere, as
- * a command, and a line break in a name would start a line the name chose.
- * So a name with a character JSON escapes in it, or `##[`, or that does not
- * begin with a letter, a digit, `.`, `_`, `-` or `~`, is printed as JSON text
- * with each `#` escaped; any other is printed as itself.
+ * a command; the problem matchers actions/setup-node registers for the job
+ * read a line holding `: line 1, col 2, Error - x (y)`, or an indented line
+ * beginning `1:2 error x  y`, as an error; and a line break in a name would
+ * start a line the name chose. So a name is printed as itself only when every
+ * character of it is an ASCII letter, a digit, `.`, `_`, `~`, `/` or `-`; any
+ * other name, and the empty one, is printed as JSON text with each `#`
+ * escaped.
  */
-const shown = (name) => {
-  const text = JSON.stringify(name);
-  return text === `"${name}"` && /^[A-Za-z0-9._~-]/.test(name) && !name.includes('##[') ? name : text.replace(/#/g, '\\u0023');
-};
+const shown = (name) => (/^[A-Za-z0-9._~\/-]+$/.test(name) ? name : JSON.stringify(name).replace(/#/g, '\\u0023'));
 
 // The base has to be a commit this checkout can read. If it is not, nothing
 // below can tell a rewritten tree from an untouched one, and a check that
