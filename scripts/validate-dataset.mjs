@@ -1611,7 +1611,8 @@ function checkCatalogCheck(eco, rows, catalog, file, bad) {
       bad(`${where} checks ${describe(row.entry)}, which is not a ${eco} entry of the catalogue snapshot`);
       return;
     }
-    if (row.alias !== null && !entry.aliases.some((alias) => alias.name === row.alias)) {
+    // The snapshot's alias map answers in one step, however many aliases an entry has.
+    if (row.alias !== null && registry.aliasOf.get(row.alias) !== entry.name) {
       bad(`${where} checks the alias ${describe(row.alias)}, which ${entry.name} does not have in the catalogue snapshot`);
       return;
     }
@@ -1727,7 +1728,7 @@ function checkPackages(eco, packages, method, catalog, file, bad) {
         wrong(`${there}.entry is ${describe(m.entry)}, which is not a ${eco} entry of the catalogue snapshot`);
       } else if (entry && m.matchedBy === 'exact' && m.declaredName !== m.entry) {
         wrong(`${there} is matched exactly, but the declared name ${describe(m.declaredName)} is not the entry's name ${describe(m.entry)}`);
-      } else if (entry && m.matchedBy === 'alias' && !entry.aliases.some((alias) => alias.name === m.declaredName)) {
+      } else if (entry && m.matchedBy === 'alias' && registry.aliasOf.get(m.declaredName) !== entry.name) {
         wrong(`${there} is matched by alias, but ${describe(m.declaredName)} is not an alias of ${m.entry} in the catalogue snapshot`);
       }
       if (!checkDeclarations(eco, m.declarations, there, bad)) sound = false;

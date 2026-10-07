@@ -2381,6 +2381,24 @@ test('a ledger of a thousand million empty rows is refused at its sixth row, wit
   assert.match(result.stderr, /listing-hex\.tsv\.gz: row 7 is the sixth malformed row, so the ledger is refused and the rows after it are not read/, result.stderr);
 });
 
+// One entry with a hundred thousand aliases, every alias checked by the scan's own registry check and every alias
+// matched in one manifest. Each alias is looked up in the snapshot's alias map, so the run grows with the aliases,
+// not with their square: it passes in seconds, and a run that compared each alias with every other is killed by the
+// timeout here.
+test('a hundred thousand aliases of one entry, each checked and each matched, pass within half a minute', { timeout: 120000 }, async () => {
+  const result = await validateOne({ fixture: (f) => {
+    const e = f.go.entries.find((x) => x.name === 'golang.org/x/crypto');
+    const row = f.go.rows.find((x) => x.name === 'example.com/lib');
+    for (let i = 0; i < 100_000; i += 1) {
+      const name = `example.com/alias-${String(i).padStart(6, '0')}`;
+      e.aliases.push(alias(name));
+      // One entry matched through every alias in one manifest: records of one entry, which count once.
+      row.matches.push(matchAs(name, e.name, 'alias', go(false)));
+    }
+  } }, undefined, { timeout: 30_000 });
+  assert.equal(result.code, 0, `exit ${result.code}, signal ${result.signal}:\n${result.stderr.slice(-1500)}`);
+});
+
 // A key, a file name and a manifest field with a line break and `::notice` in them. Each is printed through
 // describe(), as JSON text, so the break is written as \n and no line of the output begins with `::`, which the
 // host's runner would read as a command.
