@@ -1107,8 +1107,9 @@ function readListedFiles(name, dir, manifest, manifestBytes, bad) {
     if (entry.role === 'listing') ledgerBytes += stat.size;
     else jsonBytes += stat.size;
   }
+  // The problem is listed through fail(), so that the cap on the problems listed for MANIFEST.json cannot hide it.
   if (jsonBytes > MAX_DATASET_JSON_BYTES) {
-    bad(`MANIFEST.json and its listed files, ledgers aside, total ${jsonBytes.toLocaleString('en-US')} bytes, over the ` +
+    fail(name, `MANIFEST.json and its listed files, ledgers aside, total ${jsonBytes.toLocaleString('en-US')} bytes, over the ` +
       `${MAX_DATASET_JSON_BYTES.toLocaleString('en-US')} a dataset may hold; past that, small objects exhaust memory before any ` +
       'problem is listed. Nothing listed was parsed.');
     return null;

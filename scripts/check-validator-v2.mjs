@@ -1497,6 +1497,24 @@ test('a manifest and listed files over 150,000,000 bytes together are refused be
   ], result.stderr);
 });
 
+// The bound's problem is listed through fail(), outside the cap of fifty problems listed for one file: fifty manifest
+// entries with a role these rules do not know fill the share of MANIFEST.json, and the bound's line is still listed.
+test('past the bound, its problem is listed after fifty problems of MANIFEST.json', async () => {
+  const result = await validateOne({}, (dir) => {
+    toDatasetTotal(150_000_001)(dir);
+    const path = join(datasetDir(dir), 'MANIFEST.json');
+    const m = JSON.parse(readText(path));
+    for (let i = 0; i < 50; i += 1) m.files.push({ role: 'readme', ecosystem: null, file: `README-${i}`, bytes: 0, sha256: sha256(''), schemaVersion: 2 });
+    writeFileSync(path, json(m));
+  });
+  assert.equal(result.code, 1, result.stdout);
+  const listed = result.stderr.split('\n').filter((line) => line.startsWith(`  ${DATE}: `));
+  assert.equal(listed.filter((line) => /MANIFEST\.json: files\[\d+\]\.role is "readme", not one of/.test(line)).length, 50, result.stderr);
+  assert.ok(listed.some((line) => /: MANIFEST\.json and its listed files, ledgers aside, total [\d,]+ bytes, over the 150,000,000 a dataset may hold; past that, small objects exhaust memory before any problem is listed\. Nothing listed was parsed\.$/.test(line)),
+    result.stderr);
+  assert.doesNotMatch(result.stderr, /more problem\(s\) in this file are not listed/, result.stderr);
+});
+
 test('a manifest and listed files of exactly 150,000,000 bytes together are read', async () => {
   const result = await validateOne({}, toDatasetTotal(150_000_000));
   assert.equal(result.code, 1, result.stdout);
