@@ -26,8 +26,32 @@
 import { readFileSync, readdirSync, existsSync, statSync, lstatSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
+
+/**
+ * Everything this prints sits inside an envelope the GitHub runner honours.
+ * The first line of stdout and of stderr is `::stop-commands::<token>`,
+ * written before any byte of a dataset is read: from there the runner reads
+ * no line as a workflow command, whatever text a dataset puts into a key, a
+ * file name or a parser's message, until a line is `::<token>::`, the last
+ * line of both streams. The token is drawn afresh for each run, so no dataset
+ * can write the line that ends it. A run ends through closeEnvelope() on
+ * every path it can take: the end of this file, a thrown error, and a
+ * process.exit() anywhere. A run that is killed, or that the engine aborts,
+ * ends with the envelope open, and the runner then reads no command from it.
+ */
+const STOP_TOKEN = randomBytes(16).toString('hex');
+process.stdout.write(`::stop-commands::${STOP_TOKEN}\n`);
+process.stderr.write(`::stop-commands::${STOP_TOKEN}\n`);
+let envelopeOpen = true;
+function closeEnvelope() {
+  if (!envelopeOpen) return;
+  envelopeOpen = false;
+  process.stderr.write(`::${STOP_TOKEN}::\n`);
+  process.stdout.write(`::${STOP_TOKEN}::\n`);
+}
+process.on('exit', closeEnvelope);
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DATASETS = join(ROOT, 'datasets');
@@ -3713,97 +3737,119 @@ function listRegeneratedScans(name, manifest, found) {
 
 // ---------------------------------------------------------------------------
 
-if (!existsSync(DATASETS)) {
-  process.stderr.write('No datasets/ directory.\n');
-  process.exit(2);
-}
-
-const requested = process.argv[2];
-// Everything directly under datasets/ is a dataset directory. A file there is
-// read by none of these checks, so it would be published unchecked. Names that
-// begin with a dot are left to the check that reads the committed tree: an
-// operating system can leave one in a working copy.
-for (const entry of readdirSync(DATASETS)) {
-  if (!entry.startsWith('.') && !lstatSync(join(DATASETS, entry)).isDirectory()) {
-    fail('datasets', `${entry} is not a dataset directory. A file directly under datasets/ is read by none of these checks.`);
-  }
-}
-const all = readdirSync(DATASETS).filter((f) => statSync(join(DATASETS, f), { throwIfNoEntry: false })?.isDirectory());
-const names = requested ? [requested] : all;
-
-if (requested && !all.includes(requested)) {
-  process.stderr.write(`No dataset datasets/${requested}\n`);
-  process.exit(2);
-}
-
-// With no dataset named, every entry of errata/ is read, whatever it is
-// called: a file passed over for its name is a file nothing has checked. With
-// one dataset named, only that dataset's errata file is read.
-let allErrata = [];
-// errata/ is asked about itself and not about what it may point at: a link to
-// a directory reads like one, while the files live where the append-only
-// check does not look.
-const errataEntry = lstatSync(ERRATA, { throwIfNoEntry: false });
-if (errataEntry) {
-  if (errataEntry.isDirectory()) allErrata = readdirSync(ERRATA).sort();
-  else fail('errata', 'is not a directory. A link would keep the errata files somewhere the checks do not look.');
-}
-const errataFiles = requested ? allErrata.filter((f) => f === `${requested}.json`) : allErrata;
-
-// An empty repository is a valid state (nothing published yet), but a run that
-// validated nothing must say so rather than print a checkmark.
-if (names.length === 0 && errataFiles.length === 0 && problems.length === 0) {
-  process.stdout.write('No datasets published yet. Nothing to validate.\n');
-  process.exit(0);
-}
-
-for (const name of names) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(name)) {
-    fail(describe(name), 'directory name is not a YYYY-MM-DD collection date');
-    continue;
-  }
-  // A check that throws reports where it stopped, and the problems found before it are still listed.
-  try {
-    validate(name);
-  } catch (err) {
-    fail(name, `could not be checked to the end: ${err.message}`);
-  }
-}
-
-for (const file of errataFiles) {
-  try {
-    validateErrata(file);
-  } catch (err) {
-    fail(`errata/${file}`, `could not be checked to the end: ${err.message}`);
-  }
-}
-
-const checked = `${names.length} dataset(s)` +
-  (errataFiles.length > 0 ? ` and ${errataFiles.length} errata file(s)` : '');
-
 /**
- * One problem or note, every line of it indented. Keys, names and fields are
- * printed through describe() above, so a line break in one is written as
- * `\n`; this holds for whatever else a file's text reaches, a parser's own
- * message included. No line of the log begins with text a dataset chose, so
- * none can read as a command to whatever runs these checks.
+ * One problem or note, every line of it indented, so that a problem of
+ * several lines, a parser's message among them, reads as one item of the list.
  */
 const indented = (text) => `  ${text.replace(/\r\n|\r|\n/g, '\n  ')}\n`;
 
-if (notes.length > 0) {
-  process.stdout.write(`\nRecorded, not refused (${notes.length}):\n\n`);
-  for (const n of notes) process.stdout.write(indented(n));
-  process.stdout.write('\n');
+/** What a thrown value says about itself, or that it says nothing printable. */
+function errorText(err) {
+  try {
+    return String(err instanceof Error ? err.stack ?? err.message : err);
+  } catch {
+    return 'a value that cannot be printed';
+  }
 }
 
-if (problems.length > 0) {
-  process.stderr.write(`\n${problems.length} problem(s) across ${checked}:\n\n`);
-  for (const p of problems) process.stderr.write(indented(p));
-  process.stderr.write('\n');
-  process.exit(1);
+/** Every check above, over what was asked for. Returns the exit code: 0 passed, 1 refused, 2 nothing to read. */
+function main() {
+  if (!existsSync(DATASETS)) {
+    process.stderr.write('No datasets/ directory.\n');
+    return 2;
+  }
+
+  const requested = process.argv[2];
+  // Everything directly under datasets/ is a dataset directory. A file there is
+  // read by none of these checks, so it would be published unchecked. Names that
+  // begin with a dot are left to the check that reads the committed tree: an
+  // operating system can leave one in a working copy.
+  for (const entry of readdirSync(DATASETS)) {
+    if (!entry.startsWith('.') && !lstatSync(join(DATASETS, entry)).isDirectory()) {
+      fail('datasets', `${entry} is not a dataset directory. A file directly under datasets/ is read by none of these checks.`);
+    }
+  }
+  const all = readdirSync(DATASETS).filter((f) => statSync(join(DATASETS, f), { throwIfNoEntry: false })?.isDirectory());
+  const names = requested ? [requested] : all;
+
+  if (requested && !all.includes(requested)) {
+    process.stderr.write(`No dataset datasets/${requested}\n`);
+    return 2;
+  }
+
+  // With no dataset named, every entry of errata/ is read, whatever it is
+  // called: a file passed over for its name is a file nothing has checked. With
+  // one dataset named, only that dataset's errata file is read.
+  let allErrata = [];
+  // errata/ is asked about itself and not about what it may point at: a link to
+  // a directory reads like one, while the files live where the append-only
+  // check does not look.
+  const errataEntry = lstatSync(ERRATA, { throwIfNoEntry: false });
+  if (errataEntry) {
+    if (errataEntry.isDirectory()) allErrata = readdirSync(ERRATA).sort();
+    else fail('errata', 'is not a directory. A link would keep the errata files somewhere the checks do not look.');
+  }
+  const errataFiles = requested ? allErrata.filter((f) => f === `${requested}.json`) : allErrata;
+
+  // An empty repository is a valid state (nothing published yet), but a run that
+  // validated nothing must say so rather than print a checkmark.
+  if (names.length === 0 && errataFiles.length === 0 && problems.length === 0) {
+    process.stdout.write('No datasets published yet. Nothing to validate.\n');
+    return 0;
+  }
+
+  for (const name of names) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(name)) {
+      fail(describe(name), 'directory name is not a YYYY-MM-DD collection date');
+      continue;
+    }
+    // A check that throws reports where it stopped, and the problems found before it are still listed.
+    try {
+      validate(name);
+    } catch (err) {
+      fail(name, `could not be checked to the end: ${err.message}`);
+    }
+  }
+
+  for (const file of errataFiles) {
+    try {
+      validateErrata(file);
+    } catch (err) {
+      fail(`errata/${file}`, `could not be checked to the end: ${err.message}`);
+    }
+  }
+
+  const checked = `${names.length} dataset(s)` +
+    (errataFiles.length > 0 ? ` and ${errataFiles.length} errata file(s)` : '');
+
+  if (notes.length > 0) {
+    process.stdout.write(`\nRecorded, not refused (${notes.length}):\n\n`);
+    for (const n of notes) process.stdout.write(indented(n));
+    process.stdout.write('\n');
+  }
+
+  if (problems.length > 0) {
+    process.stderr.write(`\n${problems.length} problem(s) across ${checked}:\n\n`);
+    for (const p of problems) process.stderr.write(indented(p));
+    process.stderr.write('\n');
+    return 1;
+  }
+
+  process.stdout.write(`${names.length} dataset(s) validated: ${names.join(', ')}\n`);
+  if (errataFiles.length > 0) {
+    process.stdout.write(`${errataFiles.length} errata file(s) validated: ${errataFiles.join(', ')}\n`);
+  }
+  return 0;
 }
 
-process.stdout.write(`${names.length} dataset(s) validated: ${names.join(', ')}\n`);
-if (errataFiles.length > 0) {
-  process.stdout.write(`${errataFiles.length} errata file(s) validated: ${errataFiles.join(', ')}\n`);
+// The run ends here on every path but a kill: the exit code is set rather than
+// exited with, so what is written is written out before the process ends, and
+// the envelope's last line comes after it.
+try {
+  process.exitCode = main();
+} catch (err) {
+  process.stderr.write(`\nThe checks stopped on an error they do not handle:\n\n${indented(errorText(err))}\n`);
+  process.exitCode = 1;
+} finally {
+  closeEnvelope();
 }

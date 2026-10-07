@@ -853,9 +853,10 @@ const RULED_POPULATION_SHA256 = 'afab7c7dffb7018d7dbc96adb76601f451f496d660000bc
  * published dataset, and the version 2 datasets given, and run the copy.
  * `datasets` maps a directory name to [date, change, earlier]; `prepare` runs
  * on the directory before the validator does; `options` go to the run, for
- * a `timeout` in milliseconds after which the validator is killed.
+ * a `timeout` in milliseconds after which the validator is killed, except
+ * `args`, the arguments the validator is run with.
  */
-async function validate(datasets, prepare, options = {}) {
+async function validate(datasets, prepare, { args = [], ...options } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'census-v2-'));
   try {
     mkdirSync(join(dir, 'scripts'));
@@ -867,7 +868,7 @@ async function validate(datasets, prepare, options = {}) {
       for (const [name, bytes] of Object.entries(buildDataset(date, change, earlier))) writeFileSync(join(target, name), bytes);
     }
     if (prepare) await prepare(dir);
-    return await run([join(dir, 'scripts', 'validate-dataset.mjs')], { env: {}, ...options });
+    return await run([join(dir, 'scripts', 'validate-dataset.mjs'), ...args], { env: {}, ...options });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -2430,9 +2431,107 @@ test('a hundred thousand aliases of one entry, each checked and each matched, pa
   assert.equal(result.code, 0, `exit ${result.code}, signal ${result.signal}:\n${result.stderr.slice(-1500)}`);
 });
 
+// --- The envelope ---------------------------------------------------------------
+//
+// The GitHub runner (actions/runner v2.338.0) reads a line of a step's stdout or stderr as a workflow command when the
+// line, its leading whitespace trimmed, begins `::` and a registered command name and has a `::` after it
+// (src/Runner.Common/ActionCommand.cs:62-90), or when it holds `##[` anywhere, a registered name and `]` after it
+// (:132-157); it tries both forms on every line of both streams (src/Runner.Worker/ActionCommandManager.cs:70-71). From
+// `::stop-commands::<token>` on, it acts on no command until a line is `::<token>::` (:86-103). The validator writes
+// that line first on both streams and the token's line last, so whatever a dataset puts into its output is read inside
+// the envelope. Indenting a line stops nothing, and these cells show the runner's grammar still occurs inside.
+
+/** The names the runner registers by default: stop-commands and its command extensions but internal-set-repo-path (ActionCommandManager.cs:34-45). */
+const RUNNER_COMMANDS = ['stop-commands', 'set-env', 'set-output', 'save-state', 'add-mask', 'add-path', 'add-matcher', 'remove-matcher',
+  'debug', 'warning', 'error', 'notice', 'group', 'endgroup', 'echo'];
+
+/** Whether the runner, acting on commands, would read a line as one: names compared without case, `##[` taken anywhere. */
+const readsAsCommand = (line) => {
+  if (line.includes('##[')) return true;
+  const text = line.trimStart();
+  if (!text.startsWith('::')) return false;
+  const end = text.indexOf('::', 2);
+  if (end < 0) return false;
+  const info = text.slice(2, end);
+  const space = info.indexOf(' ');
+  return RUNNER_COMMANDS.includes((space < 0 ? info : info.slice(0, space)).toLowerCase());
+};
+
+/** One stream's envelope: its token, and the lines between its first line and its last. */
+function envelopeOf(stream, what) {
+  const lines = stream.split('\n');
+  assert.equal(lines.pop(), '', `${what} ends with a line break:\n${stream}`);
+  const open = /^::stop-commands::([0-9a-f]{32})$/.exec(lines[0] ?? '');
+  assert.ok(open, `the first line of ${what} is ::stop-commands:: and one token:\n${stream}`);
+  const [, token] = open;
+  assert.ok(lines.length >= 2 && lines.at(-1) === `::${token}::`, `the last line of ${what} is ::${token}:::\n${stream}`);
+  const inside = lines.slice(1, -1);
+  // Only the token ends it, in either of the runner's forms, and it appears nowhere between.
+  assert.ok(!inside.some((line) => line.includes(token)), `${what} holds its token at its ends alone:\n${stream}`);
+  return { token, inside };
+}
+
+/** Both streams of a run, each in the envelope, the same token on both. Returns the token and every line inside. */
+function enveloped(result) {
+  const out = envelopeOf(result.stdout, 'stdout');
+  const err = envelopeOf(result.stderr, 'stderr');
+  assert.equal(err.token, out.token, 'one token on both streams');
+  return { token: out.token, inside: [...out.inside, ...err.inside] };
+}
+
+// Every way a run ends: passed, refused, nothing to read, a dataset asked for that is not there, nothing published,
+// and an error no check handles (datasets/ a file, so reading it as a directory throws).
+const removeDatasets = (dir) => rmSync(join(dir, 'datasets'), { recursive: true, force: true });
+for (const [what, change, prepare, args, code, said] of [
+  ['a run that passes', {}, undefined, [], 0, /2 dataset\(s\) validated/],
+  ['a run that refuses', scanOf('hex', (s) => { s.extra = 1; }), undefined, [], 1, /scan-results-hex\.json carries "extra"/],
+  ['a run with no datasets/ directory', {}, removeDatasets, [], 2, /No datasets\/ directory/],
+  ['a run asked for a dataset that is not there', {}, undefined, ['2099-01-01'], 2, /No dataset datasets\/2099-01-01/],
+  ['a run with nothing published', {}, (dir) => { removeDatasets(dir); mkdirSync(join(dir, 'datasets')); }, [], 0, /No datasets published yet/],
+  ['a run stopped by an error no check handles', {}, (dir) => { removeDatasets(dir); writeFileSync(join(dir, 'datasets'), 'x\n'); }, [], 1,
+    /The checks stopped on an error they do not handle:\n\n {2}Error: ENOTDIR/],
+]) {
+  test(`${what} prints inside the envelope, on stdout and on stderr`, async () => {
+    const result = await validateOne(change, prepare, { args });
+    assert.equal(result.code, code, `${result.stdout}${result.stderr}`);
+    assert.match(`${result.stdout}${result.stderr}`, said);
+    enveloped(result);
+  });
+}
+
+test('the token of the envelope is drawn afresh for each run', async () => {
+  const [first, second] = await Promise.all([validateOne(), validateOne()]);
+  assert.notEqual(enveloped(first).token, enveloped(second).token);
+});
+
+// Three shapes of text a dataset chooses that reach the output as the runner's grammar: a key of an errata file,
+// printed as it is; a scan file the parser quotes, line break included; and a listed name that is not a file. Each
+// fires the predicate on a line between the envelope's first and last, where the runner reads it as text.
+for (const [what, change, prepare, fires] of [
+  ['an errata key holding a line break and ::warning::', {}, (dir) => {
+    mkdirSync(join(dir, 'errata'));
+    writeFileSync(join(dir, 'errata', `${FIRST_SHAPE}.json`), `${JSON.stringify({ 'x\n::warning::y': 1 }, null, 2)}\n`);
+  }, /^\s*::warning::y/],
+  ['a scan file whose text holds a line break and ::error::', {}, (dir) => rehash('scan-results-hex.json', '{"x":\n::error::y::}')(dir),
+    /^\s*::error::y::/],
+  ['a listed name that is not a file, holding ##[error]', {}, (dir) => {
+    const path = join(dir, 'datasets', FIRST_SHAPE, 'MANIFEST.json');
+    const m = JSON.parse(readText(path));
+    m.ecosystems = [{ ecosystem: 'npm', file: '##[error]y.json', sha256: '0'.repeat(64) }];
+    writeFileSync(path, json(m));
+    mkdirSync(join(dir, 'datasets', FIRST_SHAPE, '##[error]y.json'));
+  }, /##\[error\]y\.json/],
+]) {
+  test(`${what} is read by the runner's grammar inside the envelope, and nowhere outside it`, async () => {
+    const result = await validateOne(change, prepare);
+    assert.equal(result.code, 1, result.stdout);
+    const { inside } = enveloped(result);
+    assert.ok(inside.some((line) => fires.test(line) && readsAsCommand(line)), `${result.stdout}${result.stderr}`);
+  });
+}
+
 // A key, a file name and a manifest field with a line break and `::notice` in them. Each is printed through
-// describe(), as JSON text, so the break is written as \n and no line of the output begins with `::`, which the
-// host's runner would read as a command.
+// describe(), as JSON text, so the break is written as \n and the problem stays one line of the list.
 const COMMAND = '\n::notice title=x::y';
 for (const [what, change, prepare, shown] of [
   ['a key of a scan file', scanOf('hex', (s) => { s[`extra${COMMAND}`] = 1; }), undefined, /scan-results-hex\.json carries "extra\\n::notice title=x::y", which the schema version 2 contract does not define/],
@@ -2440,19 +2539,18 @@ for (const [what, change, prepare, shown] of [
   ['the name of a stray file', {}, (dir) => writeFileSync(join(datasetDir(dir), `notes${COMMAND}.txt`), 'notes\n'), /present but not listed in MANIFEST\.json: "notes\\n::notice title=x::y\.txt"\. An unlisted file/],
   ['a stored share', scanOf('hex', (s) => { s.coverage[`rate${COMMAND}`] = 0.5; }), undefined, /coverage carries "rate\\n::notice title=x::y", a stored share/],
 ]) {
-  test(`${what} holding a line break and a runner command is printed as text, on one line`, async () => {
+  test(`${what} holding a line break and a runner command is printed as JSON text, on one line, inside the envelope`, async () => {
     const result = await validateOne(change, prepare);
     assert.equal(result.code, 1, result.stdout);
     assert.match(firstProblem(result.stderr), shown, result.stderr);
-    assert.doesNotMatch(result.stderr, /^::/m, result.stderr);
-    assert.doesNotMatch(result.stdout, /^::/m, result.stdout);
+    enveloped(result);
   });
 }
 
 // The first file shape prints a listed file's name and recorded hash the same way, and a file name with a control
 // character in it is not the name of a file in the dataset at all. The published manifest copied beside every test
 // dataset lists its corpus alone, so the name goes on an entry added to it and the hash on the corpus.
-test('a first-shape manifest whose file name and hash hold a line break and a runner command prints them as text, on one line', async () => {
+test('a first-shape manifest whose file name and hash hold a line break and a runner command prints them as JSON text, inside the envelope', async () => {
   const result = await validate({}, (dir) => {
     const path = join(dir, 'datasets', FIRST_SHAPE, 'MANIFEST.json');
     const m = JSON.parse(readText(path));
@@ -2463,17 +2561,7 @@ test('a first-shape manifest whose file name and hash hold a line break and a ru
   assert.equal(result.code, 1, result.stdout);
   assert.match(result.stderr, /"corpus-2026-03-18\.json" does not match its recorded hash\n\s+recorded "[0-9a-f]{64}\\n::notice title=x::y"\n\s+actual\s+[0-9a-f]{64}/, result.stderr);
   assert.match(result.stderr, /a manifest entry names "scan-results-npm-clean\\n::notice title=x::y\.json", which is not the name of a file in the dataset's own directory/, result.stderr);
-  assert.doesNotMatch(result.stderr, /^::/m, result.stderr);
-});
-
-// Whatever reaches the output unquoted, a parser's own message included, is indented line by line.
-test('a parse error that quotes a line break and a runner command from the file is printed indented, so no line begins with it', async () => {
-  const result = await validateOne({}, (dir) => rehash('scan-results-hex.json', `{"schemaVersion": 2, "a":${COMMAND}}`)(dir));
-  assert.equal(result.code, 1, result.stdout);
-  assert.match(firstProblem(result.stderr), /scan-results-hex\.json does not parse/, result.stderr);
-  // The parser quotes the text around the error, line break included, cut short on either side.
-  assert.match(result.stderr, /\n {2,}::notice t/, result.stderr);
-  assert.doesNotMatch(result.stderr, /^::/m, result.stderr);
+  enveloped(result);
 });
 
 test('a manifest that is a link to a device is refused without reading it', { timeout: 30000 }, async () => {
