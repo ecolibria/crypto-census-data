@@ -33,19 +33,26 @@ jobs:
       - name: Validate every dataset
         run: node scripts/validate-dataset.mjs
 
+      # Each test step opens with the four lines the validator's output opens
+      # with, written on both streams by scripts/stop-commands.mjs before
+      # node --test in the same run: the job's three problem matchers removed,
+      # then the stop line with a fresh token. From there on the runner reads
+      # a test's name, and what a failing test prints, as text, whatever they
+      # hold. The step's result is node --test's own.
+
       # The validator's own rules, run against copies in a temporary directory.
       - name: Check the validator
-        run: node --test scripts/check-validator.mjs
+        run: node scripts/stop-commands.mjs && node --test scripts/check-validator.mjs
 
       # The rules an errata file lives under, in the validator and in the
       # immutability check, run against copies and scratch repositories.
       - name: Check the errata rules
-        run: node --test scripts/check-errata.mjs
+        run: node scripts/stop-commands.mjs && node --test scripts/check-errata.mjs
 
       # The version 2 rules, run against a small version 2 dataset built in a
       # temporary directory, with one defect planted per test.
       - name: Check the version 2 rules
-        run: node --test scripts/check-validator-v2.mjs
+        run: node scripts/stop-commands.mjs && node --test scripts/check-validator-v2.mjs
 
   immutable:
     name: No published dataset is rewritten
