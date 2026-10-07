@@ -2610,8 +2610,8 @@ test('a read source named __proto__ is counted from the ledger like any other', 
 // command manager serves both streams (src/Runner.Worker/Handlers/ScriptHandler.cs:332-336), and the lines read from
 // both are handled stderr first (src/Runner.Sdk/ProcessInvoker.cs:404-437). So the validator writes the three
 // `::remove-matcher owner=<owner>::` lines and then the stop line first on each stream, and the token on no later
-// line: whatever a dataset puts into its output is read after the matchers are gone and commands are stopped, and
-// nothing resumes them. Indenting a line stops nothing, and these cells show the runner's grammar still occurs after it.
+// line in any letter case: whatever a dataset puts into its output is read after the matchers are gone and commands
+// are stopped, and nothing resumes them. Indenting a line stops nothing, and these cells show the runner's grammar still occurs after it.
 
 /** The names the runner registers by default: stop-commands and its command extensions but internal-set-repo-path (ActionCommandManager.cs:34-45). */
 const RUNNER_COMMANDS = ['stop-commands', 'set-env', 'set-output', 'save-state', 'add-mask', 'add-path', 'add-matcher', 'remove-matcher',
@@ -2641,8 +2641,8 @@ function stopLineOf(stream, what) {
   assert.ok(stop, `the line after them in ${what} is ::stop-commands:: and one token:\n${stream}`);
   const [, token] = stop;
   const after = lines.slice(REMOVE_MATCHERS.length + 1);
-  // Only the token resumes commands, in either of the runner's forms, and no later line holds it.
-  assert.ok(!after.some((line) => line.includes(token)), `${what} holds its token on its stop line alone:\n${stream}`);
+  // Only the token resumes commands, in either of the runner's forms and in any letter case, and no later line holds it.
+  assert.ok(!after.some((line) => line.toLowerCase().includes(token)), `${what} holds its token, in any letter case, on its stop line alone:\n${stream}`);
   return { token, after };
 }
 
@@ -2677,7 +2677,7 @@ for (const [what, change, prepare, args, code, said] of [
   ['a run ended by a process.exit() after its problems', scanOf('hex', (s) => { s.extra = 1; }),
     exitAfter('for (const p of problems) process.stderr.write(indented(p));'), [], 3, /scan-results-hex\.json carries "extra"/],
 ]) {
-  test(`${what} removes setup-node's three matchers and then writes the stop line, first on stdout and on stderr, and its token on no later line`, async () => {
+  test(`${what} removes setup-node's three matchers and then writes the stop line, first on stdout and on stderr, and its token in no letter case on a later line`, async () => {
     const result = await validateOne(change, prepare, { args });
     assert.equal(result.code, code, `${result.stdout}${result.stderr}`);
     assert.match(`${result.stdout}${result.stderr}`, said);
