@@ -2271,6 +2271,51 @@ plant('a dataset dated before the last scan it holds finished', withoutScanFile(
 plant('a scan file left in the directory and out of the manifest', withoutScanFile('rubygems'),
   /present but not listed in MANIFEST\.json: "scan-results-rubygems\.json"/, (dir) => { writeFileSync(join(datasetDir(dir), 'scan-results-rubygems.json'), '{}\n'); });
 
+// Two datasets compared where one or both hold no scan file of a registry. No instrument was applied to that registry
+// on that side, so its scanner's method is compared with nothing and it names no change: the difference is one of
+// population, which each corpus records in withheld and measurableIn. A registry both read is compared as ever.
+const comparedWith = (earlier, later, changes = null) => ({
+  [EARLIER_V2]: [EARLIER_V2, earlier],
+  [DATE]: [DATE, later, [{ dataset: FIRST_SHAPE, version: 1 },
+    changes === null ? { dataset: EARLIER_V2, version: 2 } : { dataset: EARLIER_V2, version: 2, comparable: false, changes }]],
+});
+const npmVersionSelection = { scans: (s) => { s.npm.method.versionSelection = 'distTagLatest'; } };
+
+for (const [what, earlier, later] of [
+  ['the earlier one alone has no scan file of rubygems', withoutScanFile('rubygems'), {}],
+  ['the later one alone has no scan file of rubygems', {}, withoutScanFile('rubygems')],
+  ['neither has a scan file of rubygems', withoutScanFile('rubygems'), withoutScanFile('rubygems')],
+]) {
+  test(`a later dataset marked comparable with an earlier one passes when ${what}`, async () => {
+    const result = await validate(comparedWith(earlier, later));
+    assert.equal(result.code, 0, result.stderr);
+    assert.match(result.stdout, /3 dataset\(s\) validated: 2026-03-18, 2026-09-15, 2026-09-30/);
+  });
+  test(`changes that name a registry with no scan file as changed are refused when ${what}`, async () => {
+    const result = await validate(comparedWith(earlier, later, ['versionSelection', 'declarationKinds']));
+    assert.equal(result.code, 1, result.stdout);
+    assert.match(firstProblem(result.stderr),
+      /comparability\[1\]\.changes is \["versionSelection","declarationKinds"\]; recomputed from the fields each code names, the two datasets differ in \[\]/, result.stderr);
+  });
+}
+
+for (const [what, earlier, later] of [
+  ['the earlier one has no scan file of rubygems', { ...withoutScanFile('rubygems'), ...npmVersionSelection }, {}],
+  ['the later one has no scan file of rubygems', npmVersionSelection, withoutScanFile('rubygems')],
+]) {
+  test(`a registry both read whose version selection differs names versionSelection alone when ${what}`, async () => {
+    const result = await validate(comparedWith(earlier, later, ['versionSelection']));
+    assert.equal(result.code, 0, result.stderr);
+  });
+  test(`a later dataset marked comparable is refused for the method of the one registry both read that differs when ${what}`, async () => {
+    const result = await validate(comparedWith(earlier, later));
+    assert.equal(result.code, 1, result.stdout);
+    assert.match(firstProblem(result.stderr), new RegExp('2026-09-15 is marked comparable, and these differ between the two datasets: ' +
+      'the npm scanner\'s method\\. Two datasets are comparable only when the match set, the definition ids and the method of ' +
+      'every scanner both read are the same\\.$'), result.stderr);
+  });
+}
+
 // --- Errata for a version 2 dataset ----------------------------------------------
 
 const ERRATA = `errata/${DATE}.json`;

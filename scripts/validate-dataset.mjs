@@ -3035,10 +3035,18 @@ function checkDefinitions(d, file, bad) {
   return usable ? d.anyManifestMatch.includes : null;
 }
 
+/**
+ * The registries two version 2 datasets both read: a scan file of each in both manifests. A registry read on one
+ * side only, or on neither, had no instrument applied to it there, so its scanner's method is compared with nothing
+ * and it names no change; the difference is one of population, which each corpus records in withheld and
+ * measurableIn.
+ */
+const readByBoth = (a, b) => ECOSYSTEMS.filter((eco) => a.withScanFile.has(eco) && b.withScanFile.has(eco));
+
 /** The change codes these rules recompute, each from the fields it names, for two version 2 datasets. */
 const CHANGES_CHECKED = {
-  versionSelection: (a, b) => ECOSYSTEMS.some((eco) => !sameValue(a.methods[eco]?.versionSelection, b.methods[eco]?.versionSelection)),
-  declarationKinds: (a, b) => ECOSYSTEMS.some((eco) => !sameSet(a.methods[eco]?.declarationKinds ?? [], b.methods[eco]?.declarationKinds ?? [])),
+  versionSelection: (a, b) => readByBoth(a, b).some((eco) => !sameValue(a.methods[eco]?.versionSelection, b.methods[eco]?.versionSelection)),
+  declarationKinds: (a, b) => readByBoth(a, b).some((eco) => !sameSet(a.methods[eco]?.declarationKinds ?? [], b.methods[eco]?.declarationKinds ?? [])),
   matchRule: (a, b) => !sameValue(a.matchRules, b.matchRules),
   matchSet: (a, b) => a.matchSetSha256 !== b.matchSetSha256,
   coverageDefinition: (a, b) => a.definitionIds.coverage !== b.definitionIds.coverage,
@@ -3083,7 +3091,10 @@ const definitionIds = (d) => ({
   raw: d.raw.id, consolidated: d.consolidated.id, classes: d.classes, multiPurposeLibrary: d.multiPurposeLibrary.id,
 });
 
-/** What two version 2 datasets have to share to be comparable: the match set, the definition ids, and every scanner's method. */
+/**
+ * What two version 2 datasets have to share to be comparable: the match set, the definition ids, and the method of
+ * every scanner both read. Only the scan files the manifest lists are read; a registry with none has no method.
+ */
 function instrumentOf(dataset) {
   try {
     const dir = join(DATASETS, dataset);
@@ -3094,12 +3105,14 @@ function instrumentOf(dataset) {
       return readBounded(join(dir, file));
     };
     const catalog = read('catalog');
+    const withScanFile = new Set(ECOSYSTEMS.filter((eco) => manifest.files.some((entry) => entry.role === 'scan' && entry.ecosystem === eco)));
     return {
       matchSetSha256: catalog.matchSetSha256,
       classificationSha256: catalog.classificationSha256,
       matchRules: catalog.matchRules,
       definitionIds: definitionIds(read('corpus').definitions),
-      methods: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, read('scan', eco).method])),
+      withScanFile,
+      methods: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, withScanFile.has(eco) ? read('scan', eco).method : null])),
     };
   } catch {
     return null;
@@ -3154,14 +3167,18 @@ function checkComparability(name, list, corpus, ctx, file, bad) {
       }
     } else if (version === 2) {
       const theirs = instrumentOf(item.dataset);
+      // This dataset's instrument, read as instrumentOf reads an earlier one: from every scan file the manifest lists,
+      // as parsed. A listed scan file that did not parse leaves its method unknown, not absent.
       let ours = null;
       try {
-        ours = ctx.catalog ? {
+        const { withScanFile, scans } = ctx.found;
+        ours = ctx.catalog && [...withScanFile].every((eco) => scans[eco]) ? {
           matchSetSha256: ctx.catalog.value.matchSetSha256,
           classificationSha256: ctx.catalog.value.classificationSha256,
           matchRules: ctx.catalog.value.matchRules,
           definitionIds: definitionIds(corpus.definitions),
-          methods: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, ctx.scans[eco] ? ctx.scans[eco].value.method : null])),
+          withScanFile,
+          methods: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, withScanFile.has(eco) ? scans[eco].value.method : null])),
         } : null;
       } catch {
         ours = null;
@@ -3175,10 +3192,11 @@ function checkComparability(name, list, corpus, ctx, file, bad) {
         const differ = [];
         if (!sameValue(theirs.matchSetSha256, ours.matchSetSha256)) differ.push('the match set');
         if (!sameValue(theirs.definitionIds, ours.definitionIds)) differ.push('the definition ids');
-        for (const eco of ECOSYSTEMS) if (!sameValue(theirs.methods[eco], ours.methods[eco])) differ.push(`the ${eco} scanner's method`);
+        for (const eco of readByBoth(theirs, ours)) if (!sameValue(theirs.methods[eco], ours.methods[eco])) differ.push(`the ${eco} scanner's method`);
         if (differ.length > 0) {
           bad(`${at}: ${item.dataset} is marked comparable, and these differ between the two datasets: ${differ.join(', ')}. Two ` +
-            'datasets are comparable only when the match set, the definition ids and every scanner\'s method are the same.');
+            'datasets are comparable only when the match set, the definition ids and the method of every scanner both read are ' +
+            'the same.');
         }
       }
       // The change codes, recomputed from the fields each one names.
