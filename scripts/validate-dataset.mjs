@@ -224,7 +224,7 @@ function validate(name) {
       fail(name, `schemaVersion is 2, and ${name} is one of the datasets published in the first file shape, which declares ` +
         'no version. A version 2 manifest under that name is not the dataset that was published.');
     } else {
-      validateVersion2(name, dir, { text: strictText, manifest });
+      validateVersion2(name, dir, { text: strictText, manifest, size: manifestStat.size });
     }
     return;
   }
@@ -769,6 +769,15 @@ const FILE_LIMIT = {
 };
 
 /**
+ * The most MANIFEST.json and the files it lists, the ledgers aside, may hold
+ * together. Every one of them is parsed and held until the corpus is checked,
+ * and parsed JSON of small objects takes many times its size in memory, so
+ * several files each within the bound above can still exhaust it. Their sizes
+ * on disk are summed before any listed file is read.
+ */
+const MAX_DATASET_JSON_BYTES = 150_000_000;
+
+/**
  * What the generator checks, each a list of refusals that must be empty. A
  * missing scan file and an unresolved share above the ceiling are not checks:
  * each withholds the row and refuses nothing, and a withheld row is recorded
@@ -1027,16 +1036,18 @@ const fileNameFor = (role, eco, date) => ({
  * limit, and hashing to what was recorded. Every other file in the directory
  * is a stray, whatever its name. Returns the parsed files by role, and the
  * registries whose scan file the manifest lists: the scan files the corpus read.
+ * Every entry is checked first and every file read after, so that the sizes of
+ * the files to be parsed are known, together, before any of them is.
  */
-function readListedFiles(name, dir, manifest, bad) {
+function readListedFiles(name, dir, manifest, manifestBytes, bad) {
   if (!Array.isArray(manifest.files)) {
     bad(`MANIFEST.json: files is ${describe(manifest.files)}, not a list of the dataset's files`);
     return null;
   }
   const found = { scans: {}, listings: {}, corpus: null, catalog: null, consolidation: null, hashes: new Map(), withScanFile: new Set() };
   const listed = new Set();
-  let ledgerBytes = 0;
   const roles = new Set();
+  const toRead = [];
   manifest.files.forEach((entry, index) => {
     const where = `MANIFEST.json: files[${index}]`;
     if (!closed(entry, KEYS.file, where, bad)) return;
@@ -1070,13 +1081,29 @@ function readListedFiles(name, dir, manifest, bad) {
     }
     if (!isCount(entry.bytes)) bad(`${where}.bytes is ${describe(entry.bytes)}, not a size in bytes`);
     if (!isSha256(entry.sha256)) bad(`${where}.sha256 is ${describe(entry.sha256)}, not a SHA-256 digest in lower-case hex`);
+    toRead.push(entry);
+  });
 
-    if (entry.role === 'listing') {
-      const stat = lstatSync(join(dir, entry.file), { throwIfNoEntry: false });
-      if (stat && stat.isFile()) ledgerBytes += stat.size;
-    }
+  // The sizes on disk of the files to be read, before any is: the ledgers', for their own bound below, and every
+  // other file's, which is parsed, with the manifest's. Only a regular file is read, so only one is counted.
+  let ledgerBytes = 0;
+  let jsonBytes = manifestBytes;
+  for (const entry of toRead) {
+    const stat = lstatSync(join(dir, entry.file), { throwIfNoEntry: false });
+    if (!stat || !stat.isFile()) continue;
+    if (entry.role === 'listing') ledgerBytes += stat.size;
+    else jsonBytes += stat.size;
+  }
+  if (jsonBytes > MAX_DATASET_JSON_BYTES) {
+    bad(`MANIFEST.json and its listed files, ledgers aside, total ${jsonBytes.toLocaleString('en-US')} bytes, over the ` +
+      `${MAX_DATASET_JSON_BYTES.toLocaleString('en-US')} a dataset may hold; past that, small objects exhaust memory before any ` +
+      'problem is listed. Nothing listed was parsed.');
+    return null;
+  }
+
+  for (const entry of toRead) {
     const buffer = readDatasetFile(dir, entry.file, bad, entry.role === 'listing' ? LEDGER_LIMIT : FILE_LIMIT);
-    if (buffer === null) return;
+    if (buffer === null) continue;
     const actual = createHash('sha256').update(buffer).digest('hex');
     if (isSha256(entry.sha256) && actual !== entry.sha256) {
       bad(`${entry.file} does not match its recorded hash\n    recorded ${entry.sha256}\n    actual   ${actual}`);
@@ -1087,14 +1114,14 @@ function readListedFiles(name, dir, manifest, bad) {
     found.hashes.set(entry.file, actual);
     if (entry.role === 'listing') {
       found.listings[entry.ecosystem] = { file: entry.file, buffer, sha256: actual };
-      return;
+      continue;
     }
     const value = parseVersion2(buffer, entry.file, bad);
-    if (value === null) return;
+    if (value === null) continue;
     const record = { file: entry.file, value, sha256: actual };
     if (entry.role === 'scan') found.scans[entry.ecosystem] = record;
     else found[entry.role] = record;
-  });
+  }
 
   if (ledgerBytes > MAX_LEDGERS_BYTES) {
     bad(`listing ledgers: together they are ${ledgerBytes.toLocaleString('en-US')} bytes, over the ` +
@@ -3721,7 +3748,8 @@ function checkManifestAgainstFiles(manifest, found, scans, withheld, bad) {
 
 /**
  * Every rule of a version 2 dataset, in the order its files depend on each
- * other. `read` is the manifest as validate() read it: its text and its value.
+ * other. `read` is the manifest as validate() read it: its text, its value and
+ * its size on disk.
  */
 function validateVersion2(name, dir, read) {
   const counted = new Map();
@@ -3744,7 +3772,7 @@ function validateVersion2Files(name, dir, bad, read) {
   const manifest = readManifest2(read, bad);
   if (manifest === null) return;
   checkManifest2(name, manifest, bad);
-  const found = readListedFiles(name, dir, manifest, bad);
+  const found = readListedFiles(name, dir, manifest, read.size, bad);
   if (found === null) return;
   const catalog = found.catalog ? checkCatalog(name, found.catalog, bad) : null;
   const scans = {};

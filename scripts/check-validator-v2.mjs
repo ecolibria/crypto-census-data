@@ -21,7 +21,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, truncateSync, unlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, truncateSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -1469,6 +1469,40 @@ test('listing ledgers of exactly 100,000,000 bytes together are not refused for 
   const result = await validateOne({}, resized(toTotal(100_000_000)));
   assert.equal(result.code, 1, result.stdout);
   assert.doesNotMatch(result.stderr, /together they are/);
+});
+
+// What a dataset parses, together: MANIFEST.json and every listed file but the ledgers, at most 150,000,000 bytes,
+// summed from their sizes on disk before any listed file is read.
+/** Grow the scan files of npm and pypi, as sparse files each within the bound on one file, until the manifest and the listed files but the ledgers total the bytes given. */
+const toDatasetTotal = (total) => (dir) => {
+  const size = (file) => lstatSync(join(datasetDir(dir), file)).size;
+  const parsed = () => JSON.parse(readText(join(datasetDir(dir), 'MANIFEST.json'))).files.filter((f) => f.role !== 'listing').map((f) => f.file);
+  const sizes = () => size('MANIFEST.json') + sum(parsed().map(size));
+  resized({ 'scan-results-npm.json': 75_000_000, 'scan-results-pypi.json': 70_000_000 })(dir);
+  // A size of as many digits, so that the manifest recording it keeps its own size.
+  resized({ 'scan-results-pypi.json': 70_000_000 + total - sizes() })(dir);
+  assert.equal(sizes(), total);
+};
+
+test('a manifest and listed files over 150,000,000 bytes together are refused before any listed file is parsed', async () => {
+  // The catalogue no longer parses, under its own hash: read, it would be reported.
+  const result = await validateOne({}, (dir) => {
+    rehash('catalog-2026-09-30.json', '{\n')(dir);
+    toDatasetTotal(150_000_001)(dir);
+  });
+  assert.equal(result.code, 1, result.stdout);
+  assert.deepEqual(result.stderr.split('\n').filter((line) => line.startsWith(`  ${DATE}: `)), [
+    `  ${DATE}: MANIFEST.json and its listed files, ledgers aside, total 150,000,001 bytes, over the 150,000,000 a dataset may ` +
+    'hold; past that, small objects exhaust memory before any problem is listed. Nothing listed was parsed.',
+  ], result.stderr);
+});
+
+test('a manifest and listed files of exactly 150,000,000 bytes together are read', async () => {
+  const result = await validateOne({}, toDatasetTotal(150_000_000));
+  assert.equal(result.code, 1, result.stdout);
+  assert.doesNotMatch(result.stderr, /a dataset may hold/);
+  // Read and parsed: a grown file holds no JSON.
+  assert.match(result.stderr, /scan-results-npm\.json does not parse/, result.stderr);
 });
 
 const fillers = (count, extra) => (f) => {
