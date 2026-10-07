@@ -1515,6 +1515,25 @@ test('past the bound, its problem is listed after fifty problems of MANIFEST.jso
   assert.doesNotMatch(result.stderr, /more problem\(s\) in this file are not listed/, result.stderr);
 });
 
+// Past the bound nothing listed is read, and the checks that read no file still run: a stray file and a scan file
+// listed without its ledger are listed after the bound's line.
+test('past the bound, a stray file and a scan file with no ledger are still listed', async () => {
+  const result = await validateOne(manifestOf((m) => { m.files = m.files.filter((f) => f.file !== 'listing-hex.tsv.gz'); }), (dir) => {
+    unlinkSync(join(datasetDir(dir), 'listing-hex.tsv.gz'));
+    writeFileSync(join(datasetDir(dir), 'notes.txt'), 'notes\n');
+    toDatasetTotal(150_000_001)(dir);
+  });
+  assert.equal(result.code, 1, result.stdout);
+  assert.deepEqual(result.stderr.split('\n').filter((line) => line.startsWith(`  ${DATE}: `)), [
+    `  ${DATE}: MANIFEST.json and its listed files, ledgers aside, total 150,000,001 bytes, over the 150,000,000 a dataset may ` +
+    'hold; past that, small objects exhaust memory before any problem is listed. Nothing listed was parsed.',
+    `  ${DATE}: MANIFEST.json lists the scan file of hex and no listing ledger for it. A scan file and its ledger are written ` +
+    'together, so the two roles name the same registries.',
+    `  ${DATE}: present but not listed in MANIFEST.json: "notes.txt". An unlisted file is one no reader can attribute and no ` +
+    'hash covers.',
+  ], result.stderr);
+});
+
 test('a manifest and listed files of exactly 150,000,000 bytes together are read', async () => {
   const result = await validateOne({}, toDatasetTotal(150_000_000));
   assert.equal(result.code, 1, result.stdout);

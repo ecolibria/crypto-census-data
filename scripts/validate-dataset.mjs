@@ -1050,7 +1050,8 @@ const fileNameFor = (role, eco, date) => ({
  * is a stray, whatever its name. Returns the parsed files by role, and the
  * registries whose scan file the manifest lists: the scan files the corpus read.
  * Every entry is checked first and every file read after, so that the sizes of
- * the files to be parsed are known, together, before any of them is.
+ * the files to be parsed are known, together, before any of them is. Past the
+ * bound on them none is read, and the checks that read no file still run.
  */
 function readListedFiles(name, dir, manifest, manifestBytes, bad) {
   if (!Array.isArray(manifest.files)) {
@@ -1107,15 +1108,16 @@ function readListedFiles(name, dir, manifest, manifestBytes, bad) {
     if (entry.role === 'listing') ledgerBytes += stat.size;
     else jsonBytes += stat.size;
   }
-  // The problem is listed through fail(), so that the cap on the problems listed for MANIFEST.json cannot hide it.
-  if (jsonBytes > MAX_DATASET_JSON_BYTES) {
+  // Past the bound nothing listed is read. The problem is listed through fail(), so that the cap on the problems listed
+  // for MANIFEST.json cannot hide it, and the checks below that read no file still run.
+  const pastBound = jsonBytes > MAX_DATASET_JSON_BYTES;
+  if (pastBound) {
     fail(name, `MANIFEST.json and its listed files, ledgers aside, total ${jsonBytes.toLocaleString('en-US')} bytes, over the ` +
       `${MAX_DATASET_JSON_BYTES.toLocaleString('en-US')} a dataset may hold; past that, small objects exhaust memory before any ` +
       'problem is listed. Nothing listed was parsed.');
-    return null;
   }
 
-  for (const entry of toRead) {
+  for (const entry of pastBound ? [] : toRead) {
     const buffer = readDatasetFile(dir, entry.file, bad, entry.role === 'listing' ? LEDGER_LIMIT : FILE_LIMIT);
     if (buffer === null) continue;
     const actual = createHash('sha256').update(buffer).digest('hex');
@@ -1161,7 +1163,7 @@ function readListedFiles(name, dir, manifest, manifestBytes, bad) {
     bad(`present but not listed in MANIFEST.json: ${strays.map(describe).join(', ')}. An unlisted file is one no reader can attribute ` +
       'and no hash covers.');
   }
-  return found;
+  return pastBound ? null : found;
 }
 
 // --- The catalogue snapshot -----------------------------------------------------
