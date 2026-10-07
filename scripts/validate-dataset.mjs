@@ -24,7 +24,7 @@
  */
 
 import { readFileSync, readdirSync, existsSync, statSync, lstatSync } from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
+import { join, resolve, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash, randomBytes } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
@@ -197,6 +197,9 @@ function validate(name) {
     fail(name, `MANIFEST.json is ${manifestStat.size.toLocaleString('en-US')} bytes, over the ${MAX_FILE_BYTES.toLocaleString('en-US')} a dataset file may hold`);
     return;
   }
+  // Held from before it is read, as every file these checks parse is. Nothing else is held when a dataset's checks
+  // begin, and a file within the bound on one file is within the bound on what is held.
+  hold(manifestPath, manifestStat.size);
 
   // Read and parsed once. A version 2 manifest is handed on as this text and
   // this value, and read strictly as UTF-8 there, so no second copy of it is
@@ -237,7 +240,7 @@ function validate(name) {
       fail(name, `schemaVersion is 2, and ${name} is one of the datasets published in the first file shape, which declares ` +
         'no version. A version 2 manifest under that name is not the dataset that was published.');
     } else {
-      validateVersion2(name, dir, { text: strictText, manifest, size: manifestStat.size });
+      return validateVersion2(name, dir, { text: strictText, manifest, size: manifestStat.size });
     }
     return;
   }
@@ -351,6 +354,13 @@ function validate(name) {
   if (!isFileName(manifest.corpus.file)) return;
   const corpusPath = join(dir, manifest.corpus.file);
   if (!existsSync(corpusPath) || !lstatSync(corpusPath).isFile()) return;
+  // Past the bound on what is held at once the corpus is not read, and the checks that need it do not run.
+  try {
+    hold(corpusPath, lstatSync(corpusPath).size);
+  } catch (err) {
+    fail(name, err.message);
+    return;
+  }
   const corpusText = readFileSync(corpusPath, 'utf-8');
   if (textNestsDeeperThan(corpusText, MAX_NESTING)) {
     fail(name, `${manifest.corpus.file} ${NESTED_PAST_LIMIT}`);
@@ -419,8 +429,16 @@ function validateErrata(file) {
   // A regular file, and nothing else. A link would keep the text these checks
   // read somewhere the append-only check does not look, where it could be
   // rewritten without that check seeing a change.
-  if (!lstatSync(join(ERRATA, file)).isFile()) {
+  const errataStat = lstatSync(join(ERRATA, file));
+  if (!errataStat.isFile()) {
     fail(label, 'is not a regular file. A link or a directory would keep the text somewhere the checks do not look.');
+    return;
+  }
+  // Held from before it is read until its checks end, with the files it names. Past the bound it is not read.
+  try {
+    hold(join(ERRATA, file), errataStat.size);
+  } catch (err) {
+    fail(label, err.message);
     return;
   }
 
@@ -492,10 +510,13 @@ function validateErrata(file) {
     fail(label, `describes datasets/${date}, which is not a dataset in this repository`);
   } else {
     try {
-      manifest = readBounded(manifestPath);
-      corpus = readBounded(join(DATASETS, date, datasetFile(manifest, 'corpus')));
-    } catch {
-      // What is wrong with the dataset is reported by its own validation.
+      // Both are kept whole, and held, while the errata file is checked against them.
+      manifest = readFor(manifestPath);
+      corpus = readFor(join(DATASETS, date, datasetFile(manifest, 'corpus')));
+    } catch (err) {
+      // What is wrong with the dataset is reported by its own validation. A file not read for the bound on what is
+      // held at once is named first.
+      if (err instanceof PastBound) fail(label, err.message);
       fail(label, `cannot be checked against datasets/${date}: its aggregate could not be read`);
     }
   }
@@ -642,8 +663,19 @@ function validateRegenerations(label, date, list, manifest) {
     return;
   }
   const run = manifest && isObject(manifest.provenance) ? manifest.provenance.workflowRun : undefined;
+  // Every field any regeneration names in each registry's raw file, so that the file is read once, for all of them,
+  // and released once they are taken.
+  const named = new Map();
+  for (const regeneration of list) {
+    const steps = isObject(regeneration) ? regeneration.beforeSteps : undefined;
+    if (!isObject(steps) || !Array.isArray(steps.fields) || !Array.isArray(steps.ecosystems)) continue;
+    for (const ecosystem of steps.ecosystems.filter(isText)) {
+      if (!named.has(ecosystem)) named.set(ecosystem, new Set());
+      for (const field of steps.fields.filter(isText)) named.get(ecosystem).add(field);
+    }
+  }
   const rawFiles = new Map();
-  /** The dataset's raw file for one registry, parsed, or the reason it cannot be read. */
+  /** Which of the fields named in the dataset's raw file for one registry it has, or the reason it cannot be read. */
   const rawFile = (ecosystem) => {
     if (rawFiles.has(ecosystem)) return rawFiles.get(ecosystem);
     let found;
@@ -652,8 +684,11 @@ function validateRegenerations(label, date, list, manifest) {
       found = { problem: `has no raw file in datasets/${date}` };
     } else {
       try {
-        found = { file, value: readBounded(join(DATASETS, date, file)) };
-      } catch {
+        const fields = [...(named.get(ecosystem) ?? [])];
+        found = { file, has: readFor(join(DATASETS, date, file), (value) => new Set(fields.filter((field) => resolvePath(value, field) !== undefined))) };
+      } catch (err) {
+        // Not read for the bound on what is held at once: said once, here, and the problem below for each regeneration.
+        if (err instanceof PastBound) fail(label, err.message);
         found = { problem: `has a raw file, ${file}, that cannot be read` };
       }
     }
@@ -743,7 +778,7 @@ function validateRegenerations(label, date, list, manifest) {
             continue;
           }
           for (const field of fields) {
-            if (resolvePath(raw.value, field) === undefined) {
+            if (!raw.has.has(field)) {
               fail(label, `${at} names ${field}, which ${raw.file} does not have. A field that is not in the file names nothing.`);
             }
           }
@@ -789,6 +824,76 @@ const FILE_LIMIT = {
  * on disk are summed before any listed file is read.
  */
 const MAX_DATASET_JSON_BYTES = 150_000_000;
+
+/**
+ * The same bound holds over everything these checks hold at once: the dataset
+ * being validated, the earlier datasets it is compared with, an errata file
+ * and the files that names. A file counts its size on disk from before it is
+ * read until it is released; a value kept from a file read for its fields
+ * counts its compact JSON length, and the file is released once they are
+ * taken. A read that would pass the bound parses nothing, and its problem is
+ * listed through fail(), outside the cap on one file's problems. A dataset's
+ * own files are summed first, as above.
+ */
+let held = 0;
+
+/** A file not read because it would take what is held past the bound. The message is the problem listed. */
+class PastBound extends Error {}
+
+/** Count `bytes` of the file at `path` as held from now, or count nothing and throw PastBound where that would pass the bound. */
+function hold(path, bytes) {
+  if (held + bytes > MAX_DATASET_JSON_BYTES) {
+    throw new PastBound(`${relative(ROOT, path)} was not read: it is ${bytes.toLocaleString('en-US')} bytes, ` +
+      `${held.toLocaleString('en-US')} are held already, and the checks hold at most ${MAX_DATASET_JSON_BYTES.toLocaleString('en-US')} ` +
+      'at once; past that, small objects exhaust memory before any problem is listed.');
+  }
+  held += bytes;
+}
+
+/** Run `fn`, and release all it held when it returns or throws, as what it read leaves scope with it. */
+function releasing(fn) {
+  const before = held;
+  try {
+    return fn();
+  } finally {
+    held = before;
+  }
+}
+
+/**
+ * A file read from beside what is being validated (an earlier dataset, or the
+ * dataset an errata file describes), parsed, if it is a regular file of
+ * bounded size nested within the bound; otherwise an error, and PastBound
+ * where reading it would pass the bound on what is held. With `take`, it is
+ * read for what that keeps of it, which is held at its compact JSON length,
+ * and the file is released; without, it is kept whole, and held until the
+ * scope that read it is released.
+ */
+function readFor(path, take) {
+  const stat = lstatSync(path, { throwIfNoEntry: false });
+  if (!stat || !stat.isFile()) throw new Error(`${path} is not a regular file`);
+  hold(path, stat.size);
+  let value;
+  try {
+    if (stat.size > MAX_FILE_BYTES) throw new Error(`${path} is larger than a dataset file may be`);
+    const text = readStrict(path);
+    if (textNestsDeeperThan(text, MAX_NESTING)) throw new Error(`${path} nests too deep`);
+    value = JSON.parse(text);
+  } catch (err) {
+    held -= stat.size;
+    throw err;
+  }
+  if (take === undefined) return value;
+  held -= stat.size;
+  return keep(path, take(value));
+}
+
+/** Hold a value kept from the file at `path` at its compact JSON length, a Set as a list, or throw PastBound. */
+function keep(path, value) {
+  const text = JSON.stringify(value, (key, v) => (v instanceof Set ? [...v] : v));
+  hold(path, text === undefined ? 0 : Buffer.byteLength(text));
+  return value;
+}
 
 /**
  * What the generator checks, each a list of refusals that must be empty. A
@@ -1115,6 +1220,9 @@ function readListedFiles(name, dir, manifest, manifestBytes, bad) {
     fail(name, `MANIFEST.json and its listed files, ledgers aside, total ${jsonBytes.toLocaleString('en-US')} bytes, over the ` +
       `${MAX_DATASET_JSON_BYTES.toLocaleString('en-US')} a dataset may hold; past that, small objects exhaust memory before any ` +
       'problem is listed. Nothing listed was parsed.');
+  } else {
+    // Held together, from before the first is read until the dataset's checks end; the manifest is held already.
+    held += jsonBytes - manifestBytes;
   }
 
   for (const entry of pastBound ? [] : toRead) {
@@ -3152,27 +3260,16 @@ function changesBetween(a, b) {
   return CHANGE_CODES.filter((code) => differ.has(code)).map((code) => ({ code, fields: differ.get(code) }));
 }
 
-/**
- * A file read from beside what is being validated (an earlier dataset, or the
- * dataset an errata file describes), parsed, if it is a regular file of
- * bounded size nested within the bound; otherwise an error.
- */
-function readBounded(path) {
-  const stat = lstatSync(path, { throwIfNoEntry: false });
-  if (!stat || !stat.isFile() || stat.size > MAX_FILE_BYTES) throw new Error(`${path} is not a regular file of a size these rules read`);
-  const text = readStrict(path);
-  if (textNestsDeeperThan(text, MAX_NESTING)) throw new Error(`${path} nests too deep`);
-  return JSON.parse(text);
-}
-
-/** The version of an earlier dataset, read from its manifest: 1 when it declares none. */
+/** The version of an earlier dataset, read from its manifest: 1 when it declares none. PastBound where it is not read. */
 function versionOf(dataset) {
   try {
-    const manifest = readBounded(join(DATASETS, dataset, 'MANIFEST.json'));
-    if (!isObject(manifest)) return null;
-    if (!Object.hasOwn(manifest, 'schemaVersion')) return 1;
-    return manifest.schemaVersion === 2 ? 2 : null;
-  } catch {
+    return readFor(join(DATASETS, dataset, 'MANIFEST.json'), (manifest) => {
+      if (!isObject(manifest)) return null;
+      if (!Object.hasOwn(manifest, 'schemaVersion')) return 1;
+      return manifest.schemaVersion === 2 ? 2 : null;
+    });
+  } catch (err) {
+    if (err instanceof PastBound) throw err;
     return null;
   }
 }
@@ -3185,33 +3282,45 @@ const definitionIds = (d) => ({
 /**
  * The fields of a version 2 dataset that the change codes compare: the catalogue snapshot's digests and rules, the
  * definition ids, and the method of every scanner it read. Only the scan files the manifest lists are read; a
- * registry with none has no method.
+ * registry with none has no method. Each file is read for those fields alone, one at a time; PastBound where one is
+ * not read.
  */
 function instrumentOf(dataset) {
   try {
     const dir = join(DATASETS, dataset);
-    const manifest = readBounded(join(dir, 'MANIFEST.json'));
-    const read = (role, eco = null) => {
+    // Which of the files the fields come from the manifest lists under their names, and which registries have a scan file.
+    const { listed, withScanFile } = readFor(join(dir, 'MANIFEST.json'), (manifest) => {
+      const lists = (role, eco) => manifest.files.some((entry) => entry.role === role && entry.ecosystem === eco && entry.file === fileNameFor(role, eco, dataset));
+      return {
+        listed: [...['catalog', 'corpus'].filter((role) => lists(role, null)), ...ECOSYSTEMS.filter((eco) => lists('scan', eco)).map((eco) => `scan:${eco}`)],
+        withScanFile: ECOSYSTEMS.filter((eco) => manifest.files.some((entry) => entry.role === 'scan' && entry.ecosystem === eco)),
+      };
+    });
+    const read = (role, eco, take) => {
       const file = fileNameFor(role, eco, dataset);
-      if (!manifest.files.some((entry) => entry.role === role && entry.ecosystem === eco && entry.file === file)) throw new Error(file);
-      return readBounded(join(dir, file));
+      if (!listed.includes(eco === null ? role : `${role}:${eco}`)) throw new Error(file);
+      return readFor(join(dir, file), take);
     };
-    const catalog = read('catalog');
-    const withScanFile = new Set(ECOSYSTEMS.filter((eco) => manifest.files.some((entry) => entry.role === 'scan' && entry.ecosystem === eco)));
+    const catalog = read('catalog', null, (c) => ({ matchSetSha256: c.matchSetSha256, classificationSha256: c.classificationSha256, matchRules: c.matchRules }));
     return {
-      matchSetSha256: catalog.matchSetSha256,
-      classificationSha256: catalog.classificationSha256,
-      matchRules: catalog.matchRules,
-      definitionIds: definitionIds(read('corpus').definitions),
-      withScanFile,
-      methods: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, withScanFile.has(eco) ? read('scan', eco).method : null])),
+      ...catalog,
+      definitionIds: read('corpus', null, (c) => definitionIds(c.definitions)),
+      withScanFile: new Set(withScanFile),
+      methods: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, withScanFile.includes(eco) ? read('scan', eco, (s) => s.method) : null])),
     };
-  } catch {
+  } catch (err) {
+    if (err instanceof PastBound) throw err;
     return null;
   }
 }
 
-function checkComparability(name, list, corpus, ctx, file, bad) {
+/**
+ * The comparison with every earlier dataset, run last: of this dataset it has only what `later` keeps, the corpus's
+ * comparability list and the instrument (null where it cannot be read), its files released. Each earlier dataset is
+ * read alone, one file at a time, and released before the next.
+ */
+function checkComparability(name, later, bad) {
+  const { file, list, instrument: ours } = later;
   const where = `${file}: comparability`;
   if (!Array.isArray(list) || list.length === 0) {
     bad(`${where} is ${describe(list)}. It is required and names every earlier dataset, so that no surface draws a trend ` +
@@ -3221,7 +3330,17 @@ function checkComparability(name, list, corpus, ctx, file, bad) {
   const earlier = readdirSync(DATASETS)
     .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d) && d < name && lstatSync(join(DATASETS, d)).isDirectory()).sort();
   const named = new Set();
-  list.forEach((item, index) => {
+  /** What is read of an earlier dataset, or null where a file was not read for the bound, which is then listed. */
+  const unlessPastBound = (read) => {
+    try {
+      return read();
+    } catch (err) {
+      if (!(err instanceof PastBound)) throw err;
+      fail(name, err.message);
+      return null;
+    }
+  };
+  list.forEach((item, index) => releasing(() => {
     const at = `${where}[${index}]`;
     if (!closed(item, KEYS.comparability, at, bad)) return;
     if (!earlier.includes(item.dataset)) {
@@ -3248,7 +3367,7 @@ function checkComparability(name, list, corpus, ctx, file, bad) {
     if (!item.comparable && (item.reason !== 'instrumentChanged' || item.changes.length === 0)) {
       bad(`${at} is not comparable, so its reason is instrumentChanged and changes names what changed`);
     }
-    const version = versionOf(item.dataset);
+    const version = unlessPastBound(() => versionOf(item.dataset));
     if (version === 1) {
       if (item.comparable) {
         bad(`${at}: ${item.dataset} is a version 1 dataset, measured with an instrument that has since changed, so it is not ` +
@@ -3258,23 +3377,7 @@ function checkComparability(name, list, corpus, ctx, file, bad) {
           `eleven codes (${CHANGE_CODES.join(', ')}).`);
       }
     } else if (version === 2) {
-      const theirs = instrumentOf(item.dataset);
-      // This dataset's instrument, read as instrumentOf reads an earlier one: from every scan file the manifest lists,
-      // as parsed. A listed scan file that did not parse leaves its method unknown, not absent.
-      let ours = null;
-      try {
-        const { withScanFile, scans } = ctx.found;
-        ours = ctx.catalog && [...withScanFile].every((eco) => scans[eco]) ? {
-          matchSetSha256: ctx.catalog.value.matchSetSha256,
-          classificationSha256: ctx.catalog.value.classificationSha256,
-          matchRules: ctx.catalog.value.matchRules,
-          definitionIds: definitionIds(corpus.definitions),
-          withScanFile,
-          methods: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, withScanFile.has(eco) ? scans[eco].value.method : null])),
-        } : null;
-      } catch {
-        ours = null;
-      }
+      const theirs = unlessPastBound(() => instrumentOf(item.dataset));
       if (theirs === null || ours === null) {
         bad(`${at}: ${item.dataset} is a version 2 dataset whose instrument cannot be read beside this one's, so neither ` +
           'whether it is comparable nor the changes named can be checked');
@@ -3300,7 +3403,7 @@ function checkComparability(name, list, corpus, ctx, file, bad) {
     } else if (version === null) {
       bad(`${at}: ${item.dataset} has no manifest these rules can read, so whether it is comparable cannot be checked`);
     }
-  });
+  }));
   for (const dataset of earlier) {
     if (!named.has(dataset)) {
       bad(`${where} does not name ${dataset}. Every earlier dataset is named, so that a reader holding two of them knows ` +
@@ -3630,7 +3733,6 @@ function checkCorpus(name, record, ctx, bad) {
   }
   checkInputs(name, c.inputs, ctx, file, bad);
   const includes = checkDefinitions(c.definitions, file, bad);
-  checkComparability(name, c.comparability, c, ctx, file, bad);
   const publishable = checkBlocked(c.blocked, file, bad);
   const withheld = checkWithheld(c.withheld, ctx, file, bad);
   checkCorpusCoverage(c.coverage, withheld, ctx, file, bad);
@@ -3813,7 +3915,8 @@ function checkManifestAgainstFiles(manifest, found, scans, withheld, bad) {
 /**
  * Every rule of a version 2 dataset, in the order its files depend on each
  * other. `read` is the manifest as validate() read it: its text, its value and
- * its size on disk.
+ * its size on disk. The comparison with the earlier datasets is returned, to
+ * be run last, once this dataset's files have left scope with validate().
  */
 function validateVersion2(name, dir, read) {
   const counted = new Map();
@@ -3823,13 +3926,32 @@ function validateVersion2(name, dir, read) {
     counted.set(file, count);
     if (file === '' || count <= MAX_PROBLEMS_PER_FILE) fail(name, message);
   };
-  try {
-    validateVersion2Files(name, dir, bad, read);
-  } finally {
+  const more = () => {
     for (const [file, count] of counted) {
       if (file !== '' && count > MAX_PROBLEMS_PER_FILE) fail(name, `${file}: ${count - MAX_PROBLEMS_PER_FILE} more problem(s) in this file are not listed`);
     }
+  };
+  let later = null;
+  try {
+    later = validateVersion2Files(name, dir, bad, read) ?? null;
+  } finally {
+    if (later === null) more();
   }
+  if (later === null) return undefined;
+  return () => {
+    try {
+      // What the comparison keeps of this dataset is held while the earlier datasets are read.
+      try {
+        keep(join(dir, later.file), later);
+      } catch (err) {
+        fail(name, err.message);
+        return;
+      }
+      checkComparability(name, later, bad);
+    } finally {
+      more();
+    }
+  };
 }
 
 function validateVersion2Files(name, dir, bad, read) {
@@ -3855,6 +3977,27 @@ function validateVersion2Files(name, dir, bad, read) {
   const withheld = found.corpus ? checkCorpus(name, found.corpus, { catalog, scans, ledgers, map, found }, bad) : null;
   checkManifestAgainstFiles(manifest, found, scans, withheld ?? null, bad);
   listRegeneratedScans(name, manifest, found);
+
+  // What the comparison keeps, for a corpus with every field: its comparability list and this dataset's instrument,
+  // read as instrumentOf reads an earlier one, from every scan file the manifest lists, as parsed. A listed scan file
+  // that did not parse leaves its method unknown, not absent.
+  const c = found.corpus ? found.corpus.value : null;
+  if (c === null || !KEYS.corpus.every((key) => Object.hasOwn(c, key))) return null;
+  let instrument = null;
+  try {
+    const { withScanFile, scans: parsed } = found;
+    instrument = catalog && [...withScanFile].every((eco) => parsed[eco]) ? {
+      matchSetSha256: catalog.value.matchSetSha256,
+      classificationSha256: catalog.value.classificationSha256,
+      matchRules: catalog.value.matchRules,
+      definitionIds: definitionIds(c.definitions),
+      withScanFile,
+      methods: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, withScanFile.has(eco) ? parsed[eco].value.method : null])),
+    } : null;
+  } catch {
+    instrument = null;
+  }
+  return { file: found.corpus.file, list: c.comparability, instrument };
 }
 
 /**
@@ -3945,9 +4088,11 @@ function main() {
       fail(describe(name), 'directory name is not a YYYY-MM-DD collection date');
       continue;
     }
-    // A check that throws reports where it stopped, and the problems found before it are still listed.
+    // A check that throws reports where it stopped, and the problems found before it are still listed. What a
+    // dataset's checks hold is released when they end; its comparison with the earlier datasets runs after that.
     try {
-      validate(name);
+      const compare = releasing(() => validate(name));
+      if (compare) releasing(compare);
     } catch (err) {
       fail(name, `could not be checked to the end: ${err.message}`);
     }
@@ -3955,7 +4100,7 @@ function main() {
 
   for (const file of errataFiles) {
     try {
-      validateErrata(file);
+      releasing(() => validateErrata(file));
     } catch (err) {
       fail(`errata/${file}`, `could not be checked to the end: ${err.message}`);
     }

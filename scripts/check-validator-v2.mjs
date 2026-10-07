@@ -2700,6 +2700,242 @@ test('a read source named __proto__ is counted from the ledger like any other', 
   assert.doesNotMatch(result.stderr, /\[object Object\]|scannedByReadFrom gives \d+ for "__proto__"/, result.stderr);
 });
 
+// --- What the checks hold at once --------------------------------------------------
+//
+// One bound, 150,000,000 bytes, over all the checks hold at once: the dataset being validated, the earlier datasets it
+// is compared with, an errata file and the files that names. A file counts its size on disk from before it is read
+// until it is released, and a value kept from a file read for its fields counts its compact JSON length, the file
+// released once they are taken. A read that would pass the bound parses nothing, and its problem is listed before the
+// problem of the check it stopped. The comparison runs last, once the later dataset's own files are released.
+
+/** The problem listed, for the dataset or errata file `who`, about a file not read for the bound. */
+const notRead = (who, path, bytes, held) => `  ${who}: ${path} was not read: it is ${bytes.toLocaleString('en-US')} bytes, ` +
+  `${held.toLocaleString('en-US')} are held already, and the checks hold at most 150,000,000 at once; past that, small ` +
+  'objects exhaust memory before any problem is listed.';
+/** The same problem with its numbers open: the file, its size and what was held. */
+const NOT_READ = /^ {2}\S+: (\S+) was not read: it is ([\d,]+) bytes, ([\d,]+) are held already, and the checks hold at most 150,000,000 at once; past that, small objects exhaust memory before any problem is listed\.$/;
+const bytesOf = (digits) => Number(digits.replaceAll(',', ''));
+/** The problems listed for one dataset or errata file. */
+const linesOf = (stderr, who) => stderr.split('\n').filter((line) => line.startsWith(`  ${who}: `));
+const HEAP_4096 = { env: { NODE_OPTIONS: '--max-old-space-size=4096' } };
+/** The dataset under test beside an earlier version 2 one, which it names. */
+const beside = (earlier, later = {}) => ({
+  [EARLIER_V2]: [EARLIER_V2, earlier],
+  [DATE]: [DATE, later, [{ dataset: FIRST_SHAPE, version: 1 }, { dataset: EARLIER_V2, version: 2 }]],
+});
+/** A version 2 scan file of exactly `bytes` bytes holding one list of empty objects: parsed, about two thousand megabytes per 94,000,000 bytes. */
+function emptyObjects(bytes) {
+  const head = '{"schemaVersion":2,"kind":"censusScan","x":[';
+  const tail = ']}\n';
+  const count = Math.floor((bytes - head.length - tail.length + 1) / 3);
+  const text = `${head}${'{},'.repeat(count - 1)}{}${tail}`;
+  return `${text}${' '.repeat(bytes - text.length)}`;
+}
+/** What a dataset's own bound sums: the sizes on disk of its manifest and of every listed file but the ledgers. */
+function datasetTotal(target) {
+  const size = (file) => lstatSync(join(target, file)).size;
+  const m = JSON.parse(readText(join(target, 'MANIFEST.json')));
+  return size('MANIFEST.json') + sum(m.files.filter((f) => f.role !== 'listing').map((f) => size(f.file)));
+}
+/** Replace the scan files of the registries given with lists of empty objects, 94,000,000 bytes each but the last, which brings the dataset's total to `total`. */
+function toEmptyObjects(target, total, ecos) {
+  for (const eco of ecos.slice(0, -1)) writeFileSync(join(target, `scan-results-${eco}.json`), emptyObjects(94_000_000));
+  const last = join(target, `scan-results-${ecos.at(-1)}.json`);
+  writeFileSync(last, '');
+  writeFileSync(last, emptyObjects(total - datasetTotal(target)));
+  assert.equal(datasetTotal(target), total);
+}
+
+// The errata path. The manifest and the corpus of the dataset an errata file describes are kept whole while it is
+// checked, and held, with the errata file itself. Listed files of 140,000,000 bytes, under the dataset's own bound:
+// npm's raw file of 20,000,000 bytes, sparse, and the corpus and the manifest grown with spaces after their text, so
+// that both still parse. The errata file, which names npm, is as large as leaves one byte too few for that raw file
+// beside the three: the raw file is not read, the regeneration's problem follows, and nothing aborts.
+test('a raw file an errata file names is not read where the errata file and the manifest and corpus it holds leave too little room for it', { timeout: 180000 }, async () => {
+  const result = await validateOne({}, (dir) => {
+    const target = datasetDir(dir);
+    const grow = (file, bytes) => {
+      const text = readText(join(target, file));
+      writeFileSync(join(target, file), `${text}${' '.repeat(bytes - Buffer.byteLength(text))}`);
+    };
+    truncateSync(join(target, 'scan-results-npm.json'), 20_000_000);
+    grow(`corpus-${DATE}.json`, 94_000_000);
+    grow('MANIFEST.json', lstatSync(join(target, 'MANIFEST.json')).size + 140_000_000 - datasetTotal(target));
+    assert.equal(datasetTotal(target), 140_000_000);
+    // 130,000,001 held with the errata file: one byte more than leaves room for 20,000,000.
+    const errataBytes = 130_000_001 - lstatSync(join(target, 'MANIFEST.json')).size - 94_000_000;
+    const summary = 'The raw files were written again after the run.';
+    const shortest = Buffer.byteLength(errataFor((e) => { e.regenerations[0].summary = summary; }));
+    mkdirSync(join(dir, 'errata'));
+    writeFileSync(join(dir, ERRATA), errataFor((e) => { e.regenerations[0].summary = `${summary}${'x'.repeat(errataBytes - shortest)}`; }));
+    assert.equal(lstatSync(join(dir, ERRATA)).size, errataBytes);
+  }, HEAP_4096);
+  assert.equal(result.code, 1, `exit ${result.code}, signal ${result.signal}:\n${result.stderr.slice(-1500)}`);
+  const listed = linesOf(result.stderr, ERRATA);
+  const at = listed.indexOf(notRead(ERRATA, `datasets/${DATE}/scan-results-npm.json`, 20_000_000, 130_000_001));
+  assert.ok(at >= 0, result.stderr);
+  assert.equal(listed[at + 1], `  ${ERRATA}: regeneration 1 names npm, which has a raw file, scan-results-npm.json, that cannot be read`, result.stderr);
+  assert.doesNotMatch(result.stderr, /a dataset may hold|heap out of memory|could not be checked to the end/, result.stderr);
+});
+
+// The errata input of the round 6 review: three raw files of 94,000,000 bytes, each one list of empty objects, which
+// parsed together exhaust a heap of 4,096 MB. The dataset is past its own bound and none of its files is parsed; the
+// errata file names the three, and each is read alone, for the field named, and released before the next is read.
+test('an errata file naming three raw files of 94,000,000 bytes of empty objects reads each alone, within a heap of 4,096 MB', { timeout: 300000 }, async () => {
+  const text = emptyObjects(94_000_000);
+  const result = await validateOne({}, (dir) => {
+    for (const eco of ['npm', 'pypi', 'hex']) writeFileSync(join(datasetDir(dir), `scan-results-${eco}.json`), text);
+    mkdirSync(join(dir, 'errata'));
+    writeFileSync(join(dir, ERRATA), errataFor((e) => { e.regenerations[0].beforeSteps.ecosystems = ['npm', 'pypi', 'hex']; }));
+  }, HEAP_4096);
+  assert.equal(result.code, 1, `exit ${result.code}, signal ${result.signal}:\n${result.stderr.slice(-1500)}`);
+  assert.match(firstProblem(result.stderr), /MANIFEST\.json and its listed files, ledgers aside, total [\d,]+ bytes, over the 150,000,000 a dataset may hold/, result.stderr);
+  assert.deepEqual(linesOf(result.stderr, ERRATA), ['npm', 'pypi', 'hex'].map((eco) => `  ${ERRATA}: regeneration 1 names coverage.scanned, ` +
+    `which scan-results-${eco}.json does not have. A field that is not in the file names nothing.`), result.stderr);
+  assert.doesNotMatch(result.stderr, /was not read|heap out of memory/, result.stderr);
+});
+
+// The errata file itself is held from before it is read: one of 150,000,001 bytes is not read, with nothing held.
+test('an errata file over 150,000,000 bytes is not read', async () => {
+  const result = await validateOne({}, (dir) => {
+    mkdirSync(join(dir, 'errata'));
+    writeFileSync(join(dir, ERRATA), errataFor());
+    truncateSync(join(dir, ERRATA), 150_000_001);
+  });
+  assert.equal(result.code, 1, result.stdout);
+  assert.deepEqual(linesOf(result.stderr, ERRATA), [notRead(ERRATA, ERRATA, 150_000_001, 0)], result.stderr);
+});
+
+// The corpus an errata file is checked against, held beside it: an errata file grown to leave one byte too few for a
+// corpus of 94,000,000 bytes, sparse, beside the manifest. The corpus is not read, and the errata file cannot be checked
+// against the dataset.
+test('a corpus an errata file is checked against is not read where the errata file and the manifest leave too little room for it', { timeout: 120000 }, async () => {
+  const result = await validateOne({}, (dir) => {
+    const target = datasetDir(dir);
+    truncateSync(join(target, `corpus-${DATE}.json`), 94_000_000);
+    const errataBytes = 56_000_001 - lstatSync(join(target, 'MANIFEST.json')).size;
+    const summary = 'The raw files were written again after the run.';
+    const shortest = Buffer.byteLength(errataFor((e) => { e.regenerations[0].summary = summary; }));
+    mkdirSync(join(dir, 'errata'));
+    writeFileSync(join(dir, ERRATA), errataFor((e) => { e.regenerations[0].summary = `${summary}${'x'.repeat(errataBytes - shortest)}`; }));
+  });
+  assert.equal(result.code, 1, result.stdout);
+  const listed = linesOf(result.stderr, ERRATA);
+  assert.deepEqual(listed.slice(0, 2), [
+    notRead(ERRATA, `datasets/${DATE}/corpus-${DATE}.json`, 94_000_000, 56_000_001),
+    `  ${ERRATA}: cannot be checked against datasets/${DATE}: its aggregate could not be read`,
+  ], result.stderr);
+});
+
+// A first-shape dataset holds its manifest from before it is read and its corpus beside it: a corpus grown, sparse, to
+// one byte more than leaves room beside the manifest is not read.
+test('a first-shape corpus that would take what is held past the bound, beside its manifest, is not read', async () => {
+  const manifest = lstatSync(join(ROOT, 'datasets', FIRST_SHAPE, 'MANIFEST.json')).size;
+  const result = await validateOne({}, (dir) => truncateSync(join(dir, 'datasets', FIRST_SHAPE, `corpus-${FIRST_SHAPE}.json`), 150_000_001 - manifest));
+  assert.equal(result.code, 1, result.stdout);
+  assert.ok(linesOf(result.stderr, FIRST_SHAPE).includes(notRead(FIRST_SHAPE, `datasets/${FIRST_SHAPE}/corpus-${FIRST_SHAPE}.json`, 150_000_001 - manifest, manifest)),
+    result.stderr);
+  assert.doesNotMatch(result.stderr, /corpus-2026-03-18\.json does not parse/, result.stderr);
+});
+
+// The comparison input of the round 6 review: an earlier dataset of 144,155,739 bytes, its scan files of npm and pypi
+// each one list of empty objects, beside a later one of 94,187,716, its scan file of npm likewise. Each is within its
+// own bound, and the two held at once exhaust a heap of 4,096 MB. The later dataset's files are released before the
+// comparison reads the earlier one's, one at a time, so nothing is refused for the bound: each is judged on its own
+// problems, and the two instruments are compared.
+test('a later dataset of 94,187,716 bytes is compared with an earlier one of 144,155,739 once its own files are released, within a heap of 4,096 MB', { timeout: 300000 }, async () => {
+  const result = await validate(beside({}), (dir) => {
+    toEmptyObjects(join(dir, 'datasets', EARLIER_V2), 144_155_739, ['npm', 'pypi']);
+    toEmptyObjects(datasetDir(dir), 94_187_716, ['npm']);
+  }, HEAP_4096);
+  assert.equal(result.code, 1, `exit ${result.code}, signal ${result.signal}:\n${result.stderr.slice(-1500)}`);
+  assert.doesNotMatch(result.stderr, /was not read|a dataset may hold|heap out of memory|could not be checked to the end/, result.stderr);
+  assert.ok(linesOf(result.stderr, DATE).some((line) => line.includes(`comparability[1]: ${EARLIER_V2} is marked comparable, and these differ ` +
+    "between the two datasets: the pypi scanner's method.versionSelection (versionSelection)")), result.stderr);
+});
+
+// Each earlier file is read alone, for its fields, and released before the next: three earlier scan files of
+// 60,000,000 bytes, their text grown with spaces so that each still parses, pass the bound together, and each is read.
+// The earlier dataset is past its own bound; the later one is compared with it and has no problem.
+test('an earlier dataset whose scan files pass the bound together is read for its instrument one file at a time', { timeout: 120000 }, async () => {
+  const result = await validate(beside({}), (dir) => {
+    for (const eco of ['npm', 'pypi', 'go']) {
+      const path = join(dir, 'datasets', EARLIER_V2, `scan-results-${eco}.json`);
+      const text = readText(path);
+      writeFileSync(path, `${text}${' '.repeat(60_000_000 - Buffer.byteLength(text))}`);
+    }
+  });
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(firstProblem(result.stderr, EARLIER_V2), /MANIFEST\.json and its listed files, ledgers aside, total [\d,]+ bytes, over the 150,000,000 a dataset may hold/, result.stderr);
+  assert.deepEqual(linesOf(result.stderr, DATE), [], result.stderr);
+});
+
+// An earlier dataset's scan file of exactly 150,000,000 bytes, sparse: within the bound alone, past it beside what the
+// comparison holds, which is what it keeps of the later dataset and what it has read of the earlier one. It is not
+// read, and the comparison says the earlier instrument cannot be read.
+test('an earlier dataset\'s file that fits the bound alone but not beside what the comparison holds is not read', async () => {
+  const result = await validate(beside({}), (dir) => truncateSync(join(dir, 'datasets', EARLIER_V2, 'scan-results-npm.json'), 150_000_000));
+  assert.equal(result.code, 1, result.stdout);
+  const listed = linesOf(result.stderr, DATE);
+  const at = listed.findIndex((line) => NOT_READ.test(line));
+  assert.ok(at >= 0, result.stderr);
+  const [, path, bytes, held] = NOT_READ.exec(listed[at]);
+  assert.equal(path, `datasets/${EARLIER_V2}/scan-results-npm.json`);
+  assert.equal(bytesOf(bytes), 150_000_000);
+  assert.ok(bytesOf(held) > 0, listed[at]);
+  assert.match(listed[at + 1], /comparability\[1\]: 2026-09-15 is a version 2 dataset whose instrument cannot be read beside this one's/, result.stderr);
+});
+
+// What the comparison keeps of the later dataset counts while the earlier one is read: a later method listing
+// 2,150,000 limits, about 60,000,000 bytes kept, leaves too little room for an earlier scan file of 94,000,000 bytes,
+// sparse, which alone would be read.
+test('what the comparison keeps of the later dataset is held while an earlier dataset is read', { timeout: 180000 }, async () => {
+  const limits = Array.from({ length: 2_150_000 }, (_, i) => `limit${String(i).padStart(20, '0')}`);
+  const result = await validate(beside({}, scanOf('npm', (s) => { s.method.limits = limits; })),
+    (dir) => truncateSync(join(dir, 'datasets', EARLIER_V2, 'scan-results-npm.json'), 94_000_000), HEAP_4096);
+  assert.equal(result.code, 1, `exit ${result.code}, signal ${result.signal}:\n${result.stderr.slice(-1500)}`);
+  const listed = linesOf(result.stderr, DATE);
+  const at = listed.findIndex((line) => NOT_READ.test(line));
+  assert.ok(at >= 0, result.stderr.slice(-3000));
+  const [, path, bytes, held] = NOT_READ.exec(listed[at]);
+  assert.equal(path, `datasets/${EARLIER_V2}/scan-results-npm.json`);
+  assert.equal(bytesOf(bytes), 94_000_000);
+  assert.ok(bytesOf(held) > Buffer.byteLength(JSON.stringify(limits)), listed[at]);
+  assert.match(listed[at + 1], /comparability\[1\]: 2026-09-15 is a version 2 dataset whose instrument cannot be read beside this one's/, result.stderr);
+});
+
+// A value kept from a file counts its compact JSON length, which can be longer than the file: an earlier scan file
+// whose method is a list of the number 1e20, each written in four characters and kept in twenty-one. Kept, it would
+// pass the bound, so it is not kept, and the comparison says the earlier instrument cannot be read.
+test('a value kept from an earlier dataset\'s file whose compact JSON would pass the bound is not kept', { timeout: 180000 }, async () => {
+  const count = 18_000_000;
+  const result = await validate(beside({}), (dir) => writeFileSync(join(dir, 'datasets', EARLIER_V2, 'scan-results-npm.json'),
+    `{"schemaVersion":2,"method":[${'1e20,'.repeat(count - 1)}1e20]}\n`), HEAP_4096);
+  assert.equal(result.code, 1, `exit ${result.code}, signal ${result.signal}:\n${result.stderr.slice(-1500)}`);
+  const listed = linesOf(result.stderr, DATE);
+  const at = listed.findIndex((line) => NOT_READ.test(line));
+  assert.ok(at >= 0, result.stderr.slice(-3000));
+  const [, path, bytes] = NOT_READ.exec(listed[at]);
+  assert.equal(path, `datasets/${EARLIER_V2}/scan-results-npm.json`);
+  assert.equal(bytesOf(bytes), 22 * count + 1);
+  assert.match(listed[at + 1], /comparability\[1\]: 2026-09-15 is a version 2 dataset whose instrument cannot be read beside this one's/, result.stderr);
+});
+
+// An earlier manifest of 150,000,000 bytes, sparse, read for the dataset's version beside what the comparison keeps
+// of the later dataset: it is not read, and the earlier dataset has no manifest these rules can read.
+test('an earlier manifest that would take what the comparison holds past the bound is not read', async () => {
+  const result = await validate(beside({}), (dir) => truncateSync(join(dir, 'datasets', EARLIER_V2, 'MANIFEST.json'), 150_000_000));
+  assert.equal(result.code, 1, result.stdout);
+  const listed = linesOf(result.stderr, DATE);
+  const at = listed.findIndex((line) => NOT_READ.test(line));
+  assert.ok(at >= 0, result.stderr);
+  const [, path, bytes, held] = NOT_READ.exec(listed[at]);
+  assert.equal(path, `datasets/${EARLIER_V2}/MANIFEST.json`);
+  assert.equal(bytesOf(bytes), 150_000_000);
+  assert.ok(bytesOf(held) > 0, listed[at]);
+  assert.match(listed[at + 1], /comparability\[1\]: 2026-09-15 has no manifest these rules can read/, result.stderr);
+});
+
 // --- The stop line ----------------------------------------------------------------
 //
 // The GitHub runner (actions/runner v2.338.0) reads a line of a step's stdout or stderr as a workflow command when the
