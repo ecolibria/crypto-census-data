@@ -896,10 +896,10 @@ test('a version 2 dataset that meets the contract passes', async () => {
 
 // Each object is closed: a field the contract does not define fails, at every level.
 const closedInTheManifest = [
-  ['the manifest\'s provenance', manifestOf((m) => { m.provenance.note = 'x'; }), /MANIFEST\.json: provenance carries note/],
-  ['the manifest\'s checks', manifestOf((m) => { m.checks.note = []; }), /MANIFEST\.json: checks carries note/],
-  ['a file of the manifest', manifestOf((m) => { m.files[0].note = 'x'; }), /MANIFEST\.json: files\[0\] carries note/],
-  ['the manifest', manifestOf((m) => { m.note = 'x'; }), /MANIFEST\.json is not a version 2 manifest: it carries note/],
+  ['the manifest\'s provenance', manifestOf((m) => { m.provenance.note = 'x'; }), /MANIFEST\.json: provenance carries "note"/],
+  ['the manifest\'s checks', manifestOf((m) => { m.checks.note = []; }), /MANIFEST\.json: checks carries "note"/],
+  ['a file of the manifest', manifestOf((m) => { m.files[0].note = 'x'; }), /MANIFEST\.json: files\[0\] carries "note"/],
+  ['the manifest', manifestOf((m) => { m.note = 'x'; }), /MANIFEST\.json is not a version 2 manifest: it carries "note"/],
 ];
 for (const [level, change, problem] of closedInTheManifest) plant(`a field the contract does not define, in ${level}`, change, problem);
 
@@ -912,7 +912,7 @@ plant('a manifest whose schemaVersion is not its first key', manifestOf((m) => {
   /MANIFEST\.json does not begin with schemaVersion/);
 plant('a manifest that is a first-shape manifest with the marker added',
   manifestOf((m) => { delete m.files; delete m.ecosystems; m.corpus = { file: 'corpus-2026-09-30.json' }; m.totalScanned = 1; }),
-  /schemaVersion is 2, but MANIFEST\.json is not a version 2 manifest: it lacks files, ecosystems; it carries corpus, totalScanned/);
+  /schemaVersion is 2, but MANIFEST\.json is not a version 2 manifest: it lacks files, ecosystems; it carries "corpus", "totalScanned"/);
 plant('a manifest that is a link to a file elsewhere', {}, /MANIFEST\.json is not a regular file/, (dir) => {
   const path = join(datasetDir(dir), 'MANIFEST.json');
   writeFileSync(join(dir, 'kept.json'), readText(path));
@@ -943,12 +943,12 @@ for (const check of CHECKS) {
 plant('the checks without one of the five', manifestOf((m) => { delete m.checks.identityFailures; }), /MANIFEST\.json: checks is missing identityFailures/);
 // A missing scan file and an unresolved share above the ceiling withhold a row; neither is a check, empty or not.
 plant('a check for missing registries, which a manifest no longer carries', manifestOf((m) => { m.checks.missingEcosystems = []; }),
-  /MANIFEST\.json: checks carries missingEcosystems, which the schema version 2 contract does not define/);
+  /MANIFEST\.json: checks carries "missingEcosystems", which the schema version 2 contract does not define/);
 plant('a check for rows above the ceiling, which a manifest no longer carries', manifestOf((m) => { m.checks.unresolvedAboveCeiling = []; }),
-  /MANIFEST\.json: checks carries unresolvedAboveCeiling, which the schema version 2 contract does not define/);
+  /MANIFEST\.json: checks carries "unresolvedAboveCeiling", which the schema version 2 contract does not define/);
 plant('a check that is not a list', manifestOf((m) => { m.checks.identityFailures = null; }), /MANIFEST\.json: checks\.identityFailures is null, not a list/);
-plant('a manifest that carries a verdict of its own', manifestOf((m) => { m.complete = true; }), /MANIFEST\.json is not a version 2 manifest: it carries complete/);
-plant('a plausible-minimum check, which a manifest no longer carries', manifestOf((m) => { m.checks.belowPlausibleMinimum = []; }), /MANIFEST\.json: checks carries belowPlausibleMinimum/);
+plant('a manifest that carries a verdict of its own', manifestOf((m) => { m.complete = true; }), /MANIFEST\.json is not a version 2 manifest: it carries "complete"/);
+plant('a plausible-minimum check, which a manifest no longer carries', manifestOf((m) => { m.checks.belowPlausibleMinimum = []; }), /MANIFEST\.json: checks carries "belowPlausibleMinimum"/);
 plant('known issues that are not a list', manifestOf((m) => { m.knownIssues = {}; }), /MANIFEST\.json: knownIssues is \{\}, not a list/);
 
 // The files the manifest lists, and the ones it does not.
@@ -957,9 +957,9 @@ plant('a wrong hash', manifestOf((m) => { fileEntry(m, 'scan-results-hex.json').
 plant('a hash that is not one', manifestOf((m) => { fileEntry(m, 'scan-results-hex.json').sha256 = 'abc'; }), /files\[\d+\]\.sha256 is "abc", not a SHA-256 digest in lower-case hex/);
 plant('a wrong size', manifestOf((m) => { fileEntry(m, 'listing-pub.tsv.gz').bytes += 1; }), /listing-pub\.tsv\.gz is \d+ bytes, manifest says \d+/);
 plant('a size that is not a count', manifestOf((m) => { fileEntry(m, 'listing-pub.tsv.gz').bytes = '12'; }), /files\[\d+\]\.bytes is "12", not a size in bytes/);
-plant('a stray file', {}, /present but not listed in MANIFEST\.json: notes\.txt\. An unlisted file/, (dir) => writeFileSync(join(datasetDir(dir), 'notes.txt'), 'notes\n'));
-plant('a stray ledger', {}, /present but not listed in MANIFEST\.json: listing-npm-old\.tsv\.gz/, (dir) => writeFileSync(join(datasetDir(dir), 'listing-npm-old.tsv.gz'), gzipSync('x\n')));
-plant('a first-shape scan file beside the new ones', {}, /present but not listed in MANIFEST\.json: scan-results-npm-clean\.json/,
+plant('a stray file', {}, /present but not listed in MANIFEST\.json: "notes\.txt"\. An unlisted file/, (dir) => writeFileSync(join(datasetDir(dir), 'notes.txt'), 'notes\n'));
+plant('a stray ledger', {}, /present but not listed in MANIFEST\.json: "listing-npm-old\.tsv\.gz"/, (dir) => writeFileSync(join(datasetDir(dir), 'listing-npm-old.tsv.gz'), gzipSync('x\n')));
+plant('a first-shape scan file beside the new ones', {}, /present but not listed in MANIFEST\.json: "scan-results-npm-clean\.json"/,
   (dir) => writeFileSync(join(datasetDir(dir), 'scan-results-npm-clean.json'), '{"ecosystem":"npm","totalScanned":1}\n'));
 plant('a listed file that is missing', {}, /listing-hex\.tsv\.gz is listed in MANIFEST\.json but is not in the dataset/, (dir) => unlinkSync(join(datasetDir(dir), 'listing-hex.tsv.gz')));
 plant('a link in place of a file', {}, /scan-results-pub\.json is not a regular file\. A link would keep its bytes somewhere/, (dir) => {
@@ -1039,34 +1039,34 @@ const entryOf = (eco, name, fn) => catalogOf((c) => fn(c.entries.find((e) => e.e
 
 // Each object is closed: a field the contract does not define fails, at every level.
 const closedInTheSnapshotAndScans = [
-  ['the catalogue snapshot', catalogOf((c) => { c.note = 'x'; }), /catalog-2026-09-30\.json carries note/],
-  ['a catalogue entry', entryOf('npm', 'md5', (e) => { e.replacedBy = '@noble/hashes'; }), /entries\[\d+\] \(npm:md5\) carries replacedBy/],
-  ['an entry\'s class evidence', entryOf('npm', 'md5', (e) => { e.classEvidence.note = 'x'; }), /\(npm:md5\): classEvidence carries note/],
-  ['an entry\'s reason for being unclassified', entryOf('npm', '@types/bcryptjs', (e) => { e.unclassifiedReason.note = 'x'; }), /unclassifiedReason carries note/],
-  ['an entry\'s end-of-life review', entryOf('npm', 'md5', (e) => { e.endOfLifeReview.note = 'x'; }), /endOfLifeReview carries note/],
-  ['an entry\'s multi-purpose record', entryOf('pypi', 'cryptography', (e) => { e.multiPurpose.note = 'x'; }), /multiPurpose carries note/],
-  ['an entry\'s unmatchable record', entryOf('go', 'crypto/md5', (e) => { e.unmatchable.note = 'x'; }), /unmatchable carries note/],
-  ['an entry\'s registry-absent record', entryOf('npm', 'tripledes', (e) => { e.registryAbsent.extra = 'x'; }), /registryAbsent carries extra/],
-  ['an alias', entryOf('go', 'golang.org/x/crypto', (e) => { e.aliases[0].note = 'x'; }), /aliases\[0\] carries note/],
-  ['an entry\'s last release', entryOf('npm', 'crypto-js', (e) => { e.lastRelease.note = 'x'; }), /lastRelease carries note/],
-  ['a raw scan file', scanOf('hex', (s) => { s.totalScanned = 1; }), /scan-results-hex\.json carries totalScanned/],
-  ['the scanner record', scanOf('hex', (s) => { s.scanner.note = 'x'; }), /scan-results-hex\.json: scanner carries note/],
-  ['the scan\'s catalogue record', scanOf('hex', (s) => { s.catalog.note = 'x'; }), /scan-results-hex\.json: catalog carries note/],
-  ['the scan method', scanOf('hex', (s) => { s.method.note = 'x'; }), /scan-results-hex\.json: method carries note/],
-  ['the enumeration', scanOf('hex', (s) => { s.enumeration.collected = 1; }), /scan-results-hex\.json: enumeration carries collected/],
-  ['the sampling', scanOf('hex', (s) => { s.enumeration.sampling.size = 1; }), /enumeration\.sampling carries size/],
-  ['the Go index window', scanOf('go', (s) => { s.enumeration.indexWindow.note = 'x'; }), /enumeration\.indexWindow carries note/],
-  ['the scan coverage', scanOf('hex', (s) => { s.coverage.fetchErrors = 0; }), /scan-results-hex\.json: coverage carries fetchErrors/],
-  ['the listing record', scanOf('hex', (s) => { s.listing.note = 'x'; }), /scan-results-hex\.json: listing carries note/],
-  ['a registry check', scanOf('hex', (s) => { s.catalogCheck[0].note = 'x'; }), /catalogCheck\[0\] carries note/],
-  ['a package record', scanOf('hex', (s) => { s.packages[0].posture = 'modern'; }), /packages\[0\] \(acme_hex\) carries posture/],
-  ['a match record', scanOf('hex', (s) => { s.packages[0].matches[0].direct = true; }), /matches\[0\] carries direct/],
-  ['a declaration', scanOf('hex', (s) => { s.packages[0].matches[0].declarations[0].tier = 'other'; }), /declarations\[0\] carries tier/],
+  ['the catalogue snapshot', catalogOf((c) => { c.note = 'x'; }), /catalog-2026-09-30\.json carries "note"/],
+  ['a catalogue entry', entryOf('npm', 'md5', (e) => { e.replacedBy = '@noble/hashes'; }), /entries\[\d+\] \(npm:md5\) carries "replacedBy"/],
+  ['an entry\'s class evidence', entryOf('npm', 'md5', (e) => { e.classEvidence.note = 'x'; }), /\(npm:md5\): classEvidence carries "note"/],
+  ['an entry\'s reason for being unclassified', entryOf('npm', '@types/bcryptjs', (e) => { e.unclassifiedReason.note = 'x'; }), /unclassifiedReason carries "note"/],
+  ['an entry\'s end-of-life review', entryOf('npm', 'md5', (e) => { e.endOfLifeReview.note = 'x'; }), /endOfLifeReview carries "note"/],
+  ['an entry\'s multi-purpose record', entryOf('pypi', 'cryptography', (e) => { e.multiPurpose.note = 'x'; }), /multiPurpose carries "note"/],
+  ['an entry\'s unmatchable record', entryOf('go', 'crypto/md5', (e) => { e.unmatchable.note = 'x'; }), /unmatchable carries "note"/],
+  ['an entry\'s registry-absent record', entryOf('npm', 'tripledes', (e) => { e.registryAbsent.extra = 'x'; }), /registryAbsent carries "extra"/],
+  ['an alias', entryOf('go', 'golang.org/x/crypto', (e) => { e.aliases[0].note = 'x'; }), /aliases\[0\] carries "note"/],
+  ['an entry\'s last release', entryOf('npm', 'crypto-js', (e) => { e.lastRelease.note = 'x'; }), /lastRelease carries "note"/],
+  ['a raw scan file', scanOf('hex', (s) => { s.totalScanned = 1; }), /scan-results-hex\.json carries "totalScanned"/],
+  ['the scanner record', scanOf('hex', (s) => { s.scanner.note = 'x'; }), /scan-results-hex\.json: scanner carries "note"/],
+  ['the scan\'s catalogue record', scanOf('hex', (s) => { s.catalog.note = 'x'; }), /scan-results-hex\.json: catalog carries "note"/],
+  ['the scan method', scanOf('hex', (s) => { s.method.note = 'x'; }), /scan-results-hex\.json: method carries "note"/],
+  ['the enumeration', scanOf('hex', (s) => { s.enumeration.collected = 1; }), /scan-results-hex\.json: enumeration carries "collected"/],
+  ['the sampling', scanOf('hex', (s) => { s.enumeration.sampling.size = 1; }), /enumeration\.sampling carries "size"/],
+  ['the Go index window', scanOf('go', (s) => { s.enumeration.indexWindow.note = 'x'; }), /enumeration\.indexWindow carries "note"/],
+  ['the scan coverage', scanOf('hex', (s) => { s.coverage.fetchErrors = 0; }), /scan-results-hex\.json: coverage carries "fetchErrors"/],
+  ['the listing record', scanOf('hex', (s) => { s.listing.note = 'x'; }), /scan-results-hex\.json: listing carries "note"/],
+  ['a registry check', scanOf('hex', (s) => { s.catalogCheck[0].note = 'x'; }), /catalogCheck\[0\] carries "note"/],
+  ['a package record', scanOf('hex', (s) => { s.packages[0].posture = 'modern'; }), /packages\[0\] \(acme_hex\) carries "posture"/],
+  ['a match record', scanOf('hex', (s) => { s.packages[0].matches[0].direct = true; }), /matches\[0\] carries "direct"/],
+  ['a declaration', scanOf('hex', (s) => { s.packages[0].matches[0].declarations[0].tier = 'other'; }), /declarations\[0\] carries "tier"/],
 ];
 for (const [level, change, problem] of closedInTheSnapshotAndScans) plant(`a field the contract does not define, in ${level}`, change, problem);
 
 // Each object is closed: a field the contract does not define fails, at every level.
-plant('a stored share in a scan file', scanOf('npm', (s) => { s.coverage.unresolvedShare = 0; }), /coverage carries unresolvedShare, a stored share/);
+plant('a stored share in a scan file', scanOf('npm', (s) => { s.coverage.unresolvedShare = 0; }), /coverage carries "unresolvedShare", a stored share/);
 plant('a missing field', scanOf('hex', (s) => { delete s.versionYears; }), /scan-results-hex\.json is missing versionYears\. Every field of a version 2 file is written out/);
 
 // The catalogue snapshot: the entry's fields, and the states the contract makes impossible.
@@ -1296,13 +1296,13 @@ plant('an entry checked twice', scanOf('hex', (s) => { s.catalogCheck.push({ ...
 plant('an entry left unchecked', scanOf('hex', (s) => { s.catalogCheck = []; }), /catalogCheck has no row for enacl/);
 plant('an alias left unchecked', scanOf('go', (s) => { s.catalogCheck = s.catalogCheck.filter((row) => row.alias === null); }), /catalogCheck has no row for github\.com\/square\/go-jose by its alias gopkg\.in\/square\/go-jose\.v2/);
 plant('a check that finds absent an entry the tags say is present', scanOf('hex', (s) => { s.catalogCheck[0].status = 'absent'; }),
-  /the scan's own registry check finds enacl absent, and the catalogue snapshot does not tag it registryAbsent/);
+  /the scan's own registry check finds enacl "absent", and the catalogue snapshot does not tag it registryAbsent/);
 plant('a check that finds present an entry the tags say is absent', scanOf('npm', (s) => { s.catalogCheck.find((row) => row.entry === 'tripledes').status = 'present'; }),
-  /finds tripledes present, and the catalogue snapshot tags it registryAbsent/);
+  /finds tripledes "present", and the catalogue snapshot tags it registryAbsent/);
 plant('an unmatchable entry found on the registry', scanOf('go', (s) => { s.catalogCheck.find((row) => row.entry === 'crypto/md5').status = 'present'; }),
-  /crypto\/md5 is tagged unmatchable, and the registry check finds it present/);
+  /crypto\/md5 is tagged unmatchable, and the registry check finds it "present"/);
 plant('an unmatchable entry left unresolved', scanOf('go', (s) => { s.catalogCheck.find((row) => row.entry === 'crypto/md5').status = 'unresolved'; }),
-  /crypto\/md5 is tagged unmatchable, and the registry check finds it unresolved/);
+  /crypto\/md5 is tagged unmatchable, and the registry check finds it "unresolved"/);
 
 test('an unmatchable entry the registry check finds absent passes', async () => {
   const result = await validateOne(scanOf('go', (s) => { Object.assign(s.catalogCheck.find((row) => row.entry === 'crypto/md5'), { status: 'absent', httpStatus: 404 }); }));
@@ -1501,7 +1501,7 @@ plant('a count that is not what the ledger gives', scanOf('npm', (s) => { s.cove
 plant('a ledger that reads an unread package as read', ledgerOf('npm', (lines) => lines.map((line) => line.replace(/^eta\tabsent\thttp404\t\t\t\t$/, 'eta\tscanned\t\t1.0.0\trelease\t1\t0'))),
   /scan-results-npm\.json: coverage\.scanned is 7, and listing-npm\.tsv\.gz gives 8/);
 plant('counts by source that the ledger does not give', { fixture: (f) => { f.packagist.rows.find((r) => r.name === 'acme/cli').readFrom = 'taggedRelease'; }, scans: (s) => { s.packagist.coverage.scannedByReadFrom = { taggedRelease: 2, devDefaultBranch: 1 }; } },
-  /coverage\.scannedByReadFrom\.taggedRelease is 2, and listing-packagist\.tsv\.gz gives 3/);
+  /coverage\.scannedByReadFrom gives 2 for "taggedRelease", and listing-packagist\.tsv\.gz gives 3/);
 plant('a package whose ledger row records no match', ledgerOf('hex', (lines) => [lines[0], lines[1].replace(/\t1$/, '\t0')]), /acme_hex is in packages, and listing-hex\.tsv\.gz records no match for it/);
 plant('a scan file with one match deleted', scanOf('npm', (s) => { s.packages[0].matches.pop(); }), /@acme\/alpha has 1 match record\(s\), and listing-npm\.tsv\.gz records 2/);
 plant('a scan file with one matched package deleted', scanOf('npm', (s) => { s.packages.shift(); s.packagesWithMatch -= 1; }), /listing-npm\.tsv\.gz records 2 match\(es\) for @acme\/alpha, which scan-results-npm\.json does not list/);
@@ -1537,11 +1537,11 @@ const mapOf = (fn) => ({ consolidation: fn });
 
 // Each object is closed: a field the contract does not define fails, at every level.
 const closedInTheMap = [
-  ['the consolidation map', mapOf((m) => { m.note = 'x'; }), /consolidation-2026-09-30\.json carries note/],
-  ['a consolidation rule', mapOf((m) => { m.rules[0].note = 'x'; }), /rules\[0\] carries note/],
-  ['a registry of the map', mapOf((m) => { m.byEcosystem.npm.note = 'x'; }), /byEcosystem\.npm carries note/],
-  ['a merged unit', mapOf((m) => { m.byEcosystem.npm.units[0].note = 'x'; }), /byEcosystem\.npm\.units\[0\] carries note/],
-  ['a removal', mapOf((m) => { m.byEcosystem.pub.removed = [{ name: 'acme_dart', rule: 'sharedNamespace', note: 'x' }]; }), /byEcosystem\.pub\.removed\[0\] carries note/],
+  ['the consolidation map', mapOf((m) => { m.note = 'x'; }), /consolidation-2026-09-30\.json carries "note"/],
+  ['a consolidation rule', mapOf((m) => { m.rules[0].note = 'x'; }), /rules\[0\] carries "note"/],
+  ['a registry of the map', mapOf((m) => { m.byEcosystem.npm.note = 'x'; }), /byEcosystem\.npm carries "note"/],
+  ['a merged unit', mapOf((m) => { m.byEcosystem.npm.units[0].note = 'x'; }), /byEcosystem\.npm\.units\[0\] carries "note"/],
+  ['a removal', mapOf((m) => { m.byEcosystem.pub.removed = [{ name: 'acme_dart', rule: 'sharedNamespace', note: 'x' }]; }), /byEcosystem\.pub\.removed\[0\] carries "note"/],
 ];
 for (const [level, change, problem] of closedInTheMap) plant(`a field the contract does not define, in ${level}`, change, problem);
 
@@ -1553,7 +1553,7 @@ plant('rules that are not a list', mapOf((m) => { m.rules = {}; }), /consolidati
 plant('a rule with no id of its own', mapOf((m) => { m.rules.push({ ...m.rules[0] }); }), /rules\[1\]\.id is "sharedNamespace", not a rule id of its own/);
 plant('a rule with no statement', mapOf((m) => { m.rules[0].statement = ''; }), /rules\[0\]\.statement is "", not a statement of the rule/);
 plant('a map that is not by registry', mapOf((m) => { m.byEcosystem = []; }), /consolidation-2026-09-30\.json: byEcosystem is \[\], not an object by registry/);
-plant('a map naming a registry that is not one', mapOf((m) => { m.byEcosystem.conda = { units: [], removed: [] }; }), /byEcosystem carries conda, which is not one of the eleven registries/);
+plant('a map naming a registry that is not one', mapOf((m) => { m.byEcosystem.conda = { units: [], removed: [] }; }), /byEcosystem carries "conda", which is not one of the eleven registries/);
 plant('units that are not a list', mapOf((m) => { m.byEcosystem.npm.units = {}; }), /byEcosystem\.npm\.units is \{\}, not a list/);
 plant('two units of one name', mapOf((m) => { m.byEcosystem.go.units.push({ unit: 'example.com/app/one', members: ['example.com/lib', 'example.com/app/one/v2'] }); }), /byEcosystem\.go\.units\[1\]\.unit is "example\.com\/app\/one", not a name of its own/);
 plant('a unit of one member', mapOf((m) => { m.byEcosystem.npm.units.push({ unit: '@other', members: ['@other/delta'] }); }), /units\[1\]\.members is \["@other\/delta"\]\. The map lists merged units only/);
@@ -1726,8 +1726,8 @@ plant('a known issue naming no figure', manifestOf((m) => { m.knownIssues = [{ .
 plant('a known issue larger than its whole', manifestOf((m) => { m.knownIssues = [{ ...knownIssue(), magnitude: { value: 6, of: 5, unit: 'packages' } }]; }), /knownIssues\[0\]\.magnitude is .*, not null or \{ value, of, unit \}/);
 
 // Each object is closed: a field the contract does not define fails, at every level.
-plant('a stored share at the top of the corpus', corpusOf((c) => { c.weakShareOfCryptoUsing = 0.42; }), /carries weakShareOfCryptoUsing, a stored share\. No share is stored/);
-plant('a stored share in a figure block', corpusOf((c) => { npmRaw(c).pqcRate = 0.4; }), /anyManifestMatch\.raw carries pqcRate, a stored share/);
+plant('a stored share at the top of the corpus', corpusOf((c) => { c.weakShareOfCryptoUsing = 0.42; }), /carries "weakShareOfCryptoUsing", a stored share\. No share is stored/);
+plant('a stored share in a figure block', corpusOf((c) => { npmRaw(c).pqcRate = 0.4; }), /anyManifestMatch\.raw carries "pqcRate", a stored share/);
 plant('a share stored where a count goes', corpusOf((c) => { npmRaw(c).weak.count = 0.5; }), /anyManifestMatch\.raw\.weak\.count is 0\.5, not a whole count or null/);
 
 // The consolidation map, and the rule it is held to.
@@ -1782,7 +1782,7 @@ plant('an aggregation with no script', corpusOf((c) => { c.aggregator.script = '
 plant('a direct definition without the module that evaluates it', corpusOf((c) => { delete c.definitions.directUnconditional.code; }), /directUnconditional is missing code/);
 plant('a direct definition whose module is not named', corpusOf((c) => { c.definitions.directUnconditional.code = null; }), /directUnconditional\.code is null, not the module that evaluates the rule/);
 plant('coverage without dev metadata that repeats the unread counts', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata.coverage.listed = 3; }),
-  /packagist\.excludingDevMetadata\.coverage carries listed/);
+  /packagist\.excludingDevMetadata\.coverage carries "listed"/);
 plant('a coverage total that is not the sum of the rows', corpusOf((c) => { c.coverage.total.listed += 1; }), /coverage\.total\.listed is 37; the scan files of the 11 rows not withheld sum to 36/);
 plant('a coverage without a registry', corpusOf((c) => { delete c.coverage.byEcosystem.pub; }), /coverage\.byEcosystem is missing pub/);
 plant('a corpus without a registry\'s row', corpusOf((c) => { delete c.byEcosystem.pub; }), /corpus-2026-09-30\.json: byEcosystem is missing pub/);
@@ -1822,7 +1822,7 @@ plant('a K that is not a count', corpusOf((c) => { npmRaw(c).weak.k = null; }), 
 plant('a cell under another K', corpusOf((c) => { npmRaw(c).weak.k = 3; }), /anyManifestMatch\.raw\.weak is \{"count":4,"k":3,"nullReason":null\}; recomputed/);
 plant('a block under another definition id', corpusOf((c) => { npmRaw(c).definitionId = 'census.match.anyManifest/1'; }), /anyManifestMatch\.raw\.definitionId is "census\.match\.anyManifest\/1", not census\.match\.anyManifest\/1\+census\.unit\.package\/1/);
 plant('a block without its consolidation figures', corpusOf((c) => { delete c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation; }), /anyManifestMatch\.consolidated is missing consolidation/);
-plant('a raw block with consolidation figures', corpusOf((c) => { npmRaw(c).consolidation = { unitsIn: 6, unitsOut: 6, merged: 0, removedByRule: {} }; }), /anyManifestMatch\.raw carries consolidation/);
+plant('a raw block with consolidation figures', corpusOf((c) => { npmRaw(c).consolidation = { unitsIn: 6, unitsOut: 6, merged: 0, removedByRule: {} }; }), /anyManifestMatch\.raw carries "consolidation"/);
 plant('unclassified matches off by one', corpusOf((c) => { npmRaw(c).excludedUnclassified.matches += 1; }), /raw\.excludedUnclassified\.matches is 3; recomputed it is 2/);
 plant('units with only unclassified matches off by one', corpusOf((c) => { npmRaw(c).excludedUnclassified.unitsWithOnlyUnclassifiedMatches = 2; }), /unitsWithOnlyUnclassifiedMatches is 2; recomputed it is 1/);
 plant('an unclassified entry\'s count off by one', corpusOf((c) => { npmRaw(c).excludedUnclassified.byEntry[0].matches = 3; }), /raw\.excludedUnclassified\.byEntry is .*; recomputed it is .*It lists every unclassified entry/);
@@ -1880,7 +1880,7 @@ plant('a total cell that leaves a registry out', corpusOf((c) => { c.total.anyMa
 plant('a total cell that names a registry twice', corpusOf((c) => { c.total.anyManifestMatch.raw.pqc.notMeasurableIn.push('npm'); }),
   /total\.anyManifestMatch\.raw\.pqc: measurableIn, notMeasurableIn and the withheld rows do not name the eleven registries once each \(named twice: npm\)/);
 plant('a total whose measurable rows are not registries', corpusOf((c) => { c.total.directUnconditional.raw.pqc.measurableIn = ['npm', 'npm']; }), /total\.directUnconditional\.raw\.pqc\.measurableIn is \["npm","npm"\], not a list of distinct registries/);
-plant('a total that carries figures without dev metadata', corpusOf((c) => { c.total.excludingDevMetadata = null; }), /corpus-2026-09-30\.json: total carries excludingDevMetadata/);
+plant('a total that carries figures without dev metadata', corpusOf((c) => { c.total.excludingDevMetadata = null; }), /corpus-2026-09-30\.json: total carries "excludingDevMetadata"/);
 plant('a multi-purpose library left out', corpusOf((c) => { c.multiPurposeLibraries.pop(); }), /multiPurposeLibraries has no row for go:github\.com\/cloudflare\/circl/);
 plant('a library listed as multi-purpose that is not', corpusOf((c) => { c.multiPurposeLibraries.push({ ...c.multiPurposeLibraries[0], entry: 'pyDes' }); }), /multiPurposeLibraries\[2\] names "pypi":"pyDes", which is not a multi-purpose entry/);
 plant('a multi-purpose library listed twice', corpusOf((c) => { c.multiPurposeLibraries.push(structuredClone(c.multiPurposeLibraries[0])); }), /multiPurposeLibraries\[2\] names pypi:cryptography a second time/);
@@ -1985,48 +1985,48 @@ test('an earlier dataset whose manifest cannot be read is refused as a compariso
 
 // Each object is closed: a field the contract does not define fails, at every level.
 const closedInTheCorpus = [
-  ['a registry of the manifest', manifestOf((m) => { m.ecosystems[0].note = 'x'; }), /MANIFEST\.json: ecosystems\[0\] carries note/],
-  ['a known issue', manifestOf((m) => { m.knownIssues = [{ ...knownIssue(), note: 'x' }]; }), /MANIFEST\.json: knownIssues\[0\] carries note/],
-  ['the corpus', corpusOf((c) => { c.packagesScanned = 36; }), /corpus-2026-09-30\.json carries packagesScanned/],
-  ['the inputs', corpusOf((c) => { c.inputs.note = 'x'; }), /corpus-2026-09-30\.json: inputs carries note/],
-  ['an input scan', corpusOf((c) => { c.inputs.scans[0].note = 'x'; }), /inputs\.scans\[0\] carries note/],
-  ['the input catalogue', corpusOf((c) => { c.inputs.catalog.note = 'x'; }), /inputs\.catalog carries note/],
-  ['the input map', corpusOf((c) => { c.inputs.consolidation.note = 'x'; }), /inputs\.consolidation carries note/],
-  ['the definitions', corpusOf((c) => { c.definitions.note = 'x'; }), /: definitions carries note/],
-  ['a definition', corpusOf((c) => { c.definitions.raw.note = 'x'; }), /definitions\.raw carries note/],
-  ['the manifest-match definition', corpusOf((c) => { c.definitions.anyManifestMatch.note = 'x'; }), /definitions\.anyManifestMatch carries note/],
-  ['the direct definition', corpusOf((c) => { c.definitions.directUnconditional.note = 'x'; }), /definitions\.directUnconditional carries note/],
-  ['the class ids', corpusOf((c) => { c.definitions.classes.modern = 'x'; }), /definitions\.classes carries modern/],
-  ['a comparability record', corpusOf((c) => { c.comparability[0].note = 'x'; }), /comparability\[0\] carries note/],
-  ['a blocked row', corpusOf((c) => { c.blocked = [{ ecosystem: 'hex', reason: 'sourcesOffAllowlist', detail: 'x', note: 'x' }]; }), /blocked\[0\] carries note/],
-  ['the corpus coverage', corpusOf((c) => { c.coverage.note = 'x'; }), /corpus-2026-09-30\.json: coverage carries note/],
-  ['the coverage total', corpusOf((c) => { c.coverage.total.withCrypto = 1; }), /coverage\.total carries withCrypto/],
-  ['a registry\'s coverage', corpusOf((c) => { c.coverage.byEcosystem.hex.qc = 1; }), /coverage\.byEcosystem\.hex carries qc/],
-  ['a registry\'s row', corpusOf((c) => { c.byEcosystem.hex.qc = {}; }), /byEcosystem\.hex carries qc/],
-  ['the measurability', corpusOf((c) => { c.byEcosystem.hex.measurability.modern = {}; }), /measurability carries modern/],
-  ['one class\'s measurability', corpusOf((c) => { c.byEcosystem.npm.measurability.weak.note = 'x'; }), /measurability\.weak carries note/],
-  ['an exclusion', corpusOf((c) => { c.byEcosystem.npm.measurability.weak.excluded[0].note = 'x'; }), /measurability\.weak\.excluded\[0\] carries note/],
-  ['a figure block', corpusOf((c) => { npmRaw(c).modernOnly = { count: 1, k: 1, nullReason: null }; }), /anyManifestMatch\.raw carries modernOnly/],
-  ['a pair of blocks', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.qc = {}; }), /byEcosystem\.npm\.anyManifestMatch carries qc/],
-  ['a class cell', corpusOf((c) => { npmRaw(c).weak.note = 'x'; }), /anyManifestMatch\.raw\.weak carries note/],
-  ['a joint cell', corpusOf((c) => { npmRaw(c).weakAndPqc.k = 2; }), /anyManifestMatch\.raw\.weakAndPqc carries k/],
-  ['what was left out', corpusOf((c) => { npmRaw(c).excludedUnclassified.note = 'x'; }), /raw\.excludedUnclassified carries note/],
-  ['an unclassified entry\'s count', corpusOf((c) => { npmRaw(c).excludedUnclassified.byEntry[0].ecosystem = 'npm'; }), /excludedUnclassified\.byEntry\[0\] carries ecosystem/],
-  ['the consolidation figures', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation.note = 'x'; }), /consolidated\.consolidation carries note/],
-  ['the figures without dev metadata', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata.note = 'x'; }), /byEcosystem\.packagist\.excludingDevMetadata carries note/],
-  ['the total', corpusOf((c) => { c.total.coverage = c.coverage.total; }), /corpus-2026-09-30\.json: total carries coverage/],
-  ['a total cell', corpusOf((c) => { c.total.anyManifestMatch.raw.weak.note = 'x'; }), /total\.anyManifestMatch\.raw\.weak carries note/],
-  ['a joint total cell', corpusOf((c) => { c.total.anyManifestMatch.raw.weakAndPqc.k = 2; }), /total\.anyManifestMatch\.raw\.weakAndPqc carries k/],
-  ['what a block could not count', corpusOf((c) => { npmRaw(c).excludedNotCountable.note = 'x'; }), /raw\.excludedNotCountable carries note/],
-  ['the coverage without dev metadata', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata.coverage.note = 1; }), /packagist\.excludingDevMetadata\.coverage carries note/],
-  ['the dependents of a multi-purpose library', corpusOf((c) => { c.multiPurposeLibraries[0].dependents.note = 1; }), /multiPurposeLibraries\[0\]\.dependents carries note/],
-  ['the coverage of the manifest', manifestOf((m) => { m.coverage.note = 1; }), /MANIFEST\.json: coverage carries note/],
-  ['the aggregator', corpusOf((c) => { c.aggregator.note = 'x'; }), /corpus-2026-09-30\.json: aggregator carries note/],
-  ['a withheld row', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].note = 'x'; })), /withheld\[0\] carries note/],
-  ['a reason a row is withheld', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].reasons[0].note = 'x'; })), /withheld\[0\]\.reasons\[0\] carries note/],
-  ['the coverage of a withheld row', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].coverage.note = 'x'; })), /withheld\[0\]\.coverage carries note/],
-  ['a multi-purpose library', corpusOf((c) => { c.multiPurposeLibraries[0].total = 2; }), /multiPurposeLibraries\[0\] carries total/],
-  ['its dependents', corpusOf((c) => { c.multiPurposeLibraries[0].dependents.anyManifestMatch.total = 2; }), /dependents\.anyManifestMatch carries total/],
+  ['a registry of the manifest', manifestOf((m) => { m.ecosystems[0].note = 'x'; }), /MANIFEST\.json: ecosystems\[0\] carries "note"/],
+  ['a known issue', manifestOf((m) => { m.knownIssues = [{ ...knownIssue(), note: 'x' }]; }), /MANIFEST\.json: knownIssues\[0\] carries "note"/],
+  ['the corpus', corpusOf((c) => { c.packagesScanned = 36; }), /corpus-2026-09-30\.json carries "packagesScanned"/],
+  ['the inputs', corpusOf((c) => { c.inputs.note = 'x'; }), /corpus-2026-09-30\.json: inputs carries "note"/],
+  ['an input scan', corpusOf((c) => { c.inputs.scans[0].note = 'x'; }), /inputs\.scans\[0\] carries "note"/],
+  ['the input catalogue', corpusOf((c) => { c.inputs.catalog.note = 'x'; }), /inputs\.catalog carries "note"/],
+  ['the input map', corpusOf((c) => { c.inputs.consolidation.note = 'x'; }), /inputs\.consolidation carries "note"/],
+  ['the definitions', corpusOf((c) => { c.definitions.note = 'x'; }), /: definitions carries "note"/],
+  ['a definition', corpusOf((c) => { c.definitions.raw.note = 'x'; }), /definitions\.raw carries "note"/],
+  ['the manifest-match definition', corpusOf((c) => { c.definitions.anyManifestMatch.note = 'x'; }), /definitions\.anyManifestMatch carries "note"/],
+  ['the direct definition', corpusOf((c) => { c.definitions.directUnconditional.note = 'x'; }), /definitions\.directUnconditional carries "note"/],
+  ['the class ids', corpusOf((c) => { c.definitions.classes.modern = 'x'; }), /definitions\.classes carries "modern"/],
+  ['a comparability record', corpusOf((c) => { c.comparability[0].note = 'x'; }), /comparability\[0\] carries "note"/],
+  ['a blocked row', corpusOf((c) => { c.blocked = [{ ecosystem: 'hex', reason: 'sourcesOffAllowlist', detail: 'x', note: 'x' }]; }), /blocked\[0\] carries "note"/],
+  ['the corpus coverage', corpusOf((c) => { c.coverage.note = 'x'; }), /corpus-2026-09-30\.json: coverage carries "note"/],
+  ['the coverage total', corpusOf((c) => { c.coverage.total.withCrypto = 1; }), /coverage\.total carries "withCrypto"/],
+  ['a registry\'s coverage', corpusOf((c) => { c.coverage.byEcosystem.hex.qc = 1; }), /coverage\.byEcosystem\.hex carries "qc"/],
+  ['a registry\'s row', corpusOf((c) => { c.byEcosystem.hex.qc = {}; }), /byEcosystem\.hex carries "qc"/],
+  ['the measurability', corpusOf((c) => { c.byEcosystem.hex.measurability.modern = {}; }), /measurability carries "modern"/],
+  ['one class\'s measurability', corpusOf((c) => { c.byEcosystem.npm.measurability.weak.note = 'x'; }), /measurability\.weak carries "note"/],
+  ['an exclusion', corpusOf((c) => { c.byEcosystem.npm.measurability.weak.excluded[0].note = 'x'; }), /measurability\.weak\.excluded\[0\] carries "note"/],
+  ['a figure block', corpusOf((c) => { npmRaw(c).modernOnly = { count: 1, k: 1, nullReason: null }; }), /anyManifestMatch\.raw carries "modernOnly"/],
+  ['a pair of blocks', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.qc = {}; }), /byEcosystem\.npm\.anyManifestMatch carries "qc"/],
+  ['a class cell', corpusOf((c) => { npmRaw(c).weak.note = 'x'; }), /anyManifestMatch\.raw\.weak carries "note"/],
+  ['a joint cell', corpusOf((c) => { npmRaw(c).weakAndPqc.k = 2; }), /anyManifestMatch\.raw\.weakAndPqc carries "k"/],
+  ['what was left out', corpusOf((c) => { npmRaw(c).excludedUnclassified.note = 'x'; }), /raw\.excludedUnclassified carries "note"/],
+  ['an unclassified entry\'s count', corpusOf((c) => { npmRaw(c).excludedUnclassified.byEntry[0].ecosystem = 'npm'; }), /excludedUnclassified\.byEntry\[0\] carries "ecosystem"/],
+  ['the consolidation figures', corpusOf((c) => { c.byEcosystem.npm.anyManifestMatch.consolidated.consolidation.note = 'x'; }), /consolidated\.consolidation carries "note"/],
+  ['the figures without dev metadata', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata.note = 'x'; }), /byEcosystem\.packagist\.excludingDevMetadata carries "note"/],
+  ['the total', corpusOf((c) => { c.total.coverage = c.coverage.total; }), /corpus-2026-09-30\.json: total carries "coverage"/],
+  ['a total cell', corpusOf((c) => { c.total.anyManifestMatch.raw.weak.note = 'x'; }), /total\.anyManifestMatch\.raw\.weak carries "note"/],
+  ['a joint total cell', corpusOf((c) => { c.total.anyManifestMatch.raw.weakAndPqc.k = 2; }), /total\.anyManifestMatch\.raw\.weakAndPqc carries "k"/],
+  ['what a block could not count', corpusOf((c) => { npmRaw(c).excludedNotCountable.note = 'x'; }), /raw\.excludedNotCountable carries "note"/],
+  ['the coverage without dev metadata', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata.coverage.note = 1; }), /packagist\.excludingDevMetadata\.coverage carries "note"/],
+  ['the dependents of a multi-purpose library', corpusOf((c) => { c.multiPurposeLibraries[0].dependents.note = 1; }), /multiPurposeLibraries\[0\]\.dependents carries "note"/],
+  ['the coverage of the manifest', manifestOf((m) => { m.coverage.note = 1; }), /MANIFEST\.json: coverage carries "note"/],
+  ['the aggregator', corpusOf((c) => { c.aggregator.note = 'x'; }), /corpus-2026-09-30\.json: aggregator carries "note"/],
+  ['a withheld row', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].note = 'x'; })), /withheld\[0\] carries "note"/],
+  ['a reason a row is withheld', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].reasons[0].note = 'x'; })), /withheld\[0\]\.reasons\[0\] carries "note"/],
+  ['the coverage of a withheld row', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].coverage.note = 'x'; })), /withheld\[0\]\.coverage carries "note"/],
+  ['a multi-purpose library', corpusOf((c) => { c.multiPurposeLibraries[0].total = 2; }), /multiPurposeLibraries\[0\] carries "total"/],
+  ['its dependents', corpusOf((c) => { c.multiPurposeLibraries[0].dependents.anyManifestMatch.total = 2; }), /dependents\.anyManifestMatch carries "total"/],
 ];
 for (const [level, change, problem] of closedInTheCorpus) plant(`a field the contract does not define, in ${level}`, change, problem);
 
@@ -2096,7 +2096,7 @@ plant('a row withheld above the ceiling that is within it', withholding('rubygem
 plant('withheld rows that are not a list', corpusOf((c) => { c.withheld = null; }), /corpus-2026-09-30\.json: withheld is null, not a list/);
 // A row withheld is recorded once, in the corpus: listing it as a check as well refuses it.
 plant('a withheld row listed as a check as well', withholding('rubygems', ABOVE_CEILING, { ...oneUnresolvedGem, ...manifestOf((m) => { m.checks.unresolvedAboveCeiling = ['rubygems']; }) }),
-  /MANIFEST\.json: checks carries unresolvedAboveCeiling, which the schema version 2 contract does not define/);
+  /MANIFEST\.json: checks carries "unresolvedAboveCeiling", which the schema version 2 contract does not define/);
 
 // --- Each withholding code, recomputed --------------------------------------------
 //
@@ -2217,7 +2217,7 @@ plant('a map that merges packages of a registry with no scan file', withoutScanF
 plant('a dataset dated before the last scan it holds finished', withoutScanFile('rubygems', scanOf('hex', (s) => { s.finishedAt = '2026-10-01T02:00:00.000Z'; })),
   /collectedAt is 2026-09-30, and the last scan finished on 2026-10-01/);
 plant('a scan file left in the directory and out of the manifest', withoutScanFile('rubygems'),
-  /present but not listed in MANIFEST\.json: scan-results-rubygems\.json/, (dir) => { writeFileSync(join(datasetDir(dir), 'scan-results-rubygems.json'), '{}\n'); });
+  /present but not listed in MANIFEST\.json: "scan-results-rubygems\.json"/, (dir) => { writeFileSync(join(datasetDir(dir), 'scan-results-rubygems.json'), '{}\n'); });
 
 // --- Errata for a version 2 dataset ----------------------------------------------
 
@@ -2342,6 +2342,52 @@ plant('a manifest nested deeper than any version 2 file', {}, /MANIFEST\.json ne
 plant('a listed file nested deeper than any version 2 file', {}, /corpus-2026-09-30\.json nests values more than 32 deep/, (dir) => {
   const text = readText(join(datasetDir(dir), 'corpus-2026-09-30.json'));
   rehash('corpus-2026-09-30.json', text.replace(/"comparability": \[[\s\S]*?\n {2}\],\n/, `"comparability": ${deep(20000)},\n`))(dir);
+});
+
+// A key, a file name and a manifest field with a line break and `::notice` in them. Each is printed through
+// describe(), as JSON text, so the break is written as \n and no line of the output begins with `::`, which the
+// host's runner would read as a command.
+const COMMAND = '\n::notice title=x::y';
+for (const [what, change, prepare, shown] of [
+  ['a key of a scan file', scanOf('hex', (s) => { s[`extra${COMMAND}`] = 1; }), undefined, /scan-results-hex\.json carries "extra\\n::notice title=x::y", which the schema version 2 contract does not define/],
+  ['a key of the manifest', manifestOf((m) => { m[`extra${COMMAND}`] = 1; }), undefined, /MANIFEST\.json is not a version 2 manifest: it carries "extra\\n::notice title=x::y", which a version 2 manifest does not define/],
+  ['the name of a stray file', {}, (dir) => writeFileSync(join(datasetDir(dir), `notes${COMMAND}.txt`), 'notes\n'), /present but not listed in MANIFEST\.json: "notes\\n::notice title=x::y\.txt"\. An unlisted file/],
+  ['a stored share', scanOf('hex', (s) => { s.coverage[`rate${COMMAND}`] = 0.5; }), undefined, /coverage carries "rate\\n::notice title=x::y", a stored share/],
+]) {
+  test(`${what} holding a line break and a runner command is printed as text, on one line`, async () => {
+    const result = await validateOne(change, prepare);
+    assert.equal(result.code, 1, result.stdout);
+    assert.match(firstProblem(result.stderr), shown, result.stderr);
+    assert.doesNotMatch(result.stderr, /^::/m, result.stderr);
+    assert.doesNotMatch(result.stdout, /^::/m, result.stdout);
+  });
+}
+
+// The first file shape prints a listed file's name and recorded hash the same way, and a file name with a control
+// character in it is not the name of a file in the dataset at all. The published manifest copied beside every test
+// dataset lists its corpus alone, so the name goes on an entry added to it and the hash on the corpus.
+test('a first-shape manifest whose file name and hash hold a line break and a runner command prints them as text, on one line', async () => {
+  const result = await validate({}, (dir) => {
+    const path = join(dir, 'datasets', FIRST_SHAPE, 'MANIFEST.json');
+    const m = JSON.parse(readText(path));
+    m.corpus.sha256 = `${m.corpus.sha256}${COMMAND}`;
+    m.ecosystems = [{ ecosystem: 'npm', file: `scan-results-npm-clean${COMMAND}.json`, sha256: '0'.repeat(64) }];
+    writeFileSync(path, json(m));
+  });
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(result.stderr, /"corpus-2026-03-18\.json" does not match its recorded hash\n\s+recorded "[0-9a-f]{64}\\n::notice title=x::y"\n\s+actual\s+[0-9a-f]{64}/, result.stderr);
+  assert.match(result.stderr, /a manifest entry names "scan-results-npm-clean\\n::notice title=x::y\.json", which is not the name of a file in the dataset's own directory/, result.stderr);
+  assert.doesNotMatch(result.stderr, /^::/m, result.stderr);
+});
+
+// Whatever reaches the output unquoted, a parser's own message included, is indented line by line.
+test('a parse error that quotes a line break and a runner command from the file is printed indented, so no line begins with it', async () => {
+  const result = await validateOne({}, (dir) => rehash('scan-results-hex.json', `{"schemaVersion": 2, "a":${COMMAND}}`)(dir));
+  assert.equal(result.code, 1, result.stdout);
+  assert.match(firstProblem(result.stderr), /scan-results-hex\.json does not parse/, result.stderr);
+  // The parser quotes the text around the error, line break included, cut short on either side.
+  assert.match(result.stderr, /\n {2,}::notice t/, result.stderr);
+  assert.doesNotMatch(result.stderr, /^::/m, result.stderr);
 });
 
 test('a manifest that is a link to a device is refused without reading it', { timeout: 30000 }, async () => {

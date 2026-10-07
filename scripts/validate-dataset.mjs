@@ -142,10 +142,12 @@ const note = (dataset, message) => notes.push(`${dataset}: ${message}`);
 
 /**
  * A name a manifest gives a file is read only as the name of a file in the
- * dataset's own directory: no separator, and not a step up or in place. A path
- * would have these checks read, and report on, a file outside it.
+ * dataset's own directory: no separator, not a step up or in place, and no
+ * control or format character. A path would have these checks read, and
+ * report on, a file outside it; a name with a line break in it would print
+ * as two lines, the second of which the name chose.
  */
-const isFileName = (name) => typeof name === 'string' && /^[^/\\]+$/.test(name) && name !== '..' && name !== '.';
+const isFileName = (name) => typeof name === 'string' && /^[^/\\]+$/.test(name) && !hasHiddenCharacters(name) && name !== '..' && name !== '.';
 
 function validate(name) {
   const dir = join(DATASETS, name);
@@ -232,7 +234,7 @@ function validate(name) {
     listed.add(entry.file);
     const path = join(dir, entry.file);
     if (!existsSync(path)) {
-      fail(name, `${entry.file} is listed in MANIFEST.json but is not in the dataset`);
+      fail(name, `${describe(entry.file)} is listed in MANIFEST.json but is not in the dataset`);
       continue;
     }
     if (!lstatSync(path).isFile()) {
@@ -240,15 +242,15 @@ function validate(name) {
       continue;
     }
     if (!entry.sha256) {
-      fail(name, `${entry.file} carries no sha256, so nothing about it can be verified after transit`);
+      fail(name, `${describe(entry.file)} carries no sha256, so nothing about it can be verified after transit`);
       continue;
     }
     const actual = sha256(path);
     if (actual !== entry.sha256) {
-      fail(name, `${entry.file} does not match its recorded hash\n    recorded ${entry.sha256}\n    actual   ${actual}`);
+      fail(name, `${describe(entry.file)} does not match its recorded hash\n    recorded ${describe(entry.sha256)}\n    actual   ${actual}`);
     }
     if (typeof entry.bytes === 'number' && entry.bytes !== statSync(path).size) {
-      fail(name, `${entry.file} is ${statSync(path).size} bytes, manifest says ${entry.bytes}`);
+      fail(name, `${describe(entry.file)} is ${statSync(path).size} bytes, manifest says ${entry.bytes}`);
     }
   }
 
@@ -256,7 +258,7 @@ function validate(name) {
   const present = readdirSync(dir).filter((f) => f.endsWith('.json') && f !== 'MANIFEST.json');
   const strays = present.filter((f) => !listed.has(f));
   if (strays.length > 0) {
-    fail(name, `present but not listed in MANIFEST.json: ${strays.join(', ')}. ` +
+    fail(name, `present but not listed in MANIFEST.json: ${strays.map(describe).join(', ')}. ` +
       'An unlisted file is one no reader can attribute and no hash covers.');
   }
 
@@ -281,7 +283,7 @@ function validate(name) {
   // absent measurement.
   if (kind.requiresRaw && manifest.complete !== true && !manifest.partialReason) {
     fail(name, `complete is ${JSON.stringify(manifest.complete)} and no partialReason is given. ` +
-      `The dataset covers ${manifest.ecosystemCount} ecosystem(s); a reader comparing its total ` +
+      `The dataset covers ${describe(manifest.ecosystemCount)} ecosystem(s); a reader comparing its total ` +
       'against a previous dataset would read the missing ones as a drop rather than as a gap.');
   }
 
@@ -339,10 +341,10 @@ function validate(name) {
   for (const [eco, row] of Object.entries(byEco)) {
     if (!row.knownIssue) continue;
     for (const field of ['defect', 'summary', 'affects', 'direction', 'correctedIn']) {
-      if (!row.knownIssue[field]) fail(name, `${eco}.knownIssue is missing ${field}`);
+      if (!row.knownIssue[field]) fail(name, `${describe(eco)}.knownIssue is missing ${field}`);
     }
     if (!DIRECTIONS.includes(row.knownIssue.direction)) {
-      fail(name, `${eco}.knownIssue.direction is ${JSON.stringify(row.knownIssue.direction)}, ` +
+      fail(name, `${describe(eco)}.knownIssue.direction is ${JSON.stringify(row.knownIssue.direction)}, ` +
         'which tells a reader nothing about which way to read the figure');
     }
   }
@@ -801,9 +803,9 @@ function closed(value, keys, where, bad) {
   for (const key of Object.keys(value)) {
     if (keys.includes(key)) continue;
     bad(looksLikeShare(key, value[key])
-      ? `${where} carries ${key}, a stored share. No share is stored in a version 2 file: one is computed where it is shown, ` +
+      ? `${where} carries ${describe(key)}, a stored share. No share is stored in a version 2 file: one is computed where it is shown, ` +
         'from two counts of the same block, so its denominator is never left to the reader.'
-      : `${where} carries ${key}, which the schema version 2 contract does not define. Every object is closed, so a stale or ` +
+      : `${where} carries ${describe(key)}, which the schema version 2 contract does not define. Every object is closed, so a stale or ` +
         'misspelt field fails instead of being ignored.');
   }
   const missing = keys.filter((key) => !Object.hasOwn(value, key));
@@ -899,7 +901,7 @@ function readManifest2(dir, bad) {
   if (missing.length > 0 || extra.length > 0) {
     const parts = [];
     if (missing.length > 0) parts.push(`it lacks ${missing.join(', ')}`);
-    if (extra.length > 0) parts.push(`it carries ${extra.join(', ')}, which a version 2 manifest does not define`);
+    if (extra.length > 0) parts.push(`it carries ${extra.map(describe).join(', ')}, which a version 2 manifest does not define`);
     bad(`schemaVersion is 2, but MANIFEST.json is not a version 2 manifest: ${parts.join('; ')}. A file is read as version 2 ` +
       'by the fields it has, not by its marker alone.');
     return null;
@@ -1057,7 +1059,7 @@ function readListedFiles(name, dir, manifest, bad) {
 
   const strays = readdirSync(dir).filter((entry) => entry !== 'MANIFEST.json' && !listed.has(entry)).sort();
   if (strays.length > 0) {
-    bad(`present but not listed in MANIFEST.json: ${strays.join(', ')}. An unlisted file is one no reader can attribute ` +
+    bad(`present but not listed in MANIFEST.json: ${strays.map(describe).join(', ')}. An unlisted file is one no reader can attribute ` +
       'and no hash covers.');
   }
   return found;
@@ -1274,7 +1276,7 @@ function checkCatalog(name, record, bad) {
   let sound = true;
   let previous = null;
   c.entries.forEach((entry, index) => {
-    const label = isObject(entry) && isText(entry.name) ? ` (${entry.ecosystem}:${entry.name})` : '';
+    const label = isObject(entry) && isText(entry.name) && isText(entry.ecosystem) ? ` (${entry.ecosystem}:${entry.name})` : '';
     const where = `${file}: entries[${index}]${label}`;
     if (!checkEntry(entry, where, bad)) {
       sound = false;
@@ -1608,13 +1610,13 @@ function checkCatalogCheck(eco, rows, catalog, file, bad) {
     if (row.alias !== null) return;
     if (entry.unmatchable !== null) {
       if (!['notApplicable', 'absent'].includes(row.status)) {
-        bad(`${where}: ${entry.name} is tagged unmatchable, and the registry check finds it ${row.status}. A name a manifest ` +
+        bad(`${where}: ${entry.name} is tagged unmatchable, and the registry check finds it ${describe(row.status)}. A name a manifest ` +
           'cannot declare is notApplicable or absent; present means the tag is wrong.');
       }
       return;
     }
     if ((row.status === 'absent') !== (entry.registryAbsent !== null)) {
-      bad(`${where}: the scan's own registry check finds ${entry.name} ${row.status}, and the catalogue snapshot ` +
+      bad(`${where}: the scan's own registry check finds ${entry.name} ${describe(row.status)}, and the catalogue snapshot ` +
         `${entry.registryAbsent === null ? 'does not tag it registryAbsent' : 'tags it registryAbsent'}. The two have to agree, ` +
         'since the tag decides whether the entry counts toward K.');
     }
@@ -2001,7 +2003,7 @@ function compareLedger(eco, ledger, scan, bad) {
       const stored = scan.coverage.scannedByReadFrom[source] ?? 0;
       const counted = ledger.byReadFrom[source] ?? 0;
       if (stored !== counted) {
-        bad(`${file}: coverage.scannedByReadFrom.${source} is ${stored}, and ${ledger.file} gives ${counted}`);
+        bad(`${file}: coverage.scannedByReadFrom gives ${stored} for ${describe(source)}, and ${ledger.file} gives ${counted}`);
       }
     }
   }
@@ -2098,7 +2100,7 @@ function checkConsolidation(name, record, scans, withScanFile, bad) {
     return null;
   }
   for (const key of Object.keys(c.byEcosystem)) {
-    if (!ECOSYSTEMS.includes(key)) bad(`${file}: byEcosystem carries ${key}, which is not one of the eleven registries`);
+    if (!ECOSYSTEMS.includes(key)) bad(`${file}: byEcosystem carries ${describe(key)}, which is not one of the eleven registries`);
   }
   for (const eco of ECOSYSTEMS) {
     const unitOf = new Map();
@@ -3732,7 +3734,7 @@ if (names.length === 0 && errataFiles.length === 0 && problems.length === 0) {
 
 for (const name of names) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(name)) {
-    fail(name, 'directory name is not a YYYY-MM-DD collection date');
+    fail(describe(name), 'directory name is not a YYYY-MM-DD collection date');
     continue;
   }
   // A check that throws reports where it stopped, and the problems found before it are still listed.
@@ -3754,15 +3756,24 @@ for (const file of errataFiles) {
 const checked = `${names.length} dataset(s)` +
   (errataFiles.length > 0 ? ` and ${errataFiles.length} errata file(s)` : '');
 
+/**
+ * One problem or note, every line of it indented. Keys, names and fields are
+ * printed through describe() above, so a line break in one is written as
+ * `\n`; this holds for whatever else a file's text reaches, a parser's own
+ * message included. No line of the log begins with text a dataset chose, so
+ * none can read as a command to whatever runs these checks.
+ */
+const indented = (text) => `  ${text.replace(/\r\n|\r|\n/g, '\n  ')}\n`;
+
 if (notes.length > 0) {
   process.stdout.write(`\nRecorded, not refused (${notes.length}):\n\n`);
-  for (const n of notes) process.stdout.write(`  ${n}\n`);
+  for (const n of notes) process.stdout.write(indented(n));
   process.stdout.write('\n');
 }
 
 if (problems.length > 0) {
   process.stderr.write(`\n${problems.length} problem(s) across ${checked}:\n\n`);
-  for (const p of problems) process.stderr.write(`  ${p}\n`);
+  for (const p of problems) process.stderr.write(indented(p));
   process.stderr.write('\n');
   process.exit(1);
 }
