@@ -3309,6 +3309,59 @@ for (const [what, change, said, publish] of [
   });
 }
 
+// --- The test steps ---------------------------------------------------------------
+//
+// Each step of .github/workflows/validate.yml that runs `node --test` opens with the four lines the validator's output
+// opens with, written on both streams by scripts/stop-commands.mjs before `node --test` in the same `run:`. A test's
+// name, or what a failing test prints, can hold text the runner reads as a command or a matcher reads as an error, and
+// the reporter `node --test` defaults to off a terminal writes it as it is. The workflow and the opener are read at
+// their tracked paths in this repository, not from a copy.
+
+const WORKFLOW = '.github/workflows/validate.yml';
+const OPENER = 'scripts/stop-commands.mjs';
+
+/** The `run:` text of every step of a workflow: a one-line value as it is, a block's lines joined by line breaks. */
+function runsOf(workflow) {
+  const lines = workflow.split('\n');
+  const runs = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const key = /^(\s*)(- )?run:\s*(.*?)\s*$/.exec(lines[i]);
+    if (!key) continue;
+    const [, indent, item, value] = key;
+    if (!/^[|>]/.test(value)) {
+      runs.push(value);
+      continue;
+    }
+    // A block's lines are indented past the key's column, and a blank line does not end it.
+    const inside = ' '.repeat(indent.length + (item ? item.length : 0) + 1);
+    const block = [];
+    while (i + 1 < lines.length && (lines[i + 1].trim() === '' || lines[i + 1].startsWith(inside))) {
+      i += 1;
+      block.push(lines[i].trim());
+    }
+    runs.push(block.filter(Boolean).join('\n'));
+  }
+  return runs;
+}
+
+test('every step of validate.yml that runs node --test opens with the four lines of scripts/stop-commands.mjs, read from the tracked tree', async () => {
+  const tracked = execFileSync('git', ['ls-files', '--error-unmatch', '-z', '--', WORKFLOW, OPENER], { cwd: ROOT, encoding: 'utf-8' });
+  assert.deepEqual(tracked.split('\0').filter(Boolean), [WORKFLOW, OPENER]);
+  const steps = runsOf(readText(join(ROOT, WORKFLOW))).filter((text) => text.includes('node --test'));
+  assert.equal(steps.length, 3, steps.join('\n'));
+  for (const text of steps) assert.ok(text.startsWith(`node ${OPENER} && node --test `), `a test step opens with the opener: ${text}`);
+  const result = await run([join(ROOT, OPENER)], { cwd: ROOT });
+  assert.equal(result.code, 0, `${result.stdout}${result.stderr}`);
+  const { stdout, stderr } = stopped(result);
+  assert.deepEqual(stdout, [], 'the opener writes its four lines on stdout and nothing else');
+  assert.deepEqual(stderr, [], 'the opener writes its four lines on stderr and nothing else');
+});
+
+test('the token of scripts/stop-commands.mjs is drawn afresh for each run', async () => {
+  const [first, second] = await Promise.all([run([join(ROOT, OPENER)], { cwd: ROOT }), run([join(ROOT, OPENER)], { cwd: ROOT })]);
+  assert.notEqual(stopped(first).token, stopped(second).token);
+});
+
 // --- Running the planted defects -------------------------------------------------
 
 for (const [what, change, problem, prepare] of defects) {
