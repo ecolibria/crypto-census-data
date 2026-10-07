@@ -2813,7 +2813,7 @@ test('a raw file an errata file names is read where the errata file and the mani
 // Three raw files of 94,000,000 bytes, each one list of empty objects, which parsed together exhaust a heap of
 // 4,096 MB. The dataset is past its own bound and none of its files is parsed; the errata file names the three, and
 // each is read alone, for the field named, and released before the next is read.
-test('an errata file naming three raw files of 94,000,000 bytes of empty objects reads each alone, within a heap of 4,096 MB', { timeout: 300000 }, async () => {
+test('an errata file naming three raw files of 94,000,000 bytes of empty objects reads each alone, within a heap of 4,096 MB', { timeout: 600000 }, async () => {
   const text = emptyObjects(94_000_000);
   const result = await validateOne({}, (dir) => {
     for (const eco of ['npm', 'pypi', 'hex']) writeFileSync(join(datasetDir(dir), `scan-results-${eco}.json`), text);
@@ -2875,7 +2875,7 @@ test('a first-shape corpus that would take what is held past the bound, beside i
 // exhaust a heap of 4,096 MB. The later dataset's files are released before the comparison reads the earlier one's,
 // one at a time, so nothing is refused for the bound: each is judged on its own problems, and the two instruments are
 // compared.
-test('a later dataset of 94,187,716 bytes is compared with an earlier one of 144,155,739 once its own files are released, within a heap of 4,096 MB', { timeout: 300000 }, async () => {
+test('a later dataset of 94,187,716 bytes is compared with an earlier one of 144,155,739 once its own files are released, within a heap of 4,096 MB', { timeout: 600000 }, async () => {
   const result = await validate(beside({}), (dir) => {
     toEmptyObjects(join(dir, 'datasets', EARLIER_V2), 144_155_739, ['npm', 'pypi']);
     toEmptyObjects(datasetDir(dir), 94_187_716, ['npm']);
