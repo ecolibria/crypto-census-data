@@ -132,7 +132,8 @@ const hasHiddenCharacters = (v) => /[\p{Cc}\p{Cf}]/u.test(v);
 const isText = (v) => hasWords(v) && !hasHiddenCharacters(v);
 
 /** Read a file as UTF-8 and refuse bytes that are not: a decoder that substitutes a character hides the difference. */
-const readStrict = (path) => new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(readFileSync(path));
+const decodeStrict = (bytes) => new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+const readStrict = (path) => decodeStrict(readFileSync(path));
 
 /** The day this run happens on, in UTC. A date of issue cannot be later. */
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -194,9 +195,24 @@ function validate(name) {
     return;
   }
 
+  // Read and parsed once. A version 2 manifest is handed on as this text and
+  // this value, and read strictly as UTF-8 there, so no second copy of it is
+  // ever built beside the first.
+  const bytes = readFileSync(manifestPath);
+  let strictText = null;
+  try {
+    strictText = decodeStrict(bytes);
+  } catch {
+    // Not UTF-8. The first file shape is read as it always was; the version 2 rules refuse it.
+  }
+  const text = strictText ?? bytes.toString('utf-8');
+  if (textNestsDeeperThan(text, MAX_NESTING)) {
+    fail(name, `MANIFEST.json ${NESTED_PAST_LIMIT}`);
+    return;
+  }
   let manifest;
   try {
-    manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+    manifest = JSON.parse(text);
   } catch (err) {
     fail(name, `MANIFEST.json does not parse: ${err.message}`);
     return;
@@ -218,7 +234,7 @@ function validate(name) {
       fail(name, `schemaVersion is 2, and ${name} is one of the datasets published in the first file shape, which declares ` +
         'no version. A version 2 manifest under that name is not the dataset that was published.');
     } else {
-      validateVersion2(name, dir);
+      validateVersion2(name, dir, { text: strictText, manifest });
     }
     return;
   }
@@ -332,9 +348,14 @@ function validate(name) {
   if (!isFileName(manifest.corpus.file)) return;
   const corpusPath = join(dir, manifest.corpus.file);
   if (!existsSync(corpusPath) || !lstatSync(corpusPath).isFile()) return;
+  const corpusText = readFileSync(corpusPath, 'utf-8');
+  if (textNestsDeeperThan(corpusText, MAX_NESTING)) {
+    fail(name, `${manifest.corpus.file} ${NESTED_PAST_LIMIT}`);
+    return;
+  }
   let corpus;
   try {
-    corpus = JSON.parse(readFileSync(corpusPath, 'utf-8'));
+    corpus = JSON.parse(corpusText);
   } catch (err) {
     fail(name, `${manifest.corpus.file} does not parse: ${err.message}`);
     return;
@@ -404,6 +425,15 @@ function validateErrata(file) {
   let errata;
   try {
     text = readStrict(join(ERRATA, file));
+  } catch (err) {
+    fail(label, `does not parse: ${err.message}`);
+    return;
+  }
+  if (textNestsDeeperThan(text, MAX_NESTING)) {
+    fail(label, NESTED_PAST_LIMIT);
+    return;
+  }
+  try {
     errata = JSON.parse(text);
   } catch (err) {
     fail(label, `does not parse: ${err.message}`);
@@ -790,29 +820,40 @@ const startsWithVersion = (text) => /^\s*\{\s*"schemaVersion"\s*:/.test(text);
 
 /**
  * The deepest a version 2 file nests: a corpus cell sits about nine levels
- * down. Anything deeper is refused before a reader that recurses meets it.
+ * down. Anything deeper, in any file these checks parse, is refused on its
+ * text, before a parser builds anything from it.
  */
 const MAX_NESTING = 32;
 
+/** What is said of a file nested past the limit, after its name. */
+const NESTED_PAST_LIMIT = `nests values more than ${MAX_NESTING} deep. No file published here nests so deep, and one that ` +
+  'does is refused on its text, before a parser builds anything from it.';
+
 /**
- * Whether a parsed value nests deeper than the limit. The walk descends one
- * frame per level and turns back at the first value past the limit, so it
- * holds at most `limit` + 1 frames at a time and allocates nothing per value:
- * a file of millions of values costs its parse, never a second copy of the
- * tree beside it.
+ * Whether JSON text nests deeper than the limit, counted on the text itself:
+ * each `[` or `{` outside a string opens a level and each `]` or `}` closes
+ * one, and the count stops at the first level past the limit. For text that
+ * parses, this is the nesting of the value it parses to; a deep file costs one
+ * pass over its characters, and the parser nothing.
  */
-function nestsDeeperThan(value, limit) {
-  const deeper = (node, depth) => {
-    if (node === null || typeof node !== 'object') return false;
-    if (depth > limit) return true;
-    if (Array.isArray(node)) {
-      for (let i = 0; i < node.length; i += 1) if (deeper(node[i], depth + 1)) return true;
-      return false;
+function textNestsDeeperThan(text, limit) {
+  let depth = 0;
+  let inString = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text.charCodeAt(i);
+    if (inString) {
+      if (c === 0x5c) i += 1; // a backslash: the character after it is escaped
+      else if (c === 0x22) inString = false;
+    } else if (c === 0x22) {
+      inString = true;
+    } else if (c === 0x5b || c === 0x7b) {
+      depth += 1;
+      if (depth > limit) return true;
+    } else if (c === 0x5d || c === 0x7d) {
+      depth -= 1;
     }
-    for (const key in node) if (Object.hasOwn(node, key) && deeper(node[key], depth + 1)) return true;
-    return false;
-  };
-  return deeper(value, 1);
+  }
+  return false;
 }
 
 /** The most problems listed for one file of a dataset; past it, the rest are counted. */
@@ -858,6 +899,10 @@ function parseVersion2(buffer, file, bad) {
     bad(`${file} is not UTF-8. A decoder that substitutes a character would hide the difference from every check here.`);
     return null;
   }
+  if (textNestsDeeperThan(text, MAX_NESTING)) {
+    bad(`${file} ${NESTED_PAST_LIMIT}`);
+    return null;
+  }
   let value;
   try {
     value = JSON.parse(text);
@@ -867,11 +912,6 @@ function parseVersion2(buffer, file, bad) {
   }
   if (!isObject(value)) {
     bad(`${file} is not a JSON object`);
-    return null;
-  }
-  if (nestsDeeperThan(value, MAX_NESTING)) {
-    bad(`${file} nests values more than ${MAX_NESTING} deep. No version 2 file is nested so deep, and reading one that is ` +
-      'could exhaust the stack of whoever checks it.');
     return null;
   }
   if (!Object.hasOwn(value, 'schemaVersion')) {
@@ -913,20 +953,15 @@ function readDatasetFile(dir, file, bad, limit = FILE_LIMIT) {
 
 // --- MANIFEST.json --------------------------------------------------------------
 
-/** The manifest, read strictly. One that is not a version 2 manifest in shape is reported once, since nothing else can be read from it. */
-function readManifest2(dir, bad) {
-  const path = join(dir, 'MANIFEST.json');
-  let text;
-  try {
-    text = readStrict(path);
-  } catch {
+/**
+ * The manifest, read strictly: the text and the value validate() read and
+ * parsed once, its nesting already bounded, with the text null when the bytes
+ * are not UTF-8. One that is not a version 2 manifest in shape is reported
+ * once, since nothing else can be read from it.
+ */
+function readManifest2({ text, manifest }, bad) {
+  if (text === null) {
     bad('MANIFEST.json is not UTF-8. A decoder that substitutes a character would hide the difference from every check here.');
-    return null;
-  }
-  const manifest = JSON.parse(text);
-  if (nestsDeeperThan(manifest, MAX_NESTING)) {
-    bad(`MANIFEST.json nests values more than ${MAX_NESTING} deep. No version 2 file is nested so deep, and reading one that is ` +
-      'could exhaust the stack of whoever checks it.');
     return null;
   }
   const missing = KEYS.manifest.filter((key) => !Object.hasOwn(manifest, key));
@@ -3032,9 +3067,9 @@ const UNCHECKED_CHANGES = ['enumerationFrame', 'manifestReader'];
 function readBounded(path) {
   const stat = lstatSync(path, { throwIfNoEntry: false });
   if (!stat || !stat.isFile() || stat.size > MAX_FILE_BYTES) throw new Error(`${path} is not a regular file of a size these rules read`);
-  const value = JSON.parse(readStrict(path));
-  if (nestsDeeperThan(value, MAX_NESTING)) throw new Error(`${path} nests too deep`);
-  return value;
+  const text = readStrict(path);
+  if (textNestsDeeperThan(text, MAX_NESTING)) throw new Error(`${path} nests too deep`);
+  return JSON.parse(text);
 }
 
 /** The version of an earlier dataset, read from its manifest: 1 when it declares none. */
@@ -3672,8 +3707,11 @@ function checkManifestAgainstFiles(manifest, found, scans, withheld, bad) {
   checkKnownIssues(manifest.knownIssues, corpus, bad);
 }
 
-/** Every rule of a version 2 dataset, in the order its files depend on each other. */
-function validateVersion2(name, dir) {
+/**
+ * Every rule of a version 2 dataset, in the order its files depend on each
+ * other. `read` is the manifest as validate() read it: its text and its value.
+ */
+function validateVersion2(name, dir, read) {
   const counted = new Map();
   const bad = (message) => {
     const file = (/^([A-Za-z0-9.-]+\.(?:json|gz))[: ]/.exec(message) ?? [])[1] ?? '';
@@ -3682,7 +3720,7 @@ function validateVersion2(name, dir) {
     if (file === '' || count <= MAX_PROBLEMS_PER_FILE) fail(name, message);
   };
   try {
-    validateVersion2Files(name, dir, bad);
+    validateVersion2Files(name, dir, bad, read);
   } finally {
     for (const [file, count] of counted) {
       if (file !== '' && count > MAX_PROBLEMS_PER_FILE) fail(name, `${file}: ${count - MAX_PROBLEMS_PER_FILE} more problem(s) in this file are not listed`);
@@ -3690,8 +3728,8 @@ function validateVersion2(name, dir) {
   }
 }
 
-function validateVersion2Files(name, dir, bad) {
-  const manifest = readManifest2(dir, bad);
+function validateVersion2Files(name, dir, bad, read) {
+  const manifest = readManifest2(read, bad);
   if (manifest === null) return;
   checkManifest2(name, manifest, bad);
   const found = readListedFiles(name, dir, manifest, bad);

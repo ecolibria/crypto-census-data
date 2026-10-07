@@ -2401,6 +2401,34 @@ test('a listed file of 95,000,000 bytes holding thirty million values is refused
   assert.doesNotMatch(result.stderr, /heap out of memory|could not be checked to the end/);
 });
 
+// The deepest manifest the size bound lets through: `{"schemaVersion":2,"x":`, 47,499,988 `[` and as many `]`, and
+// `}`, 95,000,000 bytes in all. Its nesting is counted on its text before anything parses it, so it is refused at the
+// 33rd `[`, with a problem list, within a heap of 2 GB; parsed, and parsed a second time, it exhausted the heap.
+test('a manifest of 95,000,000 bytes nested 47,499,988 deep is refused with a problem list, within a heap of 2 GB', { timeout: 180000 }, async () => {
+  const head = '{"schemaVersion":2,"x":';
+  const depth = (95_000_000 - head.length - 1) / 2;
+  assert.equal(depth, 47_499_988);
+  const result = await validateOne({}, (dir) => writeFileSync(join(datasetDir(dir), 'MANIFEST.json'), `${head}${'['.repeat(depth)}${']'.repeat(depth)}}`),
+    { env: { NODE_OPTIONS: '--max-old-space-size=2048' } });
+  assert.equal(result.code, 1, `exit ${result.code}, signal ${result.signal}:\n${result.stdout}${result.stderr.slice(-1500)}`);
+  assert.match(firstProblem(result.stderr), /MANIFEST\.json nests values more than 32 deep/, result.stderr);
+  assert.doesNotMatch(result.stderr, /heap out of memory|could not be checked to the end/);
+});
+
+// A manifest as wide as the largest scan file, about thirty million empty objects: within the nesting bound, so it is
+// parsed, once. The version 2 rules read the value validate() parsed; a second parse beside it exhausted a heap of 2 GB.
+test('a manifest of 95,000,000 bytes holding thirty million values is parsed once and refused with a problem list, within a heap of 2 GB', { timeout: 180000 }, async () => {
+  const result = await validateOne({}, (dir) => {
+    const head = '{"schemaVersion":2,"x":[';
+    const tail = ']}';
+    const count = Math.floor((95_000_000 - head.length - tail.length + 1) / 3);
+    writeFileSync(join(datasetDir(dir), 'MANIFEST.json'), `${head}${'{},'.repeat(count - 1)}{}${tail}`);
+  }, { env: { NODE_OPTIONS: '--max-old-space-size=2048' } });
+  assert.equal(result.code, 1, `exit ${result.code}, signal ${result.signal}:\n${result.stdout}${result.stderr.slice(-1500)}`);
+  assert.match(firstProblem(result.stderr), /MANIFEST\.json is not a version 2 manifest: it lacks dataset, /, result.stderr);
+  assert.doesNotMatch(result.stderr, /heap out of memory|could not be checked to the end/);
+});
+
 // A ledger of a thousand million empty rows: a valid header, then 10^9 newlines, about a megabyte of gzip written
 // as members of a million newlines each. It is refused at its sixth row, so the run ends in seconds; a run that
 // read every row would take minutes and is killed by the timeout here, which leaves it no exit code.
