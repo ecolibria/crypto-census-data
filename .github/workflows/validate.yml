@@ -30,6 +30,11 @@ jobs:
         with:
           node-version: '22'
 
+      # The runner's cores, memory and Node version, in the log beside the
+      # times the steps below take.
+      - name: Record the runner
+        run: nproc; free -m; node --version
+
       - name: Validate every dataset
         run: node scripts/validate-dataset.mjs
 
