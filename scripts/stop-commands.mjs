@@ -2,9 +2,9 @@
 /**
  * The four lines a test step's output opens with, on stdout and on stderr,
  * before any other byte of the step: the three lines that remove the problem
- * matchers actions/setup-node registers for the job (at 49933ea, the commit
+ * matchers actions/setup-node registers for the job (at 82076278, the commit
  * the workflows pin, .github/tsc.json, eslint-stylish.json and
- * eslint-compact.json at src/main.ts:72-79), then `::stop-commands::<token>`.
+ * eslint-compact.json at src/main.ts:91-102), then `::stop-commands::<token>`.
  * The same text, in the same order, that scripts/validate-dataset.mjs writes
  * at its start, and for the same reasons: the runner keeps one stop state for
  * both streams and handles the stderr lines it has read first, so each stream
