@@ -32,8 +32,8 @@ import { gunzipSync } from 'node:zlib';
 /**
  * The first three lines of stdout and of stderr remove the problem matchers
  * setup-node registers for the job, by their owners (actions/setup-node at
- * 49933ea, the commit the workflows pin, adds .github/tsc.json,
- * eslint-stylish.json and eslint-compact.json at src/main.ts:72-78). A
+ * 82076278, the commit the workflows pin, adds .github/tsc.json,
+ * eslint-stylish.json and eslint-compact.json at src/main.ts:91-102). A
  * matcher reads every line the runner does not take as a command, commands
  * stopped or not, so a line a dataset chose could otherwise be read as an
  * error or a warning. The runner keeps one stop state for both streams and

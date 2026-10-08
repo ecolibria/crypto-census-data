@@ -2977,7 +2977,7 @@ test('an earlier manifest that would take what the comparison holds past the bou
 // `::stop-commands::<token>` on, it acts on no command until a line is `::<token>::`, the name compared without case
 // (:86-103). It gives every line it does not take as a command to the job's problem matchers, commands stopped or not
 // (src/Runner.Worker/Handlers/OutputManager.cs:77-101), and actions/setup-node at the commit the workflows pin
-// registers three, whose owners are tsc, eslint-stylish and eslint-compact (src/main.ts:72-78, .github/*.json). One
+// registers three, whose owners are tsc, eslint-stylish and eslint-compact (src/main.ts:91-102, .github/*.json). One
 // command manager serves both streams (src/Runner.Worker/Handlers/ScriptHandler.cs:332-336), and the lines read from
 // both are handled stderr first (src/Runner.Sdk/ProcessInvoker.cs:404-437). So the validator writes the three
 // `::remove-matcher owner=<owner>::` lines and then the stop line first on each stream, and the token on no later
