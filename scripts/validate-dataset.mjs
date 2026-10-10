@@ -162,11 +162,38 @@ function resolvePath(root, path) {
   return at;
 }
 
+/**
+ * Text as it is written to either output stream: every character outside
+ * U+0020 to U+007E as a \u escape of four lowercase hex digits. A control, a
+ * format or direction character, a line or paragraph separator, or a byte
+ * order mark from a dataset reaches the log as six printable characters and
+ * never as itself. The pattern reads UTF-16 code units, so a character above
+ * U+FFFF is written as its two surrogate escapes.
+ */
+const escapeOutside = (text) => text.replace(/[^\x20-\x7e]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
+
+/**
+ * A text from a dataset, a file name or a parser's message as it is printed
+ * unquoted: the backslash doubled and every other character outside U+0020 to
+ * U+007E escaped, so that the printed text reads back as exactly what was
+ * there (as the inside of a JSON string, once each quotation mark is escaped)
+ * and printable text is printed as it is.
+ */
+const printable = (text) => escapeOutside(String(text).replace(/\\/g, '\\\\'));
+
+/**
+ * The lines of a problem or note, each escaped whole. A message is one line,
+ * or a list of lines where it is written as several: a line break inside a
+ * line is escaped like any other character, so no value can start a line of
+ * its own.
+ */
+const lines = (message) => (Array.isArray(message) ? message : [message]).map((line) => escapeOutside(String(line))).join('\n');
+
 const problems = [];
-const fail = (dataset, message) => problems.push(`${dataset}: ${message}`);
+const fail = (dataset, message) => problems.push(`${escapeOutside(String(dataset))}: ${lines(message)}`);
 /** What a reader should know and no rule refuses. Listed beside the result of every run, problems or none. */
 const notes = [];
-const note = (dataset, message) => notes.push(`${dataset}: ${message}`);
+const note = (dataset, message) => notes.push(`${escapeOutside(String(dataset))}: ${lines(message)}`);
 
 /**
  * A name a manifest gives a file is read only as the name of a file in the
@@ -220,7 +247,7 @@ function validate(name) {
   try {
     manifest = JSON.parse(text);
   } catch (err) {
-    fail(name, `MANIFEST.json does not parse: ${err.message}`);
+    fail(name, `MANIFEST.json does not parse: ${printable(err.message)}`);
     return;
   }
 
@@ -293,7 +320,7 @@ function validate(name) {
     }
     const actual = sha256(path);
     if (actual !== entry.sha256) {
-      fail(name, `${describe(entry.file)} does not match its recorded hash\n    recorded ${describe(entry.sha256)}\n    actual   ${actual}`);
+      fail(name, [`${describe(entry.file)} does not match its recorded hash`, `    recorded ${describe(entry.sha256)}`, `    actual   ${actual}`]);
     }
     if (typeof entry.bytes === 'number' && entry.bytes !== statSync(path).size) {
       fail(name, `${describe(entry.file)} is ${statSync(path).size} bytes, manifest says ${entry.bytes}`);
@@ -358,7 +385,7 @@ function validate(name) {
   try {
     hold(corpusPath, lstatSync(corpusPath).size);
   } catch (err) {
-    fail(name, err.message);
+    fail(name, printable(err.message));
     return;
   }
   const corpusText = readFileSync(corpusPath, 'utf-8');
@@ -370,7 +397,7 @@ function validate(name) {
   try {
     corpus = JSON.parse(corpusText);
   } catch (err) {
-    fail(name, `${manifest.corpus.file} does not parse: ${err.message}`);
+    fail(name, `${manifest.corpus.file} does not parse: ${printable(err.message)}`);
     return;
   }
   if (!isObject(corpus)) {
@@ -438,7 +465,7 @@ function validateErrata(file) {
   try {
     hold(join(ERRATA, file), errataStat.size);
   } catch (err) {
-    fail(label, err.message);
+    fail(label, printable(err.message));
     return;
   }
 
@@ -447,7 +474,7 @@ function validateErrata(file) {
   try {
     text = readStrict(join(ERRATA, file));
   } catch (err) {
-    fail(label, `does not parse: ${err.message}`);
+    fail(label, `does not parse: ${printable(err.message)}`);
     return;
   }
   if (textNestsDeeperThan(text, MAX_NESTING)) {
@@ -457,7 +484,7 @@ function validateErrata(file) {
   try {
     errata = JSON.parse(text);
   } catch (err) {
-    fail(label, `does not parse: ${err.message}`);
+    fail(label, `does not parse: ${printable(err.message)}`);
     return;
   }
   if (!isObject(errata)) {
@@ -516,7 +543,7 @@ function validateErrata(file) {
     } catch (err) {
       // What is wrong with the dataset is reported by its own validation. A file not read for the bound on what is
       // held at once is named first.
-      if (err instanceof PastBound) fail(label, err.message);
+      if (err instanceof PastBound) fail(label, printable(err.message));
       fail(label, `cannot be checked against datasets/${date}: its aggregate could not be read`);
     }
   }
@@ -688,7 +715,7 @@ function validateRegenerations(label, date, list, manifest) {
         found = { file, has: readFor(join(DATASETS, date, file), (value) => new Set(fields.filter((field) => resolvePath(value, field) !== undefined))) };
       } catch (err) {
         // Not read for the bound on what is held at once: said once, here, and the problem below for each regeneration.
-        if (err instanceof PastBound) fail(label, err.message);
+        if (err instanceof PastBound) fail(label, printable(err.message));
         found = { problem: `has a raw file, ${file}, that cannot be read` };
       }
     }
@@ -914,10 +941,22 @@ const KEYS = {
 
 // --- Small readers ------------------------------------------------------------
 
+/**
+ * A value as JSON text with every character outside U+0020 to U+007E escaped,
+ * and cut to 160 characters. The escape comes before the cut, and the cut
+ * falls between whole escapes, never inside one and never between the two
+ * escapes of one character above U+FFFF.
+ */
 const describe = (value) => {
   if (value === undefined) return 'missing';
-  const text = JSON.stringify(value);
-  return text.length > 160 ? `${text.slice(0, 157)}...` : text;
+  const text = escapeOutside(JSON.stringify(value));
+  if (text.length <= 160) return text;
+  let cut = 0;
+  for (const [unit] of text.matchAll(/\\ud[89ab][0-9a-f]{2}\\ud[c-f][0-9a-f]{2}|\\u[0-9a-f]{4}|\\[^u]|[^\\]/g)) {
+    if (cut + unit.length > 157) break;
+    cut += unit.length;
+  }
+  return `${text.slice(0, cut)}...`;
 };
 const isCount = (v) => Number.isSafeInteger(v) && v >= 0;
 const isSha256 = (v) => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
@@ -1024,7 +1063,7 @@ function parseVersion2(buffer, file, bad) {
   try {
     value = JSON.parse(text);
   } catch (err) {
-    bad(`${file} does not parse: ${err.message}`);
+    bad(`${file} does not parse: ${printable(err.message)}`);
     return null;
   }
   if (!isObject(value)) {
@@ -1230,7 +1269,7 @@ function readListedFiles(name, dir, manifest, manifestBytes, bad) {
     if (buffer === null) continue;
     const actual = createHash('sha256').update(buffer).digest('hex');
     if (isSha256(entry.sha256) && actual !== entry.sha256) {
-      bad(`${entry.file} does not match its recorded hash\n    recorded ${entry.sha256}\n    actual   ${actual}`);
+      bad([`${entry.file} does not match its recorded hash`, `    recorded ${entry.sha256}`, `    actual   ${actual}`]);
     }
     if (isCount(entry.bytes) && entry.bytes !== buffer.length) {
       bad(`${entry.file} is ${buffer.length} bytes, manifest says ${entry.bytes}`);
@@ -2146,7 +2185,7 @@ function readLedger(eco, listing, scan, bad) {
     bad(err.code === 'ERR_BUFFER_TOO_LARGE'
       ? `${file} decompresses to more than ${MAX_LEDGER_BYTES.toLocaleString('en-US')} bytes, the most a ledger may hold. ` +
         'Read whole, a file like it could exhaust the memory of whoever checks it.'
-      : `${file} is not a gzip file: ${err.message}`);
+      : `${file} is not a gzip file: ${printable(err.message)}`);
     return null;
   }
   const readFrom = scan.method ? scan.method.readFrom : null;
@@ -2204,6 +2243,7 @@ function readLedger(eco, listing, scan, bad) {
       continue;
     }
     const [name, disposition, reason, version, source, observable, matches] = fields;
+    const shown = printable(name);
     const extra = fields[7];
     const scanned = disposition === 'scanned';
     if (!Object.hasOwn(LEDGER_REASONS, disposition)) {
@@ -2216,33 +2256,33 @@ function readLedger(eco, listing, scan, bad) {
     }
     const nameBytes = bytes.subarray(0, bytes.indexOf(9));
     if (previous !== null && Buffer.compare(previous, nameBytes) >= 0) {
-      rowBad(line, `(${name}) does not follow the row above it. Rows are sorted by name in byte order, one per package, so ` +
+      rowBad(line, `(${shown}) does not follow the row above it. Rows are sorted by name in byte order, one per package, so ` +
         'that a row is found, and the acceptance sample drawn, the same way every time.');
     }
     previous = nameBytes;
     if (!ledgerReasons(eco, disposition).includes(reason)) {
-      rowBad(line, `(${name}) gives the reason ${describe(reason)} for ${disposition}; it is one of: ` +
+      rowBad(line, `(${shown}) gives the reason ${describe(reason)} for ${disposition}; it is one of: ` +
         `${ledgerReasons(eco, disposition).map((r) => (r === '' ? 'empty' : r)).join(', ')}`);
       continue;
     }
     counts[disposition] += 1;
     if (eco === 'maven' && !/^(0|[1-9][0-9]{0,8})$/.test(extra)) {
-      rowBad(line, `(${name}) has page ${describe(extra)}, not the search page it was drawn from, counted from 0`);
+      rowBad(line, `(${shown}) has page ${describe(extra)}, not the search page it was drawn from, counted from 0`);
     } else if (eco === 'maven') {
       pages.add(Number(extra));
     }
     if (!scanned) {
       if ([version, source, observable, matches, ...(eco === 'packagist' ? [extra] : [])].some((field) => field !== '')) {
-        rowBad(line, `(${name}) records a version, a source, an observation, matches or a type for a package that was not read`);
+        rowBad(line, `(${shown}) records a version, a source, an observation, matches or a type for a package that was not read`);
       }
       continue;
     }
-    if (eco === 'packagist' && extra === '') rowBad(line, `(${name}) is scanned with no type of the version read`);
-    if (version === '') rowBad(line, `(${name}) is scanned with no version read`);
-    if (readFrom !== null && !readFrom.includes(source)) rowBad(line, `(${name}) is read from ${describe(source)}, not one of method.readFrom`);
-    if (observable !== '0' && observable !== '1') rowBad(line, `(${name}) has observable ${describe(observable)}, not 1 or 0`);
+    if (eco === 'packagist' && extra === '') rowBad(line, `(${shown}) is scanned with no type of the version read`);
+    if (version === '') rowBad(line, `(${shown}) is scanned with no version read`);
+    if (readFrom !== null && !readFrom.includes(source)) rowBad(line, `(${shown}) is read from ${describe(source)}, not one of method.readFrom`);
+    if (observable !== '0' && observable !== '1') rowBad(line, `(${shown}) has observable ${describe(observable)}, not 1 or 0`);
     if (!/^(0|[1-9][0-9]{0,8})$/.test(matches)) {
-      rowBad(line, `(${name}) has matches ${describe(matches)}, not a whole count`);
+      rowBad(line, `(${shown}) has matches ${describe(matches)}, not a whole count`);
       continue;
     }
     byReadFrom[source] = (byReadFrom[source] ?? 0) + 1;
@@ -3384,7 +3424,7 @@ function checkComparability(name, later, bad) {
       return read();
     } catch (err) {
       if (!(err instanceof PastBound)) throw err;
-      fail(name, err.message);
+      fail(name, printable(err.message));
       return null;
     }
   };
@@ -4081,7 +4121,7 @@ function checkManifestAgainstFiles(manifest, found, scans, withheld, bad) {
 function validateVersion2(name, dir, read) {
   const counted = new Map();
   const bad = (message) => {
-    const file = (/^([A-Za-z0-9.-]+\.(?:json|gz))[: ]/.exec(message) ?? [])[1] ?? '';
+    const file = (/^([A-Za-z0-9.-]+\.(?:json|gz))[: ]/.exec(Array.isArray(message) ? message[0] : message) ?? [])[1] ?? '';
     const count = (counted.get(file) ?? 0) + 1;
     counted.set(file, count);
     if (file === '' || count <= MAX_PROBLEMS_PER_FILE) fail(name, message);
@@ -4104,7 +4144,7 @@ function validateVersion2(name, dir, read) {
       try {
         keep(join(dir, later.file), later);
       } catch (err) {
-        fail(name, err.message);
+        fail(name, printable(err.message));
         return;
       }
       checkComparability(name, later, bad);
@@ -4188,10 +4228,20 @@ function listRegeneratedScans(name, manifest, found) {
  */
 const indented = (text) => `  ${text.replace(/\r\n|\r|\n/g, '\n  ')}\n`;
 
-/** What a thrown value says about itself, or that it says nothing printable. */
+/**
+ * What a thrown value says about itself, or that it says nothing printable.
+ * The message is escaped whole, line breaks included; each line of the stack
+ * after it is escaped as a line of its own.
+ */
 function errorText(err) {
   try {
-    return String(err instanceof Error ? err.stack ?? err.message : err);
+    if (!(err instanceof Error)) return printable(String(err));
+    const head = String(err);
+    if (typeof err.stack !== 'string') return printable(head);
+    // A stack that does not begin with the message is escaped as one line.
+    if (!err.stack.startsWith(head)) return printable(err.stack);
+    const frames = err.stack.slice(head.length).split('\n').filter((line) => line !== '');
+    return [printable(head), ...frames.map(printable)].join('\n');
   } catch {
     return 'a value that cannot be printed';
   }
@@ -4211,14 +4261,14 @@ function main() {
   // operating system can leave one in a working copy.
   for (const entry of readdirSync(DATASETS)) {
     if (!entry.startsWith('.') && !lstatSync(join(DATASETS, entry)).isDirectory()) {
-      fail('datasets', `${entry} is not a dataset directory. A file directly under datasets/ is read by none of these checks.`);
+      fail('datasets', `${printable(entry)} is not a dataset directory. A file directly under datasets/ is read by none of these checks.`);
     }
   }
   const all = readdirSync(DATASETS).filter((f) => statSync(join(DATASETS, f), { throwIfNoEntry: false })?.isDirectory());
   const names = requested ? [requested] : all;
 
   if (requested && !all.includes(requested)) {
-    process.stderr.write(`No dataset datasets/${requested}\n`);
+    process.stderr.write(`No dataset datasets/${printable(requested)}\n`);
     return 2;
   }
 
@@ -4254,7 +4304,7 @@ function main() {
       const compare = releasing(() => validate(name));
       if (compare) releasing(compare);
     } catch (err) {
-      fail(name, `could not be checked to the end: ${err.message}`);
+      fail(name, `could not be checked to the end: ${printable(err.message)}`);
     }
   }
 
@@ -4262,7 +4312,7 @@ function main() {
     try {
       releasing(() => validateErrata(file));
     } catch (err) {
-      fail(`errata/${file}`, `could not be checked to the end: ${err.message}`);
+      fail(`errata/${printable(file)}`, `could not be checked to the end: ${printable(err.message)}`);
     }
   }
 
@@ -4282,9 +4332,9 @@ function main() {
     return 1;
   }
 
-  process.stdout.write(`${names.length} dataset(s) validated: ${names.join(', ')}\n`);
+  process.stdout.write(`${names.length} dataset(s) validated: ${names.map(printable).join(', ')}\n`);
   if (errataFiles.length > 0) {
-    process.stdout.write(`${errataFiles.length} errata file(s) validated: ${errataFiles.join(', ')}\n`);
+    process.stdout.write(`${errataFiles.length} errata file(s) validated: ${errataFiles.map(printable).join(', ')}\n`);
   }
   return 0;
 }
