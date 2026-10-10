@@ -1635,9 +1635,11 @@ Object.assign(KEYS, {
   scanner: ['script', 'commit', 'workflowRun'],
   scanCatalog: ['entries', 'matchSetSha256', 'matchRule'],
   method: ['versionSelection', 'readFrom', 'declarationKinds', 'notObservableWhen', 'limits'],
-  enumeration: ['requested', 'listed', 'truncated', 'reason', 'unit', 'budgetMinutes', 'elapsedMinutes', 'frameSize', 'sampling', 'indexWindow'],
+  enumeration: ['requested', 'listed', 'truncated', 'reason', 'unit', 'budgetMinutes', 'elapsedMinutes', 'frameSize', 'sampling', 'indexWindow',
+    'repeatedNames', 'pageAnswers'],
   sampling: ['method', 'seed', 'draw', 'pageRows'],
   indexWindow: ['since', 'until'],
+  pageAnswers: ['documents', 'repeated', 'unnamed', 'sortReported'],
   scanCoverage: [...COVERAGE_COUNTS, 'scannedByReadFrom'],
   listing: ['file', 'sha256', 'rows'],
   catalogCheck: ['entry', 'alias', 'status', 'httpStatus', 'url', 'checkedAt', 'latestVersion', 'latestReleaseAt'],
@@ -1746,6 +1748,41 @@ function checkEnumeration(eco, e, file, bad) {
     }
   } else if (e.indexWindow !== null) {
     bad(`${where}.indexWindow is ${describe(e.indexWindow)}; it is kept for Go's index alone and is null for ${eco}`);
+  }
+  // Hex counts the names its paged listing served on two pages; the other ten write null.
+  if (eco === 'hex') {
+    if (!isCount(e.repeatedNames)) {
+      bad(`${where}.repeatedNames is ${describe(e.repeatedNames)}, not a whole count. A scan of hex counts the names its paged ` +
+        'listing served on two pages, 0 included, so that a listing that moved while it was read can be told from one that did not.');
+    }
+  } else if (e.repeatedNames !== null) {
+    bad(`${where}.repeatedNames is ${describe(e.repeatedNames)}; it is kept for the paged listing of hex alone and is null for ${eco}`);
+  }
+  // Maven records what its drawn pages answered: every document, those naming an artifact an earlier page listed,
+  // those naming none, and the distinct sorts the answers reported. The other ten write null.
+  if (eco === 'maven') {
+    const at = `${where}.pageAnswers`;
+    if (closed(e.pageAnswers, KEYS.pageAnswers, at, bad)) {
+      const p = e.pageAnswers;
+      let counts = true;
+      for (const field of ['documents', 'repeated', 'unnamed']) {
+        if (!isCount(p[field])) {
+          bad(`${at}.${field} is ${describe(p[field])}, not a whole count`);
+          counts = false;
+        }
+      }
+      if (!Array.isArray(p.sortReported) || !p.sortReported.every((sort) => sort === null || typeof sort === 'string') ||
+        !isDistinct(p.sortReported)) {
+        bad(`${at}.sortReported is ${describe(p.sortReported)}, not the distinct sorts the answers reported, each text or null ` +
+          'for an answer that named none');
+      }
+      if (counts && isCount(e.listed) && p.documents !== e.listed + p.repeated + p.unnamed) {
+        bad(`${at}.documents is ${p.documents}, and listed + repeated + unnamed is ${e.listed + p.repeated + p.unnamed}. Every ` +
+          'document a drawn page answered named a package listed once, one an earlier page listed, or none.');
+      }
+    }
+  } else if (e.pageAnswers !== null) {
+    bad(`${where}.pageAnswers is ${describe(e.pageAnswers)}; it is kept for the search pages of maven alone and is null for ${eco}`);
   }
 }
 
@@ -2082,6 +2119,16 @@ const LEDGER_REASONS = {
 };
 
 /**
+ * The reasons one registry's listing adds. Go: `notFoundUnconfirmed`, a module
+ * whose `@v/<indexedVersion>.mod` answered 404 or 410 and that the budget
+ * ended the draw before reading again. The index shows the proxy served every
+ * version it lists, so one not-found answer is not absence, and the module is
+ * unresolved.
+ */
+const LEDGER_REASONS_ADDED = { go: { unresolved: ['notFoundUnconfirmed'] } };
+const ledgerReasons = (eco, disposition) => [...LEDGER_REASONS[disposition], ...(LEDGER_REASONS_ADDED[eco]?.[disposition] ?? [])];
+
+/**
  * The malformed rows a ledger is read past. The first five are listed; at the
  * sixth the ledger is refused and the rest is not read, so a ledger of a
  * billion malformed rows costs the time to read six of them, not all of them.
@@ -2173,9 +2220,9 @@ function readLedger(eco, listing, scan, bad) {
         'that a row is found, and the acceptance sample drawn, the same way every time.');
     }
     previous = nameBytes;
-    if (!LEDGER_REASONS[disposition].includes(reason)) {
+    if (!ledgerReasons(eco, disposition).includes(reason)) {
       rowBad(line, `(${name}) gives the reason ${describe(reason)} for ${disposition}; it is one of: ` +
-        `${LEDGER_REASONS[disposition].map((r) => (r === '' ? 'empty' : r)).join(', ')}`);
+        `${ledgerReasons(eco, disposition).map((r) => (r === '' ? 'empty' : r)).join(', ')}`);
       continue;
     }
     counts[disposition] += 1;
@@ -2524,11 +2571,12 @@ const UNRESOLVED_CEILING = 1 / ONE_IN;
 Object.assign(KEYS, {
   manifestEcosystem: ['ecosystem', 'coverage', 'enumeration', 'sources'],
   knownIssue: ['defect', 'summary', 'affects', 'direction', 'magnitude', 'correctedIn'],
-  corpus: ['schemaVersion', 'kind', 'collectedAt', 'generatedAt', 'aggregator', 'inputs', 'definitions', 'comparability', 'blocked',
-    'withheld', 'coverage', 'byEcosystem', 'total', 'multiPurposeLibraries'],
+  corpus: ['schemaVersion', 'kind', 'collectedAt', 'generatedAt', 'aggregator', 'scanJobsComplete', 'inputs', 'definitions', 'comparability',
+    'blocked', 'withheld', 'coverage', 'byEcosystem', 'total', 'multiPurposeLibraries'],
   withheld: ['ecosystem', 'reasons', 'coverage'],
+  withheldNoScanFile: ['ecosystem', 'reasons', 'coverage', 'jobResult', 'cause'],
   withheldReason: ['code', 'detail'],
-  aggregator: ['script', 'commit'],
+  aggregator: ['script', 'commit', 'workflowRun', 'runAttempt'],
   inputs: ['scans', 'catalog', 'consolidation'],
   inputScan: ['ecosystem', 'file', 'sha256'],
   inputCatalog: ['file', 'sha256', 'matchSetSha256', 'classificationSha256'],
@@ -3437,13 +3485,13 @@ function checkBlocked(list, file, bad) {
 }
 
 /** Why a row may be withheld, as the aggregator writes it. A withheld row is not published, and no total sums it. */
-const WITHHELD_CODES = ['noScanFile', 'listingNotWhole', 'notUnderPopulationRule', 'sampleNotDrawnToSize', 'seedNotRunId',
-  'unresolvedShareAboveCeiling'];
+const WITHHELD_CODES = ['noScanFile', 'listingNotWhole', 'notUnderPopulationRule', 'sampleNotDrawnToSize', 'pageOrderNotHeld',
+  'seedNotRunId', 'unresolvedShareAboveCeiling'];
 
 /**
  * The population rule: which packages a scan of each registry sets out to
  * read. A literal copy of the instrument's POPULATION (lib/census/population.mjs
- * at 56078ea, lines 59 to 71, its three constants written out), held here
+ * at 7e12d01e, lines 68 to 80, its four constants written out), held here
  * apart from the code that writes the files, as JSON text so that a reader
  * that does not run this script can parse it and recompute its digest. Eight
  * registries are read whole from their listing; npm, Go and Maven are seeded
@@ -3451,6 +3499,9 @@ const WITHHELD_CODES = ['noScanFile', 'listingNotWhole', 'notUnderPopulationRule
  * `pageRows` rows. `source` is the listing read, which the allowlist holds as
  * the scan's enumeration source; `frameDays` bounds Go's frame, which no
  * field of a scan records whole. Neither decides a withholding code here.
+ * Maven's `sort` is the order search.maven.org reports whatever sort it is
+ * asked; a page draw whose answers report anything else is withheld for
+ * pageOrderNotHeld.
  */
 const POPULATION_RULE_JSON = `{
   "pypi": {"rule": "listing", "source": "https://pypi.org/simple/"},
@@ -3463,7 +3514,7 @@ const POPULATION_RULE_JSON = `{
   "cocoapods": {"rule": "listing", "source": "https://cdn.cocoapods.org/all_pods.txt"},
   "npm": {"rule": "sample", "source": "https://replicate.npmjs.com/_all_docs", "size": 385000, "draw": "package"},
   "go": {"rule": "sample", "source": "https://index.golang.org/index", "size": 385000, "draw": "package", "frameDays": 365},
-  "maven": {"rule": "sample", "source": "https://search.maven.org/solrsearch/select", "size": 385000, "draw": "page", "pageRows": 200}
+  "maven": {"rule": "sample", "source": "https://search.maven.org/solrsearch/select", "size": 385000, "draw": "page", "pageRows": 200, "sort": "score desc,timestamp desc,g asc,a asc"}
 }`;
 const POPULATION_RULE = Object.freeze(Object.fromEntries(Object.entries(JSON.parse(POPULATION_RULE_JSON))
   .map(([eco, rule]) => [eco, Object.freeze(rule)])));
@@ -3495,6 +3546,9 @@ function withholdingReasons(eco, scan, ledger) {
   if (!scan || !scan.coverage || !ledger || !ledger.sound) return null;
   const e = scan.value.enumeration;
   if (!isObject(e) || !isObject(e.sampling)) return null;
+  // The counts the codes below read, as their own checks hold them; a file that breaks one has been reported there.
+  if (eco === 'hex' && !isCount(e.repeatedNames)) return null;
+  if (eco === 'maven' && !(isObject(e.pageAnswers) && isCount(e.pageAnswers.repeated) && Array.isArray(e.pageAnswers.sortReported))) return null;
   const s = e.sampling;
   const listed = scan.coverage.listed;
   const reasons = [];
@@ -3510,8 +3564,11 @@ function withholdingReasons(eco, scan, ledger) {
   if (misfit.length > 0) {
     add('notUnderPopulationRule', misfit.join('; '));
   } else if (POPULATION_RULE[eco].rule === 'listing') {
-    if (e.truncated === true || listed !== e.frameSize) {
-      add('listingNotWhole', `listed ${listed} of the ${e.frameSize} its listing holds${e.truncated === true ? ', truncated' : ''}`);
+    // A listing that moved while it was read served some names on two pages, so a name that moved the other way was never listed.
+    const repeated = eco === 'hex' ? e.repeatedNames : 0;
+    if (e.truncated === true || listed !== e.frameSize || repeated > 0) {
+      add('listingNotWhole', `listed ${listed} of the ${e.frameSize} its listing holds${e.truncated === true ? ', truncated' : ''}` +
+        `${repeated > 0 ? `, ${repeated} name(s) served on two pages` : ''}`);
     }
   } else {
     if (s.draw === 'page') {
@@ -3519,6 +3576,18 @@ function withholdingReasons(eco, scan, ledger) {
       const due = Math.min(Math.ceil(e.frameSize / s.pageRows), Math.ceil(e.requested / s.pageRows));
       if (!(read === due || (e.truncated === true && read < due)) || listed > read * s.pageRows) {
         add('sampleNotDrawnToSize', `read ${read} page(s) of ${s.pageRows} rows, ${due} due, and listed ${listed}${e.truncated === true ? ', truncated' : ''}`);
+      }
+      // The pages are the frame's pages only if every answer reported the rule's sort, and the documents served again on
+      // a later page, doubled (pages read in the opposite order skip about as many unseen), stay within the ceiling.
+      const sort = POPULATION_RULE[eco].sort;
+      const answers = e.pageAnswers;
+      const sortHeld = answers.sortReported.length === 1 && answers.sortReported[0] === sort;
+      const moved = 2 * answers.repeated * ONE_IN > listed;
+      if (!sortHeld || moved) {
+        add('pageOrderNotHeld', [
+          ...(sortHeld ? [] : [`the pages report the sort ${describe(answers.sortReported)}, and the rule's is ${describe(sort)}`]),
+          ...(moved ? [`${answers.repeated} document(s) served again on a later page, twice which is above 1 in ${ONE_IN} of ${listed} listed`] : []),
+        ].join('; '));
       }
     } else {
       const due = Math.min(e.requested, e.frameSize);
@@ -3534,8 +3603,10 @@ function withholdingReasons(eco, scan, ledger) {
         `${run === null ? 'is not a run of the instrument' : `has the id ${run[1]}`}`);
     }
   }
-  if (aboveCeiling(scan.coverage)) {
-    add('unresolvedShareAboveCeiling', `${scan.coverage.unresolved} of ${listed} listed unresolved, above the ceiling of 1 in ${ONE_IN}`);
+  if (aboveCeiling(eco, scan.coverage)) {
+    add('unresolvedShareAboveCeiling', ABSENT_TOWARD_CEILING.includes(eco)
+      ? `${scan.coverage.unresolved} unresolved and ${scan.coverage.absent} absent of ${listed} listed, above the ceiling of 1 in ${ONE_IN}`
+      : `${scan.coverage.unresolved} of ${listed} listed unresolved, above the ceiling of 1 in ${ONE_IN}`);
   }
   return reasons;
 }
@@ -3547,8 +3618,76 @@ function withholdingReasons(eco, scan, ledger) {
  */
 const rowCoverageOf = (scan) => ({ ...scan.value.coverage, enumeration: scan.value.enumeration, sources: scan.value.sources });
 
-/** True when a registry's scan reads more than the ceiling of its listed packages as unresolved. */
-const aboveCeiling = (coverage) => coverage.unresolved * ONE_IN > coverage.listed;
+/**
+ * The registries whose absent packages count toward the ceiling with the
+ * unresolved ones. Go: each module is read at the version of its last index
+ * record, and the index shows the proxy served every version it lists.
+ */
+const ABSENT_TOWARD_CEILING = ['go'];
+
+/** True when a registry's scan reads more than the ceiling of its listed packages as unresolved, for Go as unresolved or absent. */
+const aboveCeiling = (eco, coverage) =>
+  (coverage.unresolved + (ABSENT_TOWARD_CEILING.includes(eco) ? coverage.absent : 0)) * ONE_IN > coverage.listed;
+
+/** A scan job's result as quality control read it, or null when it was not read. */
+const JOB_RESULTS = ['success', 'failure', 'cancelled', 'skipped'];
+
+/**
+ * The causes a row withheld for having no scan file may give, by its job's
+ * result: a failed or skipped job is that; a cancelled one is a timeout when
+ * GitHub's record shows its run time reached its timeout-minutes, cancelled
+ * when the record shows it did not, and unknown when the record was not read;
+ * a job that succeeded and left no file, or one whose result was not read, is
+ * unknown.
+ */
+const CAUSES_BY_RESULT = {
+  failure: ['failure'],
+  skipped: ['skipped'],
+  cancelled: ['timeout', 'cancelled', 'unknown'],
+  success: ['unknown'],
+  null: ['unknown'],
+};
+
+/** The scan job of a row withheld for having no scan file: its result, and a cause that result allows. */
+function checkScanJob(item, at, bad, jobResults) {
+  if (item.jobResult !== null && !JOB_RESULTS.includes(item.jobResult)) {
+    bad(`${at}.jobResult is ${describe(item.jobResult)}, not one of: ${JOB_RESULTS.join(', ')}, or null when it was not read`);
+    return false;
+  }
+  const causes = CAUSES_BY_RESULT[String(item.jobResult)];
+  if (!causes.includes(item.cause)) {
+    bad(`${at}.cause is ${describe(item.cause)} for a job whose result is ${describe(item.jobResult)}; it is ${causes.join(' or ')} then. ` +
+      'A timeout is named only where GitHub\'s record shows the run time reached the job\'s timeout-minutes.');
+    return false;
+  }
+  jobResults.push({ at, jobResult: item.jobResult });
+  return true;
+}
+
+/**
+ * Whether every scan job of the aggregating run concluded in success, as
+ * quality control read them: a record, not a verdict, so only its agreement
+ * with the rows withheld for having no scan file is checked. Null means the
+ * results were not read, and then no such row has one; true or false means
+ * they were, and every such row has one; true means each was a success.
+ */
+function checkScanJobsComplete(complete, jobResults, file, bad) {
+  const where = `${file}: scanJobsComplete`;
+  if (complete !== null && typeof complete !== 'boolean') {
+    bad(`${where} is ${describe(complete)}, not true, false or null`);
+    return;
+  }
+  for (const { at, jobResult } of jobResults) {
+    if (complete === null && jobResult !== null) {
+      bad(`${at}.jobResult is ${describe(jobResult)}, and scanJobsComplete is null, which says the scan jobs' results were not read`);
+    } else if (complete !== null && jobResult === null) {
+      bad(`${at}.jobResult is null, and scanJobsComplete is ${complete}, which says the scan jobs' results were read`);
+    } else if (complete === true && jobResult !== 'success') {
+      bad(`${at}.jobResult is ${describe(jobResult)}, and scanJobsComplete is true, which says every scan job concluded in success. ` +
+        'It is never true by default.');
+    }
+  }
+}
 
 /**
  * The rows the corpus withholds, as a set of registries, or null when the list
@@ -3557,7 +3696,7 @@ const aboveCeiling = (coverage) => coverage.unresolved * ONE_IN > coverage.liste
  * and the corpus must withhold exactly the rows, for exactly the codes, they
  * give. A detail is words, and is not compared.
  */
-function checkWithheld(list, ctx, file, bad) {
+function checkWithheld(list, ctx, file, bad, jobResults = []) {
   const where = `${file}: withheld`;
   if (!Array.isArray(list)) {
     bad(`${where} is ${describe(list)}, not a list`);
@@ -3568,10 +3707,13 @@ function checkWithheld(list, ctx, file, bad) {
   let sound = true;
   list.forEach((item, index) => {
     const at = `${where}[${index}]`;
-    if (!closed(item, KEYS.withheld, at, bad)) {
+    // A row withheld for having no scan file also says what became of its scan job; no other row does.
+    const noScanFile = isObject(item) && Array.isArray(item.reasons) && item.reasons.some((r) => isObject(r) && r.code === 'noScanFile');
+    if (!closed(item, noScanFile ? KEYS.withheldNoScanFile : KEYS.withheld, at, bad)) {
       sound = false;
       return;
     }
+    if (noScanFile && !checkScanJob(item, at, bad, jobResults)) sound = false;
     if (!ECOSYSTEMS.includes(item.ecosystem) || withheld.has(item.ecosystem)) {
       bad(`${at}.ecosystem is ${describe(item.ecosystem)}, not one of the eleven registries withheld once`);
       sound = false;
@@ -3725,16 +3867,34 @@ function checkCorpus(name, record, ctx, bad) {
   }
   if (!isTime(c.generatedAt)) bad(`${file}: generatedAt is ${describe(c.generatedAt)}, not a time as toISOString() writes it, or a date`);
   if (closed(c.aggregator, KEYS.aggregator, `${file}: aggregator`, bad)) {
-    if (!isText(c.aggregator.script)) bad(`${file}: aggregator.script is ${describe(c.aggregator.script)}`);
-    if (!isText(c.aggregator.commit)) {
-      bad(`${file}: aggregator.commit is ${describe(c.aggregator.commit)}. A published corpus names the instrument commit its ` +
+    const a = c.aggregator;
+    const provenance = ctx.manifest && isObject(ctx.manifest.provenance) ? ctx.manifest.provenance : null;
+    if (!isText(a.script)) bad(`${file}: aggregator.script is ${describe(a.script)}`);
+    if (!isText(a.commit)) {
+      bad(`${file}: aggregator.commit is ${describe(a.commit)}. A published corpus names the instrument commit its ` +
         'aggregation ran at; null belongs to a local run.');
+    } else if (provenance && isText(provenance.sourceCommit) && a.commit !== provenance.sourceCommit) {
+      bad(`${file}: aggregator.commit is ${describe(a.commit)}, and MANIFEST.json's provenance.sourceCommit is ` +
+        `${describe(provenance.sourceCommit)}. The corpus is aggregated at the commit the dataset names.`);
+    }
+    if (!isText(a.workflowRun)) {
+      bad(`${file}: aggregator.workflowRun is ${describe(a.workflowRun)}. A published corpus names the workflow run that ` +
+        'aggregated it; null belongs to a local run.');
+    } else if (provenance && isText(provenance.workflowRun) && a.workflowRun !== provenance.workflowRun) {
+      bad(`${file}: aggregator.workflowRun is ${describe(a.workflowRun)}, and MANIFEST.json's provenance.workflowRun is ` +
+        `${describe(provenance.workflowRun)}. The corpus is aggregated by the run the dataset names.`);
+    }
+    if (!(Number.isSafeInteger(a.runAttempt) && a.runAttempt >= 1)) {
+      bad(`${file}: aggregator.runAttempt is ${describe(a.runAttempt)}, not the attempt of the run that aggregated, a whole ` +
+        'number from 1; null belongs to a local run.');
     }
   }
   checkInputs(name, c.inputs, ctx, file, bad);
   const includes = checkDefinitions(c.definitions, file, bad);
   const publishable = checkBlocked(c.blocked, file, bad);
-  const withheld = checkWithheld(c.withheld, ctx, file, bad);
+  const jobResults = [];
+  const withheld = checkWithheld(c.withheld, ctx, file, bad, jobResults);
+  checkScanJobsComplete(c.scanJobsComplete, jobResults, file, bad);
   checkCorpusCoverage(c.coverage, withheld, ctx, file, bad);
   const rowsShaped = closed(c.byEcosystem, ECOSYSTEMS, `${file}: byEcosystem`, bad);
   const totalShaped = closed(c.total, KEYS.total, `${file}: total`, bad);
@@ -3974,7 +4134,7 @@ function validateVersion2Files(name, dir, bad, read) {
     ledgers[eco] = ledger;
   }
   const map = found.consolidation ? checkConsolidation(name, found.consolidation, scans, found.withScanFile, bad) : null;
-  const withheld = found.corpus ? checkCorpus(name, found.corpus, { catalog, scans, ledgers, map, found }, bad) : null;
+  const withheld = found.corpus ? checkCorpus(name, found.corpus, { catalog, scans, ledgers, map, found, manifest }, bad) : null;
   checkManifestAgainstFiles(manifest, found, scans, withheld ?? null, bad);
   listRegeneratedScans(name, manifest, found);
 

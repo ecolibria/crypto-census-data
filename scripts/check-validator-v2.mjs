@@ -7,7 +7,8 @@
  * one thing about it, and runs the copy. Nothing in this repository is written
  * to, and every temporary directory is removed.
  *
- * The dataset has all eleven registries and 36 listed packages. Every figure
+ * The dataset has all eleven registries and 130 listed packages, 94 of them Go
+ * modules read with no match. Every figure
  * of each registry's row is written out by hand below, beside the packages it
  * comes from, small enough to be checked by eye, and so is every figure of the
  * total. The coverage counts and the ledger's match counts are computed by the
@@ -152,6 +153,9 @@ const plain = (anyCells, anyUnits, directCells, directUnits) => ({
   directUnconditional: { raw: [directCells, {}, 0], consolidated: [directCells, {}, 0, [directUnits, directUnits, 0]] },
 });
 
+/** Go modules read with no match, so that Go lists 100 and its one absent module sits at the ceiling. */
+const GO_FILLERS = 94;
+
 /** The eleven registries. Built afresh for each test, so that a change to one never reaches another. */
 function registries() {
   return {
@@ -245,6 +249,8 @@ function registries() {
         scanned('example.com/onlymod', [], { observable: 0 }),
         scanned('example.com/plain', []),
         unread('example.com/zgone', 'absent', 'http410'),
+        // For Go an absent module counts toward the ceiling with the unresolved ones: one in 100 listed is at it.
+        ...Array.from({ length: GO_FILLERS }, (_, i) => scanned(`example.com/filler/m${String(i).padStart(2, '0')}`, [])),
       ],
       units: [{ unit: 'example.com/app/one', members: ['example.com/app/one', 'example.com/app/one/v2'] }],
       notCountable: everywhere([{ 'crypto/md5': 0 }, 0]),
@@ -671,6 +677,9 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
           ? { method: 'all', seed: null, draw: null, pageRows: null }
           : { method: 'seededShuffle', seed: RUN_ID, draw: RULED_POPULATION[eco].draw, pageRows: RULED_POPULATION[eco].pageRows ?? null },
         indexWindow: eco === 'go' ? { since: '2026-09-01T00:00:00.000Z', until: `${date}T00:00:00.000Z` } : null,
+        // Hex counts the names its paged listing served twice; Maven what its drawn pages answered, every answer in the rule's sort.
+        repeatedNames: eco === 'hex' ? 0 : null,
+        pageAnswers: eco === 'maven' ? { documents: coverage.listed, repeated: 0, unnamed: 0, sortReported: [RULED_POPULATION.maven.sort] } : null,
       },
       versionYears: eco === 'go' ? { 2024: 2, 2025: 3 } : null,
       coverage: { ...coverage, scannedByReadFrom: byReadFrom },
@@ -705,7 +714,7 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
   }
   // Rows the corpus withholds: not published, and summed by no total.
   const withhold = [...(change.withhold ?? []),
-    ...missing.map((eco) => ({ ecosystem: eco, reasons: [{ code: 'noScanFile', detail: `no scan file of ${eco}` }] }))];
+    ...missing.map((eco) => ({ ecosystem: eco, reasons: [{ code: 'noScanFile', detail: `no scan file of ${eco}` }], jobResult: 'failure', cause: 'failure' }))];
   const isPublished = (eco) => !withhold.some((w) => w.ecosystem === eco);
   const tables = { ...totalTables(), withheld: withhold.map((w) => w.ecosystem) };
   change.totalTables?.(tables);
@@ -714,7 +723,9 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
     : { dataset, doi: null, comparable, reason: comparable ? null : 'instrumentChanged', changes }));
   const corpus = {
     schemaVersion: 2, kind: 'censusCorpus', collectedAt: date, generatedAt: `${date}T12:00:00.000Z`,
-    aggregator: { script: 'scripts/aggregate.mjs', commit: COMMIT },
+    aggregator: { script: 'scripts/aggregate.mjs', commit: COMMIT, workflowRun: RUN_URL, runAttempt: 1 },
+    // Every scan job read; a registry with no scan file is one whose job did not succeed.
+    scanJobsComplete: missing.length === 0,
     inputs: {
       scans: read.map((eco) => ({ ecosystem: eco, file: fileName.scan(eco), sha256: sha256(files[fileName.scan(eco)]) })),
       catalog: { file: fileName.catalog(date), sha256: sha256(files[fileName.catalog(date)]), matchSetSha256: MATCH_SET, classificationSha256: CLASSIFICATION },
@@ -736,9 +747,10 @@ function buildDataset(date, change = {}, earlier = [{ dataset: FIRST_SHAPE, vers
     comparability,
     blocked: [],
     // A withheld row keeps the coverage its row would have held: the raw coverage, its enumeration and its sources.
-    withheld: withhold.map(({ ecosystem, reasons }) => ({ ecosystem, reasons: structuredClone(reasons),
+    withheld: withhold.map(({ ecosystem, reasons, ...job }) => ({ ecosystem, reasons: structuredClone(reasons),
       coverage: missing.includes(ecosystem) ? null
-        : structuredClone({ ...scans[ecosystem].coverage, enumeration: scans[ecosystem].enumeration, sources: scans[ecosystem].sources }) })),
+        : structuredClone({ ...scans[ecosystem].coverage, enumeration: scans[ecosystem].enumeration, sources: scans[ecosystem].sources }),
+      ...job })),
     coverage: {
       total: Object.fromEntries(COVERAGE.map((field) => [field, sum(ECOSYSTEMS.filter(isPublished).map((eco) => scans[eco].coverage[field]))])),
       byEcosystem: Object.fromEntries(ECOSYSTEMS.map((eco) => [eco, structuredClone({ ...scans[eco].coverage, enumeration: scans[eco].enumeration, sources: scans[eco].sources })])),
@@ -828,7 +840,7 @@ const ADMITTED_SOURCES_SHA256 = 'dc3da855b33e5ef92470b0647f54da194006bf1fc6c71a4
 
 /**
  * The population rule, this file's own copy of the instrument's `POPULATION`
- * (lib/census/population.mjs at 56078ea, lines 59 to 71, with its three
+ * (lib/census/population.mjs at 7e12d01e, lines 68 to 80, with its four
  * constants written out), as JSON text. Every scan the fixture writes is read
  * under it, and the digest below pins both copies.
  */
@@ -843,10 +855,10 @@ const RULED_POPULATION_JSON = `{
   "cocoapods": {"rule": "listing", "source": "https://cdn.cocoapods.org/all_pods.txt"},
   "npm": {"rule": "sample", "source": "https://replicate.npmjs.com/_all_docs", "size": 385000, "draw": "package"},
   "go": {"rule": "sample", "source": "https://index.golang.org/index", "size": 385000, "draw": "package", "frameDays": 365},
-  "maven": {"rule": "sample", "source": "https://search.maven.org/solrsearch/select", "size": 385000, "draw": "page", "pageRows": 200}
+  "maven": {"rule": "sample", "source": "https://search.maven.org/solrsearch/select", "size": 385000, "draw": "page", "pageRows": 200, "sort": "score desc,timestamp desc,g asc,a asc"}
 }`;
 const RULED_POPULATION = JSON.parse(RULED_POPULATION_JSON);
-const RULED_POPULATION_SHA256 = 'afab7c7dffb7018d7dbc96adb76601f451f496d660000bcf8895508f791b8c43';
+const RULED_POPULATION_SHA256 = 'bbae14fb24c350052d37937850460d4c533041f5637fceba403274d7af132c94';
 
 /**
  * Write a repository holding a copy of the validator, a copy of the smaller
@@ -1271,7 +1283,7 @@ plant('a count that is null', scanOf('hex', (s) => { s.coverage.unresolved = nul
 plant('counts by source that are not counts', scanOf('hex', (s) => { s.coverage.scannedByReadFrom = { release: '1' }; }), /coverage\.scannedByReadFrom is \{"release":"1"\}, not an object of counts by read source/);
 plant('coverage whose parts do not add up', scanOf('npm', (s) => { s.coverage.listed = 9; s.enumeration.listed = 9; s.listing.rows = 9; }),
   /coverage\.listed is 9, and scanned \+ absent \+ unresolved \+ unversioned is 8\. Every listed package has one disposition/);
-plant('more unobservable manifests than manifests read', scanOf('go', (s) => { s.coverage.dependenciesNotObservable = 9; }), /coverage\.dependenciesNotObservable is 9, more than the 5 manifests read/);
+plant('more unobservable manifests than manifests read', scanOf('go', (s) => { s.coverage.dependenciesNotObservable = 100; }), /coverage\.dependenciesNotObservable is 100, more than the 99 manifests read/);
 plant('unobservable manifests where the registry always shows them', scanOf('npm', (s) => { s.coverage.dependenciesNotObservable = 1; }),
   /coverage\.dependenciesNotObservable is 1 while method\.notObservableWhen is empty/);
 plant('counts by source that are not the method\'s sources', scanOf('packagist', (s) => { s.coverage.scannedByReadFrom = { taggedRelease: 3 }; }),
@@ -1681,6 +1693,14 @@ const WITHHELD_TOTALS = {
     t.excluded.directUnconditional.excludedNotCountable = [[['npm', 'tripledes', 1], ['go', 'crypto/md5', 0]], 1];
     t.stats = { anyManifestMatch: [21, 17, 4], directUnconditional: [15, 12, 3] };
   },
+  // Hex is one package matching enacl by an optional requirement: one fewer matched in each any block, none fewer in
+  // the direct ones, one less K, one any unit fewer.
+  hex: (t) => {
+    t.measurable.matched = ECOSYSTEMS.filter((eco) => eco !== 'hex');
+    Object.assign(t.k, { matched: 22 });
+    t.cells.anyManifestMatch = { raw: [19, 13, 4, 9, 3, 3, 0], consolidated: [14, 11, 3, 9, 3, 3, 0] };
+    t.stats = { anyManifestMatch: [22, 17, 5], directUnconditional: [16, 13, 3] };
+  },
   pypi: (t) => {
     t.measurable.matched = ECOSYSTEMS.filter((eco) => eco !== 'pypi');
     t.measurable.weak = ['npm', 'go', 'maven', 'crates', 'packagist', 'nuget', 'cocoapods'];
@@ -1859,7 +1879,7 @@ plant('a direct definition without the module that evaluates it', corpusOf((c) =
 plant('a direct definition whose module is not named', corpusOf((c) => { c.definitions.directUnconditional.code = null; }), /directUnconditional\.code is null, not the module that evaluates the rule/);
 plant('coverage without dev metadata that repeats the unread counts', corpusOf((c) => { c.byEcosystem.packagist.excludingDevMetadata.coverage.listed = 3; }),
   /packagist\.excludingDevMetadata\.coverage carries "listed"/);
-plant('a coverage total that is not the sum of the rows', corpusOf((c) => { c.coverage.total.listed += 1; }), /coverage\.total\.listed is 37; the scan files of the 11 rows not withheld sum to 36/);
+plant('a coverage total that is not the sum of the rows', corpusOf((c) => { c.coverage.total.listed += 1; }), /coverage\.total\.listed is 131; the scan files of the 11 rows not withheld sum to 130/);
 plant('a coverage without a registry', corpusOf((c) => { delete c.coverage.byEcosystem.pub; }), /coverage\.byEcosystem is missing pub/);
 plant('a corpus without a registry\'s row', corpusOf((c) => { delete c.byEcosystem.pub; }), /corpus-2026-09-30\.json: byEcosystem is missing pub/);
 
@@ -1939,7 +1959,7 @@ plant('a total entry under another registry', corpusOf((c) => { c.total.anyManif
   /total\.anyManifestMatch\.raw\.excludedUnclassified\.byEntry is .*recomputed/);
 plant('weak outside its two classes', corpusOf((c) => { npmRaw(c).deprecatedLibrary.count = 0; }), /anyManifestMatch\.raw: weak \(4\) is not between the larger of brokenAlgorithm \(3\) and deprecatedLibrary \(0\) and their sum/);
 plant('"neither" counted where post-quantum is not measurable', corpusOf((c) => { c.byEcosystem.go.anyManifestMatch.raw.neitherWeakNorPqc = { count: 2, nullReason: null }; }), /go\.anyManifestMatch\.raw: weakAndPqc or neitherWeakNorPqc is counted while weak or pqc is not measurable/);
-plant('more matched than packages read with observable dependencies', corpusOf((c) => { c.byEcosystem.go.anyManifestMatch.raw.matched.count = 5; }), /go\.anyManifestMatch\.raw: matched \(5\) is more than the 4 packages read whose dependencies could be observed/);
+plant('more matched than packages read with observable dependencies', corpusOf((c) => { c.byEcosystem.go.anyManifestMatch.raw.matched.count = 99; }), /go\.anyManifestMatch\.raw: matched \(99\) is more than the 98 packages read whose dependencies could be observed/);
 plant('a direct figure above the manifest-match one', corpusOf((c) => { c.byEcosystem.npm.directUnconditional.raw.deprecatedLibrary.count = 2; }),
   /byEcosystem\.npm: directUnconditional\.raw\.deprecatedLibrary \(2\) is more than anyManifestMatch\.raw\.deprecatedLibrary \(1\)/);
 plant('figures without dev metadata for a registry that has none', corpusOf((c) => { c.byEcosystem.npm.excludingDevMetadata = c.byEcosystem.packagist.excludingDevMetadata; }), /byEcosystem\.npm\.excludingDevMetadata is .*\. It is kept for a registry read partly from dev metadata/);
@@ -2175,18 +2195,18 @@ plant('a withheld row whose coverage is published', withholding('rubygems', NOT_
 plant('a total that still sums a withheld row', { withhold: [{ ecosystem: 'rubygems', reasons: NOT_UNDER_RULE }], ...readAsAHead('rubygems') },
   /total\.anyManifestMatch\.raw\.matched: measurableIn, notMeasurableIn and the withheld rows do not name the eleven registries once each \(named twice: rubygems\)/);
 plant('a coverage total that still counts a withheld row', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.coverage.total.listed += 1; c.coverage.total.scanned += 1; })),
-  /coverage\.total\.listed is 36; the scan files of the 10 rows not withheld sum to 35/);
+  /coverage\.total\.listed is 130; the scan files of the 10 rows not withheld sum to 129/);
 plant('a multi-purpose count published for a withheld row', withholding('pypi', NOT_UNDER_RULE, corpusOf((c) => { c.multiPurposeLibraries[0].dependents.anyManifestMatch.raw = 1; })),
   /multiPurposeLibraries\[0\]\.dependents\.anyManifestMatch\.raw is 1; pypi is withheld, so it is null/);
 plant('a row withheld for a reason the aggregator does not give', withholding('rubygems', [{ code: 'tooSmall', detail: 'x' }]),
-  /withheld\[0\]\.reasons\[0\]\.code is "tooSmall", not one of: noScanFile, listingNotWhole, notUnderPopulationRule, sampleNotDrawnToSize, seedNotRunId, unresolvedShareAboveCeiling/);
+  /withheld\[0\]\.reasons\[0\]\.code is "tooSmall", not one of: noScanFile, listingNotWhole, notUnderPopulationRule, sampleNotDrawnToSize, pageOrderNotHeld, seedNotRunId, unresolvedShareAboveCeiling/);
 plant('a row withheld for no reason', withholding('rubygems', []), /withheld\[0\]\.reasons is \[\], not a list with a reason in it/);
 plant('a reason that does not say what it found', withholding('rubygems', [{ code: 'notUnderPopulationRule', detail: '' }]), /withheld\[0\]\.reasons\[0\]\.detail is "", not text/);
 plant('a row withheld twice', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld.push(structuredClone(c.withheld[0])); })),
   /withheld\[1\]\.ecosystem is "rubygems", not one of the eleven registries withheld once/);
 plant('a registry withheld that is not one', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld.push({ ...structuredClone(c.withheld[0]), ecosystem: 'conda' }); })),
   /withheld\[1\]\.ecosystem is "conda", not one of the eleven registries withheld once/);
-plant('a row withheld for having no scan file, beside its scan file', withholding('rubygems', [{ code: 'noScanFile', detail: 'x' }]),
+plant('a row withheld for having no scan file, beside its scan file', withholding('rubygems', [{ code: 'noScanFile', detail: 'x' }], corpusOf((c) => { Object.assign(c.withheld[0], { jobResult: 'success', cause: 'unknown' }); })),
   /withheld\[0\] withholds rubygems for noScanFile; recomputed from scan-results-rubygems\.json and the population rule, it is withheld for no reason\. Each reason is a verdict on the files/);
 plant('a withheld row without its counts', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { c.withheld[0].coverage = null; })),
   /withheld\[0\]\.coverage is null\. It is null only for a row with no scan file/);
@@ -2212,11 +2232,11 @@ plant('a withheld row listed as a check as well', withholding('rubygems', ABOVE_
 
 // --- Each withholding code, recomputed --------------------------------------------
 //
-// Every code is a verdict on the files: the validator recomputes all six from
+// Every code is a verdict on the files: the validator recomputes all seven from
 // the scan file, its ledger and its own copy of the population rule, and the
 // corpus must withhold exactly the rows, for exactly the codes, they give. The
 // detail is words and is never compared. A row not read under the rule is
-// withheld for that alone; the other three rule codes are asked of a row that
+// withheld for that alone; the other four rule codes are asked of a row that
 // was, and the ceiling of every row.
 
 const reasonsFor = (...codes) => codes.map((code) => ({ code, detail: `Withheld for ${code}, in the aggregator's words.` }));
@@ -2313,7 +2333,11 @@ for (const eco of ['rubygems', 'pypi']) {
 
 plant('a registry with no scan file that the corpus does not withhold', withoutScanFile('rubygems', corpusOf((c) => { c.withheld = []; })),
   /rubygems: the dataset holds no scan file of rubygems, and corpus-2026-09-30\.json does not withhold the row for noScanFile\. A registry is left out of a dataset only as a row withheld for having no scan file/);
-plant('a registry with no scan file withheld for another reason', withoutScanFile('rubygems', corpusOf((c) => { c.withheld[0].reasons = structuredClone(NOT_UNDER_RULE); })),
+plant('a registry with no scan file withheld for another reason', withoutScanFile('rubygems', corpusOf((c) => {
+  c.withheld[0].reasons = structuredClone(NOT_UNDER_RULE);
+  delete c.withheld[0].jobResult;
+  delete c.withheld[0].cause;
+})),
   /withheld\[0\] withholds rubygems for notUnderPopulationRule; recomputed from the files, which hold no scan file of rubygems, it is withheld for noScanFile/);
 plant('a row with no scan file that carries coverage', withoutScanFile('rubygems', corpusOf((c) => { c.withheld[0].coverage = structuredClone(c.coverage.byEcosystem.hex); })),
   /withheld\[0\]\.coverage is \{.*\. A row with no scan file has no coverage to copy, so it is null/);
@@ -3360,6 +3384,176 @@ test('every step of validate.yml that runs node --test opens with the four lines
 test('the token of scripts/stop-commands.mjs is drawn afresh for each run', async () => {
   const [first, second] = await Promise.all([run([join(ROOT, OPENER)], { cwd: ROOT }), run([join(ROOT, OPENER)], { cwd: ROOT })]);
   assert.notEqual(stopped(first).token, stopped(second).token);
+});
+
+// --- What a paged listing and drawn pages answered, Go's ceiling, the aggregating run ---------
+//
+// Hex counts the names its paged listing served on two pages (repeatedNames)
+// and Maven what its drawn pages answered (pageAnswers); the other registries
+// write null for each. A listing that moved while it was read is not whole. A
+// page draw whose answers report a sort other than exactly the rule's, or whose
+// documents served again on a later page, doubled, are above the ceiling times
+// listed, is withheld for pageOrderNotHeld. For Go an absent module counts
+// toward the ceiling with the unresolved ones, and a not-found answer the
+// budget left unread again is unresolved as notFoundUnconfirmed.
+
+const SORT = RULED_POPULATION.maven.sort;
+const answersOf = (fn) => enumerationOf('maven', (e) => fn(e.pageAnswers));
+/** Maven listing 200: 196 artifacts the registry answered gone for, drawn on the second of its two pages. */
+const MAVEN_LISTS_200 = { fixture: (f) => {
+  for (let i = 0; i < 196; i += 1) f.maven.rows.push({ ...unread(`org.filler:q${String(i).padStart(3, '0')}`, 'absent', 'http404'), page: 1 });
+} };
+const repeats = (n) => answersOf((a) => { a.repeated = n; a.documents += n; });
+
+plant('a Hex scan with no count of names served twice', enumerationOf('hex', (e) => { e.repeatedNames = null; }),
+  /scan-results-hex\.json: enumeration\.repeatedNames is null, not a whole count\. A scan of hex counts the names its paged listing served on two pages/);
+plant('a count of names served twice that is not a count', enumerationOf('hex', (e) => { e.repeatedNames = -1; }),
+  /scan-results-hex\.json: enumeration\.repeatedNames is -1, not a whole count/);
+plant('a count of names served twice outside Hex', enumerationOf('pub', (e) => { e.repeatedNames = 0; }),
+  /scan-results-pub\.json: enumeration\.repeatedNames is 0; it is kept for the paged listing of hex alone and is null for pub/);
+plant('an enumeration without repeatedNames', enumerationOf('npm', (e) => { delete e.repeatedNames; }),
+  /scan-results-npm\.json: enumeration is missing repeatedNames\. Every field of a version 2 file is written out/);
+plant('an enumeration without pageAnswers', enumerationOf('pub', (e) => { delete e.pageAnswers; }),
+  /scan-results-pub\.json: enumeration is missing pageAnswers\. Every field of a version 2 file is written out/);
+plant('a Maven scan that records no page answers', enumerationOf('maven', (e) => { e.pageAnswers = null; }),
+  /scan-results-maven\.json: enumeration\.pageAnswers is null, not an object/);
+plant('page answers without a count', answersOf((a) => { delete a.unnamed; }),
+  /scan-results-maven\.json: enumeration\.pageAnswers is missing unnamed/);
+plant('page answers that record the sort asked', answersOf((a) => { a.sortAsked = SORT; }),
+  /scan-results-maven\.json: enumeration\.pageAnswers carries "sortAsked", which the schema version 2 contract does not define/);
+plant('page answers whose repeats are not a count', answersOf((a) => { a.repeated = 1.5; }),
+  /scan-results-maven\.json: enumeration\.pageAnswers\.repeated is 1\.5, not a whole count/);
+plant('page answers that give one sort twice', answersOf((a) => { a.sortReported = [SORT, SORT]; }),
+  /scan-results-maven\.json: enumeration\.pageAnswers\.sortReported is \[.*\], not the distinct sorts the answers reported/);
+plant('page answers whose sort is not text', answersOf((a) => { a.sortReported = [7]; }),
+  /scan-results-maven\.json: enumeration\.pageAnswers\.sortReported is \[7\], not the distinct sorts the answers reported/);
+plant('page answers that count a document no page answered', answersOf((a) => { a.documents += 1; }),
+  /scan-results-maven\.json: enumeration\.pageAnswers\.documents is 5, and listed \+ repeated \+ unnamed is 4\. Every document a drawn page answered/);
+plant('page answers outside Maven', enumerationOf('npm', (e) => { e.pageAnswers = { documents: 8, repeated: 0, unnamed: 0, sortReported: [SORT] }; }),
+  /scan-results-npm\.json: enumeration\.pageAnswers is \{.*\}; it is kept for the search pages of maven alone and is null for npm/);
+
+for (const [what, change] of [
+  ['a Hex listing that moved while it was read, withheld as not whole', withholding('hex', reasonsFor('listingNotWhole'), enumerationOf('hex', (e) => { e.repeatedNames = 1; }))],
+  ['a page draw whose answers report another sort, withheld for it', withholding('maven', reasonsFor('pageOrderNotHeld'), answersOf((a) => { a.sortReported = ['id asc']; }))],
+  ['a page draw one of whose answers names no sort, withheld for it', withholding('maven', reasonsFor('pageOrderNotHeld'), answersOf((a) => { a.sortReported = [SORT, null]; }))],
+  ['a page draw whose answers name no sort at all, withheld for it', withholding('maven', reasonsFor('pageOrderNotHeld'), answersOf((a) => { a.sortReported = []; }))],
+  ['a page draw with two repeats in 200 listed, withheld for it', withholding('maven', reasonsFor('pageOrderNotHeld'), both(MAVEN_LISTS_200, repeats(2)))],
+  ['a page draw with one repeat in 200 listed, twice which is at the ceiling, published', both(MAVEN_LISTS_200, repeats(1))],
+  ['a page draw whose answers named no artifact at times, published', answersOf((a) => { a.unnamed = 3; a.documents += 3; })],
+  ['a Go module answered not found and not read again, unresolved at the ceiling, published',
+    { fixture: (f) => { Object.assign(f.go.rows.find((row) => row.name === 'example.com/zgone'), { disposition: 'unresolved', reason: 'notFoundUnconfirmed' }); } }],
+  ['a Go scan whose version is the last indexed in its frame, published', scanOf('go', (s) => { s.method.versionSelection = 'lastIndexedInFrame'; })],
+]) {
+  test(`${what} passes`, async () => {
+    const result = await validateOne(change);
+    assert.equal(result.code, 0, result.stderr);
+  });
+}
+
+plant('a Hex listing that moved while it was read, published', enumerationOf('hex', (e) => { e.repeatedNames = 1; }),
+  notWithheld('hex', 'listingNotWhole', 'listed 1 of the 1 its listing holds, 1 name\\(s\\) served on two pages\\)'));
+plant('a page draw whose answers report another sort, published', answersOf((a) => { a.sortReported = ['id asc']; }),
+  notWithheld('maven', 'pageOrderNotHeld', 'the pages report the sort \\["id asc"\\], and the rule\'s is "score desc,timestamp desc,g asc,a asc"\\)'));
+plant('a page draw with two repeats in 200 listed, published', both(MAVEN_LISTS_200, repeats(2)),
+  notWithheld('maven', 'pageOrderNotHeld', '2 document\\(s\\) served again on a later page, twice which is above 1 in 100 of 200 listed\\)'));
+plant('a page draw with one repeat in 4 listed, published', repeats(1),
+  notWithheld('maven', 'pageOrderNotHeld', '1 document\\(s\\) served again on a later page, twice which is above 1 in 100 of 4 listed\\)'));
+plant('a page draw whose order held, withheld for it', withholding('maven', reasonsFor('pageOrderNotHeld')),
+  /withheld\[0\] withholds maven for pageOrderNotHeld; recomputed from scan-results-maven\.json and the population rule, it is withheld for no reason/);
+plant('a Go row with two absent modules in 101 listed, published', { fixture: (f) => { f.go.rows.push(unread('example.com/zgone2', 'absent', 'http404')); } },
+  notWithheld('go', 'unresolvedShareAboveCeiling', '0 unresolved and 2 absent of 101 listed, above the ceiling of 1 in 100\\)'));
+plant('a Go row with one absent and one unresolved module in 101 listed, published',
+  { fixture: (f) => { f.go.rows.push(unread('example.com/zlost', 'unresolved', 'notFoundUnconfirmed')); } },
+  notWithheld('go', 'unresolvedShareAboveCeiling', '1 unresolved and 1 absent of 101 listed, above the ceiling of 1 in 100\\)'));
+plant('a not-found answer left unconfirmed outside Go', ledgerOf('npm', (lines) => lines.map((line) => line.replace('\tabsent\thttp404\t', '\tunresolved\tnotFoundUnconfirmed\t'))),
+  /listing-npm\.tsv\.gz: row \d+ \(eta\) gives the reason "notFoundUnconfirmed" for unresolved; it is one of: timeout, network, http429, http5xx, httpOther, parseError, oversize$/);
+plant('an absent Go module given the unconfirmed reason', ledgerOf('go', (lines) => lines.map((line) => line.replace('\tabsent\thttp410\t', '\tabsent\tnotFoundUnconfirmed\t'))),
+  /listing-go\.tsv\.gz: row \d+ \(example\.com\/zgone\) gives the reason "notFoundUnconfirmed" for absent; it is one of: http404, http410$/);
+
+// The run that aggregated: its commit and run are the dataset's, and its attempt is a whole number from 1.
+plant('an aggregator that does not name its run', corpusOf((c) => { delete c.aggregator.workflowRun; }),
+  /corpus-2026-09-30\.json: aggregator is missing workflowRun\./);
+plant('an aggregator that does not name its attempt', corpusOf((c) => { delete c.aggregator.runAttempt; }),
+  /corpus-2026-09-30\.json: aggregator is missing runAttempt\./);
+plant('an aggregation by a local run', corpusOf((c) => { c.aggregator.workflowRun = null; }),
+  /aggregator\.workflowRun is null\. A published corpus names the workflow run that aggregated it; null belongs to a local run/);
+plant('an aggregation by another run than the dataset names', corpusOf((c) => { c.aggregator.workflowRun = runUrl('2'); }),
+  /aggregator\.workflowRun is "https:\/\/github\.com\/opena2a-org\/crypto-census\/actions\/runs\/2", and MANIFEST\.json's provenance\.workflowRun is "https:\/\/github\.com\/opena2a-org\/crypto-census\/actions\/runs\/1"/);
+plant('an aggregation at another commit than the dataset names', corpusOf((c) => { c.aggregator.commit = 'f'.repeat(40); }),
+  /aggregator\.commit is "f{40}", and MANIFEST\.json's provenance\.sourceCommit is "0123456789abcdef0123456789abcdef01234567"/);
+for (const [what, attempt] of [['no attempt', null], ['attempt 0', 0], ['an attempt written as text', '1'], ['a fractional attempt', 1.5]]) {
+  plant(`an aggregation with ${what}`, corpusOf((c) => { c.aggregator.runAttempt = attempt; }),
+    new RegExp(`aggregator\\.runAttempt is ${JSON.stringify(attempt).replace(/\./g, '\\.')}, not the attempt of the run that aggregated, a whole number from 1`));
+}
+test('an aggregation on its second attempt passes', async () => {
+  const result = await validateOne(corpusOf((c) => { c.aggregator.runAttempt = 2; }));
+  assert.equal(result.code, 0, result.stderr);
+});
+
+// What became of each scan job, as quality control read it: a record, checked only against the rows withheld for
+// having no scan file, each of which says its job's result and the cause that result allows.
+const jobOf = (jobResult, cause, complete) => withoutScanFile('rubygems', corpusOf((c) => {
+  Object.assign(c.withheld[0], { jobResult, cause });
+  c.scanJobsComplete = complete;
+}));
+for (const [jobResult, cause, complete] of [
+  ['failure', 'failure', false], ['skipped', 'skipped', false], ['cancelled', 'timeout', false], ['cancelled', 'cancelled', false],
+  ['cancelled', 'unknown', false], ['success', 'unknown', true], ['success', 'unknown', false], [null, 'unknown', null],
+]) {
+  test(`a row with no scan file whose job result is ${jobResult} and cause ${cause}, with scanJobsComplete ${complete}, passes`, async () => {
+    const result = await validateOne(jobOf(jobResult, cause, complete));
+    assert.equal(result.code, 0, result.stderr);
+  });
+}
+test('a dataset whose scan jobs were not read, with no row missing its scan file, passes', async () => {
+  const result = await validateOne(corpusOf((c) => { c.scanJobsComplete = null; }));
+  assert.equal(result.code, 0, result.stderr);
+});
+plant('a corpus that does not say whether its scan jobs completed', corpusOf((c) => { delete c.scanJobsComplete; }),
+  /corpus-2026-09-30\.json is missing scanJobsComplete\./);
+plant('scan jobs said complete in words', corpusOf((c) => { c.scanJobsComplete = 'yes'; }),
+  /corpus-2026-09-30\.json: scanJobsComplete is "yes", not true, false or null/);
+plant('a row with no scan file that does not say what became of its job', withoutScanFile('rubygems', corpusOf((c) => { delete c.withheld[0].jobResult; delete c.withheld[0].cause; })),
+  /withheld\[0\] is missing jobResult, cause\./);
+plant('a row withheld for another reason that carries a job result', withholding('rubygems', NOT_UNDER_RULE, corpusOf((c) => { Object.assign(c.withheld[0], { jobResult: 'success', cause: 'unknown' }); })),
+  /withheld\[0\] carries "jobResult", which the schema version 2 contract does not define/);
+plant('a job result that is not one', jobOf('timedOut', 'timeout', false),
+  /withheld\[0\]\.jobResult is "timedOut", not one of: success, failure, cancelled, skipped, or null when it was not read/);
+for (const [jobResult, cause, complete, allowed] of [
+  ['failure', 'timeout', false, 'failure'], ['skipped', 'unknown', false, 'skipped'], ['cancelled', 'failure', false, 'timeout or cancelled or unknown'],
+  ['success', 'failure', false, 'unknown'], [null, 'timeout', null, 'unknown'],
+]) {
+  plant(`a job ${jobResult} given the cause ${cause}`, jobOf(jobResult, cause, complete),
+    new RegExp(`withheld\\[0\\]\\.cause is "${cause}" for a job whose result is ${JSON.stringify(jobResult)}; it is ${allowed} then`));
+}
+plant('scan jobs not read, beside a row whose job result was read', jobOf('failure', 'failure', null),
+  /withheld\[0\]\.jobResult is "failure", and scanJobsComplete is null, which says the scan jobs' results were not read/);
+plant('scan jobs read, beside a row whose job result was not', jobOf(null, 'unknown', false),
+  /withheld\[0\]\.jobResult is null, and scanJobsComplete is false, which says the scan jobs' results were read/);
+plant('scan jobs said complete beside a job that failed', jobOf('failure', 'failure', true),
+  /withheld\[0\]\.jobResult is "failure", and scanJobsComplete is true, which says every scan job concluded in success/);
+
+// The shared vector of the match set digest: the digest both repositories pin, recomputed here by the validator's own
+// code. Two names whose UTF-16 and byte orders differ, one above U+FFFF and one from U+E000 to U+FFFF; aliases out of
+// byte order; an unmatchable entry; every registry's match rule.
+const VECTOR_MATCH_RULES = { npm: 'npmName/1', pypi: 'pypiName/1', go: 'goModulePath/1', maven: 'mavenName/1', crates: 'cratesName/1',
+  packagist: 'packagistName/1', nuget: 'nugetName/1', rubygems: 'rubygemsName/1', hex: 'hexName/1', pub: 'pubName/1', cocoapods: 'cocoapodsName/1' };
+const VECTOR_SHA256 = '4f7f7714dbbcd6819dcb8604607b0903496bd7b7e7e8c97406452d53e50413ce';
+const vectorEntries = () => [
+  entry('npm', 'vector-\u{1F512}'),
+  entry('npm', 'vector-ﬁ', { aliases: [alias('vector-alias-\u{1F512}'), alias('vector-alias-ﬁ'), alias('vector-alias-a')] }),
+  entry('go', 'golang.org/x/crypto'),
+  broken('go', 'crypto/md5', ['MD5'], { unmatchable: { reason: 'standardLibraryPath', url: evidence('go/crypto-md5'), checkedAt: CHECKED } }),
+];
+test('the validator recomputes the shared vector\'s match set digest as both repositories pin it', async () => {
+  const result = await validateOne(catalogOf((c) => {
+    c.entries = vectorEntries().sort((a, b) => byteOrder(a.ecosystem, b.ecosystem) || byteOrder(a.name, b.name));
+    c.matchRules = { ...VECTOR_MATCH_RULES };
+    c.matchSetSha256 = '0'.repeat(64);
+  }));
+  const recomputed = /catalog-2026-09-30\.json: matchSetSha256 is not the digest of the entries it covers \(recomputed: ([0-9a-f]{64})\)/.exec(result.stderr);
+  assert.ok(recomputed, result.stderr);
+  assert.equal(recomputed[1], VECTOR_SHA256);
 });
 
 // --- Running the planted defects -------------------------------------------------
