@@ -444,7 +444,7 @@ function validate(name) {
  * a figure the dataset does not contain describes nothing, and fails.
  */
 function validateErrata(file) {
-  const label = `errata/${file}`;
+  const label = `errata/${printable(file)}`;
 
   const named = /^(\d{4}-\d{2}-\d{2})\.json$/.exec(file);
   if (!named) {
@@ -503,7 +503,7 @@ function validateErrata(file) {
 
   const extra = unknownFields(errata, ERRATA_FIELDS);
   if (extra.length > 0) {
-    fail(label, `carries ${extra.join(', ')}, which an errata file does not define`);
+    fail(label, `carries ${extra.map(printable).join(', ')}, which an errata file does not define`);
   }
   if (errata.schemaVersion !== 2) {
     fail(label, `schemaVersion is ${JSON.stringify(errata.schemaVersion)}; the rules here are for version 2`);

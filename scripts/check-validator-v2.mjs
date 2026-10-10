@@ -3686,6 +3686,23 @@ test('an error no check handles prints only printable characters, and its messag
   assert.ok(readBack(printed[1]).endsWith(`/datasets/l${HIDDEN}'`), printed[1]);
 });
 
+test('errata names and keys holding a backslash and u202e, and holding U+202E itself, print apart and read back as they were', async () => {
+  const literal = 'a\\u202e';
+  const real = 'a‮';
+  const result = await validateOne({}, (dir) => {
+    mkdirSync(join(dir, 'errata'), { recursive: true });
+    for (const name of [literal, real]) writeFileSync(join(dir, 'errata', `${name}.json`), '{}\n');
+    writeFileSync(join(dir, 'errata', `${FIRST_SHAPE}.json`), `${JSON.stringify({ [`k${literal}`]: 1, [`k${real}`]: 1 }, null, 2)}\n`);
+  });
+  assert.equal(result.code, 1, result.stdout);
+  assertPrintable(result);
+  const names = new Set([...result.stderr.matchAll(/^ {2}errata\/(a[^:]*)\.json: /gm)].map((m) => readBack(m[1])));
+  assert.deepEqual([...names].sort(), [literal, real].sort(), result.stderr);
+  const keys = /errata\/2026-03-18\.json: carries (.*), which an errata file does not define/.exec(result.stderr);
+  assert.ok(keys, result.stderr);
+  assert.deepEqual(keys[1].split(', ').map(readBack).sort(), [`k${literal}`, `k${real}`].sort());
+});
+
 // --- Running the planted defects -------------------------------------------------
 
 for (const [what, change, problem, prepare] of defects) {
