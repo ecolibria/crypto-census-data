@@ -1257,8 +1257,12 @@ plant('a sample that does not name its size', scanOf('npm', (s) => { s.enumerati
 plant('a sample of no packages', scanOf('npm', (s) => { s.enumeration.requested = 0; }), /scan-results-npm\.json: enumeration\.requested is 0, not the size of the sample\. A row that is not read whole names how many packages it asked for, and that is never 0/);
 plant('a row read whole that names a size', scanOf('hex', (s) => { s.enumeration.requested = 1000; }), /scan-results-hex\.json: enumeration\.requested is 1000 for a row read whole; it is null then/);
 plant('truncation that is not a yes or no', scanOf('hex', (s) => { s.enumeration.truncated = 'no'; }), /enumeration\.truncated is "no", not true or false/);
-plant('a reason for a run that was not truncated', scanOf('hex', (s) => { s.enumeration.reason = 'budget'; }), /enumeration\.reason is "budget" for a run that was not truncated/);
+plant('a reason for a run that was not truncated', scanOf('hex', (s) => { s.enumeration.reason = 'budgetReached'; }), /enumeration\.reason is "budgetReached" for a run that was not truncated/);
 plant('a truncated run that does not say why', scanOf('hex', (s) => { s.enumeration.truncated = true; }), /enumeration\.reason is null; a truncated run says why it stopped/);
+plant('a truncated run that gives a reason other than its time budget', scanOf('hex', (s) => { s.enumeration.truncated = true; s.enumeration.reason = 'timeout'; }),
+  /enumeration\.reason is "timeout"; a truncated run says why it stopped, and the one reason is budgetReached/);
+plant('a truncated run that gives its time budget in other words', scanOf('hex', (s) => { s.enumeration.truncated = true; s.enumeration.reason = 'budget'; }),
+  /enumeration\.reason is "budget"; a truncated run says why it stopped, and the one reason is budgetReached/);
 plant('an enumeration with no unit', scanOf('hex', (s) => { s.enumeration.unit = ''; }), /enumeration\.unit is "", not the unit enumerated/);
 plant('a budget that is not a number of minutes', scanOf('hex', (s) => { s.enumeration.budgetMinutes = -5; }), /enumeration\.budgetMinutes is -5, not a number of minutes or null/);
 plant('an elapsed time left out', scanOf('hex', (s) => { s.enumeration.elapsedMinutes = null; }), /enumeration\.elapsedMinutes is null, not a number of minutes/);
@@ -2241,7 +2245,7 @@ plant('a withheld row listed as a check as well', withholding('rubygems', ABOVE_
 
 const reasonsFor = (...codes) => codes.map((code) => ({ code, detail: `Withheld for ${code}, in the aggregator's words.` }));
 const enumerationOf = (eco, fn) => scanOf(eco, (s) => fn(s.enumeration));
-const budget = (e) => { e.truncated = true; e.reason = 'budget'; };
+const budget = (e) => { e.truncated = true; e.reason = 'budgetReached'; };
 /** Two changes as one: where both change a stage, both run, in order. */
 const both = (a, b) => Object.fromEntries([...new Set([...Object.keys(a), ...Object.keys(b)])].map((key) => [key,
   typeof a[key] === 'function' && typeof b[key] === 'function' ? (x) => { a[key](x); b[key](x); } : (b[key] ?? a[key])]));

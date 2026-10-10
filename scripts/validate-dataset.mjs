@@ -1749,7 +1749,11 @@ function checkEnumeration(eco, e, file, bad) {
   if (!isCount(e.listed)) bad(`${where}.listed is ${describe(e.listed)}, not a whole count`);
   if (typeof e.truncated !== 'boolean') bad(`${where}.truncated is ${describe(e.truncated)}, not true or false`);
   if (e.truncated === false && e.reason !== null) bad(`${where}.reason is ${describe(e.reason)} for a run that was not truncated; it is null then`);
-  if (e.truncated === true && !isText(e.reason)) bad(`${where}.reason is ${describe(e.reason)}; a truncated run says why it stopped`);
+  // A run is truncated for one cause, its time budget, and says so with one code. A new code comes only with a new
+  // version of the rules, with its condition.
+  if (e.truncated === true && e.reason !== 'budgetReached') {
+    bad(`${where}.reason is ${describe(e.reason)}; a truncated run says why it stopped, and the one reason is budgetReached`);
+  }
   if (!isText(e.unit)) bad(`${where}.unit is ${describe(e.unit)}, not the unit enumerated`);
   if (e.budgetMinutes !== null && !(Number.isFinite(e.budgetMinutes) && e.budgetMinutes >= 0)) {
     bad(`${where}.budgetMinutes is ${describe(e.budgetMinutes)}, not a number of minutes or null`);
