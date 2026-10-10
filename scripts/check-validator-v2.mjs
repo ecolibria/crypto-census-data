@@ -3085,16 +3085,32 @@ test('the token of the stop line is drawn afresh for each run', async () => {
   assert.notEqual(stopped(first).token, stopped(second).token);
 });
 
-// Three shapes of text a dataset chooses that reach the output as the runner's grammar: a key of an errata file,
-// printed as it is; a scan file the parser quotes, line break included; and a listed name that is not a file. Each
-// fires the predicate on a line after the stop line, where the runner reads it as text.
-for (const [what, change, prepare, fires] of [
+// Two shapes of text a dataset chooses that would start a line of their own if printed as they are: a key of an
+// errata file, and a scan file the parser quotes, each holding a line break. The break is printed as \u000a, so no
+// line written after the stop line reads as the runner's grammar, and the escaped text reads back as what was there.
+for (const [what, change, prepare, fires, escaped, planted] of [
   ['an errata key holding a line break and ::warning::', {}, (dir) => {
     mkdirSync(join(dir, 'errata'));
     writeFileSync(join(dir, 'errata', `${FIRST_SHAPE}.json`), `${JSON.stringify({ 'x\n::warning::y': 1 }, null, 2)}\n`);
-  }, /^\s*::warning::y/],
+  }, /^\s*::warning::y/, /errata\/2026-03-18\.json: carries (.*), which an errata file does not define/, 'x\n::warning::y'],
   ['a scan file whose text holds a line break and ::error::', {}, (dir) => rehash('scan-results-hex.json', '{"x":\n::error::y::}')(dir),
-    /^\s*::error::y::/],
+    /^\s*::error::y::/, /scan-results-hex\.json does not parse: (.*)$/m, '{"x":\n::error::y::}'],
+]) {
+  test(`${what} is printed with its line break escaped, and no line after the stop line reads as the runner's grammar`, async () => {
+    const result = await validateOne(change, prepare);
+    assert.equal(result.code, 1, result.stdout);
+    assertPrintable(result);
+    const { stdout, stderr } = stopped(result);
+    assert.ok(![...stdout, ...stderr].some((line) => fires.test(line) || readsAsCommand(line)), `${result.stdout}${result.stderr}`);
+    const printed = escaped.exec(result.stderr);
+    assert.ok(printed, result.stderr);
+    assert.ok(readBack(printed[1]).includes(planted), printed[1]);
+  });
+}
+
+// A shape of text a dataset chooses that reaches the output as the runner's grammar without a line break: a listed
+// name that is not a file. It fires the predicate on a line after the stop line, where the runner reads it as text.
+for (const [what, change, prepare, fires] of [
   ['a listed name that is not a file, holding ##[error]', {}, (dir) => {
     const path = join(dir, 'datasets', FIRST_SHAPE, 'MANIFEST.json');
     const m = JSON.parse(readText(path));
@@ -3554,6 +3570,106 @@ test('the validator recomputes the shared vector\'s match set digest as both rep
   const recomputed = /catalog-2026-09-30\.json: matchSetSha256 is not the digest of the entries it covers \(recomputed: ([0-9a-f]{64})\)/.exec(result.stderr);
   assert.ok(recomputed, result.stderr);
   assert.equal(recomputed[1], VECTOR_SHA256);
+});
+
+// --- Printed output ---------------------------------------------------------------
+
+/**
+ * Characters a log viewer can be misled by, each outside U+0020 to U+007E:
+ * DEL, the C1 controls NEL and CSI, a right-to-left override, the line and
+ * paragraph separators, the Arabic letter mark, a zero-width space, a byte
+ * order mark, ESC, and one character above U+FFFF. Held here only as escapes.
+ */
+const HIDDEN = '\u007f\u0085\u009b\u202e\u2028\u2029\u061c\u200b\ufeff\u001b\u{1F600}';
+/** Those of them no ledger rule refuses in a name. */
+const HIDDEN_IN_A_NAME = '\u2028\u2029\u200b\ufeff\u{1F600}';
+
+/** Every line of both output streams holds only characters from U+0020 to U+007E. */
+function assertPrintable(result) {
+  for (const [stream, text] of [['stdout', result.stdout], ['stderr', result.stderr]]) {
+    for (const [index, line] of text.split('\n').entries()) {
+      assert.ok(/^[\x20-\x7e]*$/.test(line), `${stream} line ${index + 1} holds a character outside U+0020 to U+007E: ${JSON.stringify(line)}`);
+    }
+  }
+}
+
+/** Text printed unquoted, read back: the inside of a JSON string once each quotation mark is escaped. */
+const readBack = (text) => JSON.parse(`"${text.replace(/"/g, '\\"')}"`);
+
+test('a field printed as a value prints only printable characters, and reads back as it was', async () => {
+  const result = await validateOne(scanOf('hex', (s) => { s.enumeration.reason = HIDDEN; }));
+  assert.equal(result.code, 1, result.stdout);
+  assertPrintable(result);
+  const printed = /enumeration\.reason is ("(?:[^"\\]|\\.)*") for a run that was not truncated/.exec(result.stderr);
+  assert.ok(printed, result.stderr);
+  assert.equal(JSON.parse(printed[1]), HIDDEN);
+});
+
+for (const before of [146, 150, 155]) {
+  test(`a long value cut after ${before} characters prints only printable characters and splits no character`, async () => {
+    const value = `${'a'.repeat(before)}\u{1F600}${'b'.repeat(20)}`;
+    const result = await validateOne(scanOf('hex', (s) => { s.enumeration.reason = value; }));
+    assert.equal(result.code, 1, result.stdout);
+    assertPrintable(result);
+    const printed = /enumeration\.reason is ("(?:[^"\\]|\\.)*)\.\.\. for a run that was not truncated/.exec(result.stderr);
+    assert.ok(printed, result.stderr);
+    assert.ok(printed[1].length <= 157, printed[1]);
+    // The cut falls between whole escapes: what is printed reads back, as the start of the value, ending on a whole character.
+    const shown = JSON.parse(`${printed[1]}"`);
+    assert.ok(value.startsWith(shown), shown);
+    assert.doesNotMatch(shown, /[\ud800-\udbff]$/);
+  });
+}
+
+test('a ledger name prints only printable characters, and reads back as it was', async () => {
+  const name = `!${HIDDEN_IN_A_NAME}`;
+  const result = await validateOne(ledgerOf('hex', (lines) => [lines[0], lines[1], lines[1].replace(/^[^\t]+/, name)]));
+  assert.equal(result.code, 1, result.stdout);
+  assertPrintable(result);
+  const printed = /listing-hex\.tsv\.gz: row 3 \(((?:[^)\\]|\\.)*)\) does not follow the row above it/.exec(result.stderr);
+  assert.ok(printed, result.stderr);
+  assert.equal(readBack(printed[1]), name);
+});
+
+test('a ledger name a rule refuses prints only printable characters', async () => {
+  const result = await validateOne(ledgerOf('hex', (lines) => [lines[0], lines[1].replace(/^[^\t]+/, `acme_hex${HIDDEN}`)]));
+  assert.equal(result.code, 1, result.stdout);
+  assertPrintable(result);
+  assert.match(result.stderr, /listing-hex\.tsv\.gz: row 2 has a control or direction character in its name column/);
+});
+
+test('a directory name and a file name under datasets/ print only printable characters, and read back as they were', async () => {
+  const result = await validateOne({}, (dir) => {
+    mkdirSync(join(dir, 'datasets', `d${HIDDEN}`));
+    writeFileSync(join(dir, 'datasets', `f${HIDDEN}`), '');
+  });
+  assert.equal(result.code, 1, result.stdout);
+  assertPrintable(result);
+  const directory = /\n {2}("(?:[^"\\]|\\.)*"): directory name is not a YYYY-MM-DD collection date\n/.exec(result.stderr);
+  assert.ok(directory, result.stderr);
+  assert.equal(JSON.parse(directory[1]), `d${HIDDEN}`);
+  const file = /\n {2}datasets: (.*) is not a dataset directory\. /.exec(result.stderr);
+  assert.ok(file, result.stderr);
+  assert.equal(readBack(file[1]), `f${HIDDEN}`);
+});
+
+test('a parser\'s message prints only printable characters, and reads back as it was', async () => {
+  const result = await validateOne({}, (dir) => writeFileSync(join(datasetDir(dir), 'MANIFEST.json'), HIDDEN));
+  assert.equal(result.code, 1, result.stdout);
+  assertPrintable(result);
+  const printed = /\n {2}2026-09-30: MANIFEST\.json does not parse: (.*)\n/.exec(result.stderr);
+  assert.ok(printed, result.stderr);
+  // The parser quotes the text it stopped at, and these characters are all of it.
+  assert.ok(readBack(printed[1]).includes(HIDDEN), printed[1]);
+});
+
+test('the dataset asked for prints only printable characters, and reads back as it was', async () => {
+  const result = await validateOne({}, undefined, { args: [`x${HIDDEN}`] });
+  assert.equal(result.code, 2, result.stdout);
+  assertPrintable(result);
+  const printed = /No dataset datasets\/(.*)\n/.exec(result.stderr);
+  assert.ok(printed, result.stderr);
+  assert.equal(readBack(printed[1]), `x${HIDDEN}`);
 });
 
 // --- Running the planted defects -------------------------------------------------
