@@ -3703,6 +3703,21 @@ test('errata names and keys holding a backslash and u202e, and holding U+202E it
   assert.deepEqual(keys[1].split(', ').map(readBack).sort(), [`k${literal}`, `k${real}`].sort());
 });
 
+test('a package name in a scan file prints only printable characters where the problem is listed', async () => {
+  // The line and paragraph separators and a character above U+FFFF: no rule on a package name refuses them.
+  const name = '@acme/alpha\u2028\u2029\u{1F600}';
+  const result = await validateOne(scanOf('npm', (s) => {
+    s.packages[0].name = name;
+    s.packages.push(structuredClone(s.packages[0]));
+    s.packagesWithMatch += 1;
+  }));
+  assert.equal(result.code, 1, result.stdout);
+  assertPrintable(result);
+  const printed = /scan-results-npm\.json: packages\[6\] \((.*)\) is listed a second time/.exec(result.stderr);
+  assert.ok(printed, result.stderr);
+  assert.equal(readBack(printed[1]), name);
+});
+
 // --- Running the planted defects -------------------------------------------------
 
 for (const [what, change, problem, prepare] of defects) {
