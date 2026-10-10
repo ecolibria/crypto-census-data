@@ -2100,9 +2100,6 @@ function checkScan(name, eco, record, catalog, found, bad) {
   } else if (Array.isArray(s.packages) && s.packagesWithMatch !== s.packages.length) {
     bad(`${at} packagesWithMatch is ${s.packagesWithMatch}, and packages lists ${s.packages.length}. Only packages with a ` +
       'match are listed, so the two are one count.');
-  } else if (s.packagesWithMatch === 0) {
-    bad(`${at} matched no package. A registry that matched nothing fails checks.noMatches: a scan that went wrong and a ` +
-      'registry without cryptography look the same in it.');
   }
   return { file, value: s, method, coverage, packages, sound: method !== null && coverage !== null && packages !== null };
 }
@@ -4176,6 +4173,18 @@ function validateVersion2Files(name, dir, bad, read) {
     if (ledger === null) continue;
     if (ledger.sound) compareLedger(eco, ledger, scans[eco], bad);
     ledgers[eco] = ledger;
+  }
+  // A row that is published and matched nothing is refused: a scan that went wrong and a registry without
+  // cryptography look the same in it. A withheld row refuses nothing, and an outage that matched nothing withholds
+  // its row. A row whose reasons cannot be recomputed has had what stops them reported already.
+  for (const eco of ECOSYSTEMS) {
+    const scan = scans[eco];
+    if (!scan || scan.value.packagesWithMatch !== 0) continue;
+    if (Array.isArray(scan.value.packages) && scan.value.packages.length !== 0) continue;
+    const reasons = withholdingReasons(eco, scan, ledgers[eco]);
+    if (reasons === null || reasons.length > 0) continue;
+    bad(`${scan.file}: matched no package. A registry that matched nothing fails checks.noMatches: a scan that went wrong and a ` +
+      'registry without cryptography look the same in it.');
   }
   const map = found.consolidation ? checkConsolidation(name, found.consolidation, scans, found.withScanFile, bad) : null;
   const withheld = found.corpus ? checkCorpus(name, found.corpus, { catalog, scans, ledgers, map, found, manifest }, bad) : null;

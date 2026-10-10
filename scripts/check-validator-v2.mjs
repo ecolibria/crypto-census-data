@@ -3452,6 +3452,13 @@ plant('page answers that count a document no page answered', answersOf((a) => { 
 plant('page answers outside Maven', enumerationOf('npm', (e) => { e.pageAnswers = { documents: 8, repeated: 0, unnamed: 0, sortReported: [SORT] }; }),
   /scan-results-npm\.json: enumeration\.pageAnswers is \{.*\}; it is kept for the search pages of maven alone and is null for npm/);
 
+// A withheld row refuses nothing: one that matched nothing, as an outage does, is not refused for it.
+test('a withheld row that matched nothing passes', async () => {
+  const result = await validateOne(withholding('hex', reasonsFor('listingNotWhole'), both(enumerationOf('hex', (e) => { e.repeatedNames = 1; }),
+    { fixture: (f) => { f.hex.rows[0].matches = []; }, consolidation: () => {} })));
+  assert.equal(result.code, 0, result.stderr);
+});
+
 for (const [what, change] of [
   ['a Hex listing that moved while it was read, withheld as not whole', withholding('hex', reasonsFor('listingNotWhole'), enumerationOf('hex', (e) => { e.repeatedNames = 1; }))],
   ['a page draw whose answers report another sort, withheld for it', withholding('maven', reasonsFor('pageOrderNotHeld'), answersOf((a) => { a.sortReported = ['id asc']; }))],
