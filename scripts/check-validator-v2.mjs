@@ -3676,6 +3676,16 @@ test('the dataset asked for prints only printable characters, and reads back as 
   assert.equal(readBack(printed[1]), `x${HIDDEN}`);
 });
 
+test('an error no check handles prints only printable characters, and its message reads back as it was', async () => {
+  // A link under datasets/ that leads to itself: stat() on it throws, and nothing handles that error.
+  const result = await validateOne({}, (dir) => symlinkSync(`l${HIDDEN}`, join(dir, 'datasets', `l${HIDDEN}`)));
+  assert.equal(result.code, 1, result.stdout);
+  assertPrintable(result);
+  const printed = /The checks stopped on an error they do not handle:\n\n {2}(Error: ELOOP.*)\n/.exec(result.stderr);
+  assert.ok(printed, result.stderr);
+  assert.ok(readBack(printed[1]).endsWith(`/datasets/l${HIDDEN}'`), printed[1]);
+});
+
 // --- Running the planted defects -------------------------------------------------
 
 for (const [what, change, problem, prepare] of defects) {
