@@ -1257,8 +1257,12 @@ plant('a sample that does not name its size', scanOf('npm', (s) => { s.enumerati
 plant('a sample of no packages', scanOf('npm', (s) => { s.enumeration.requested = 0; }), /scan-results-npm\.json: enumeration\.requested is 0, not the size of the sample\. A row that is not read whole names how many packages it asked for, and that is never 0/);
 plant('a row read whole that names a size', scanOf('hex', (s) => { s.enumeration.requested = 1000; }), /scan-results-hex\.json: enumeration\.requested is 1000 for a row read whole; it is null then/);
 plant('truncation that is not a yes or no', scanOf('hex', (s) => { s.enumeration.truncated = 'no'; }), /enumeration\.truncated is "no", not true or false/);
-plant('a reason for a run that was not truncated', scanOf('hex', (s) => { s.enumeration.reason = 'budget'; }), /enumeration\.reason is "budget" for a run that was not truncated/);
+plant('a reason for a run that was not truncated', scanOf('hex', (s) => { s.enumeration.reason = 'budgetReached'; }), /enumeration\.reason is "budgetReached" for a run that was not truncated/);
 plant('a truncated run that does not say why', scanOf('hex', (s) => { s.enumeration.truncated = true; }), /enumeration\.reason is null; a truncated run says why it stopped/);
+plant('a truncated run that gives a reason other than its time budget', scanOf('hex', (s) => { s.enumeration.truncated = true; s.enumeration.reason = 'timeout'; }),
+  /enumeration\.reason is "timeout"; a truncated run says why it stopped, and the one reason is budgetReached/);
+plant('a truncated run that gives its time budget in other words', scanOf('hex', (s) => { s.enumeration.truncated = true; s.enumeration.reason = 'budget'; }),
+  /enumeration\.reason is "budget"; a truncated run says why it stopped, and the one reason is budgetReached/);
 plant('an enumeration with no unit', scanOf('hex', (s) => { s.enumeration.unit = ''; }), /enumeration\.unit is "", not the unit enumerated/);
 plant('a budget that is not a number of minutes', scanOf('hex', (s) => { s.enumeration.budgetMinutes = -5; }), /enumeration\.budgetMinutes is -5, not a number of minutes or null/);
 plant('an elapsed time left out', scanOf('hex', (s) => { s.enumeration.elapsedMinutes = null; }), /enumeration\.elapsedMinutes is null, not a number of minutes/);
@@ -2241,7 +2245,7 @@ plant('a withheld row listed as a check as well', withholding('rubygems', ABOVE_
 
 const reasonsFor = (...codes) => codes.map((code) => ({ code, detail: `Withheld for ${code}, in the aggregator's words.` }));
 const enumerationOf = (eco, fn) => scanOf(eco, (s) => fn(s.enumeration));
-const budget = (e) => { e.truncated = true; e.reason = 'budget'; };
+const budget = (e) => { e.truncated = true; e.reason = 'budgetReached'; };
 /** Two changes as one: where both change a stage, both run, in order. */
 const both = (a, b) => Object.fromEntries([...new Set([...Object.keys(a), ...Object.keys(b)])].map((key) => [key,
   typeof a[key] === 'function' && typeof b[key] === 'function' ? (x) => { a[key](x); b[key](x); } : (b[key] ?? a[key])]));
@@ -3085,16 +3089,32 @@ test('the token of the stop line is drawn afresh for each run', async () => {
   assert.notEqual(stopped(first).token, stopped(second).token);
 });
 
-// Three shapes of text a dataset chooses that reach the output as the runner's grammar: a key of an errata file,
-// printed as it is; a scan file the parser quotes, line break included; and a listed name that is not a file. Each
-// fires the predicate on a line after the stop line, where the runner reads it as text.
-for (const [what, change, prepare, fires] of [
+// Two shapes of text a dataset chooses that would start a line of their own if printed as they are: a key of an
+// errata file, and a scan file the parser quotes, each holding a line break. The break is printed as \u000a, so no
+// line written after the stop line reads as the runner's grammar, and the escaped text reads back as what was there.
+for (const [what, change, prepare, fires, escaped, planted] of [
   ['an errata key holding a line break and ::warning::', {}, (dir) => {
     mkdirSync(join(dir, 'errata'));
     writeFileSync(join(dir, 'errata', `${FIRST_SHAPE}.json`), `${JSON.stringify({ 'x\n::warning::y': 1 }, null, 2)}\n`);
-  }, /^\s*::warning::y/],
+  }, /^\s*::warning::y/, /errata\/2026-03-18\.json: carries (.*), which an errata file does not define/, 'x\n::warning::y'],
   ['a scan file whose text holds a line break and ::error::', {}, (dir) => rehash('scan-results-hex.json', '{"x":\n::error::y::}')(dir),
-    /^\s*::error::y::/],
+    /^\s*::error::y::/, /scan-results-hex\.json does not parse: (.*)$/m, '{"x":\n::error::y::}'],
+]) {
+  test(`${what} is printed with its line break escaped, and no line after the stop line reads as the runner's grammar`, async () => {
+    const result = await validateOne(change, prepare);
+    assert.equal(result.code, 1, result.stdout);
+    assertPrintable(result);
+    const { stdout, stderr } = stopped(result);
+    assert.ok(![...stdout, ...stderr].some((line) => fires.test(line) || readsAsCommand(line)), `${result.stdout}${result.stderr}`);
+    const printed = escaped.exec(result.stderr);
+    assert.ok(printed, result.stderr);
+    assert.ok(readBack(printed[1]).includes(planted), printed[1]);
+  });
+}
+
+// A shape of text a dataset chooses that reaches the output as the runner's grammar without a line break: a listed
+// name that is not a file. It fires the predicate on a line after the stop line, where the runner reads it as text.
+for (const [what, change, prepare, fires] of [
   ['a listed name that is not a file, holding ##[error]', {}, (dir) => {
     const path = join(dir, 'datasets', FIRST_SHAPE, 'MANIFEST.json');
     const m = JSON.parse(readText(path));
@@ -3432,6 +3452,13 @@ plant('page answers that count a document no page answered', answersOf((a) => { 
 plant('page answers outside Maven', enumerationOf('npm', (e) => { e.pageAnswers = { documents: 8, repeated: 0, unnamed: 0, sortReported: [SORT] }; }),
   /scan-results-npm\.json: enumeration\.pageAnswers is \{.*\}; it is kept for the search pages of maven alone and is null for npm/);
 
+// A withheld row refuses nothing: one that matched nothing, as an outage does, is not refused for it.
+test('a withheld row that matched nothing passes', async () => {
+  const result = await validateOne(withholding('hex', reasonsFor('listingNotWhole'), both(enumerationOf('hex', (e) => { e.repeatedNames = 1; }),
+    { fixture: (f) => { f.hex.rows[0].matches = []; }, consolidation: () => {} })));
+  assert.equal(result.code, 0, result.stderr);
+});
+
 for (const [what, change] of [
   ['a Hex listing that moved while it was read, withheld as not whole', withholding('hex', reasonsFor('listingNotWhole'), enumerationOf('hex', (e) => { e.repeatedNames = 1; }))],
   ['a page draw whose answers report another sort, withheld for it', withholding('maven', reasonsFor('pageOrderNotHeld'), answersOf((a) => { a.sortReported = ['id asc']; }))],
@@ -3554,6 +3581,148 @@ test('the validator recomputes the shared vector\'s match set digest as both rep
   const recomputed = /catalog-2026-09-30\.json: matchSetSha256 is not the digest of the entries it covers \(recomputed: ([0-9a-f]{64})\)/.exec(result.stderr);
   assert.ok(recomputed, result.stderr);
   assert.equal(recomputed[1], VECTOR_SHA256);
+});
+
+// --- Printed output ---------------------------------------------------------------
+
+/**
+ * Characters a log viewer can be misled by, each outside U+0020 to U+007E:
+ * DEL, the C1 controls NEL and CSI, a right-to-left override, the line and
+ * paragraph separators, the Arabic letter mark, a zero-width space, a byte
+ * order mark, ESC, and one character above U+FFFF. Held here only as escapes.
+ */
+const HIDDEN = '\u007f\u0085\u009b\u202e\u2028\u2029\u061c\u200b\ufeff\u001b\u{1F600}';
+/** Those of them no ledger rule refuses in a name. */
+const HIDDEN_IN_A_NAME = '\u2028\u2029\u200b\ufeff\u{1F600}';
+
+/** Every line of both output streams holds only characters from U+0020 to U+007E. */
+function assertPrintable(result) {
+  for (const [stream, text] of [['stdout', result.stdout], ['stderr', result.stderr]]) {
+    for (const [index, line] of text.split('\n').entries()) {
+      assert.ok(/^[\x20-\x7e]*$/.test(line), `${stream} line ${index + 1} holds a character outside U+0020 to U+007E: ${JSON.stringify(line)}`);
+    }
+  }
+}
+
+/** Text printed unquoted, read back: the inside of a JSON string once each quotation mark is escaped. */
+const readBack = (text) => JSON.parse(`"${text.replace(/"/g, '\\"')}"`);
+
+test('a field printed as a value prints only printable characters, and reads back as it was', async () => {
+  const result = await validateOne(scanOf('hex', (s) => { s.enumeration.reason = HIDDEN; }));
+  assert.equal(result.code, 1, result.stdout);
+  assertPrintable(result);
+  const printed = /enumeration\.reason is ("(?:[^"\\]|\\.)*") for a run that was not truncated/.exec(result.stderr);
+  assert.ok(printed, result.stderr);
+  assert.equal(JSON.parse(printed[1]), HIDDEN);
+});
+
+for (const before of [146, 150, 155]) {
+  test(`a long value cut after ${before} characters prints only printable characters and splits no character`, async () => {
+    const value = `${'a'.repeat(before)}\u{1F600}${'b'.repeat(20)}`;
+    const result = await validateOne(scanOf('hex', (s) => { s.enumeration.reason = value; }));
+    assert.equal(result.code, 1, result.stdout);
+    assertPrintable(result);
+    const printed = /enumeration\.reason is ("(?:[^"\\]|\\.)*)\.\.\. for a run that was not truncated/.exec(result.stderr);
+    assert.ok(printed, result.stderr);
+    assert.ok(printed[1].length <= 157, printed[1]);
+    // The cut falls between whole escapes: what is printed reads back, as the start of the value, ending on a whole character.
+    const shown = JSON.parse(`${printed[1]}"`);
+    assert.ok(value.startsWith(shown), shown);
+    assert.doesNotMatch(shown, /[\ud800-\udbff]$/);
+  });
+}
+
+test('a ledger name prints only printable characters, and reads back as it was', async () => {
+  const name = `!${HIDDEN_IN_A_NAME}`;
+  const result = await validateOne(ledgerOf('hex', (lines) => [lines[0], lines[1], lines[1].replace(/^[^\t]+/, name)]));
+  assert.equal(result.code, 1, result.stdout);
+  assertPrintable(result);
+  const printed = /listing-hex\.tsv\.gz: row 3 \(((?:[^)\\]|\\.)*)\) does not follow the row above it/.exec(result.stderr);
+  assert.ok(printed, result.stderr);
+  assert.equal(readBack(printed[1]), name);
+});
+
+test('a ledger name a rule refuses prints only printable characters', async () => {
+  const result = await validateOne(ledgerOf('hex', (lines) => [lines[0], lines[1].replace(/^[^\t]+/, `acme_hex${HIDDEN}`)]));
+  assert.equal(result.code, 1, result.stdout);
+  assertPrintable(result);
+  assert.match(result.stderr, /listing-hex\.tsv\.gz: row 2 has a control or direction character in its name column/);
+});
+
+test('a directory name and a file name under datasets/ print only printable characters, and read back as they were', async () => {
+  const result = await validateOne({}, (dir) => {
+    mkdirSync(join(dir, 'datasets', `d${HIDDEN}`));
+    writeFileSync(join(dir, 'datasets', `f${HIDDEN}`), '');
+  });
+  assert.equal(result.code, 1, result.stdout);
+  assertPrintable(result);
+  const directory = /\n {2}("(?:[^"\\]|\\.)*"): directory name is not a YYYY-MM-DD collection date\n/.exec(result.stderr);
+  assert.ok(directory, result.stderr);
+  assert.equal(JSON.parse(directory[1]), `d${HIDDEN}`);
+  const file = /\n {2}datasets: (.*) is not a dataset directory\. /.exec(result.stderr);
+  assert.ok(file, result.stderr);
+  assert.equal(readBack(file[1]), `f${HIDDEN}`);
+});
+
+test('a parser\'s message prints only printable characters, and reads back as it was', async () => {
+  const result = await validateOne({}, (dir) => writeFileSync(join(datasetDir(dir), 'MANIFEST.json'), HIDDEN));
+  assert.equal(result.code, 1, result.stdout);
+  assertPrintable(result);
+  const printed = /\n {2}2026-09-30: MANIFEST\.json does not parse: (.*)\n/.exec(result.stderr);
+  assert.ok(printed, result.stderr);
+  // The parser quotes the text it stopped at, and these characters are all of it.
+  assert.ok(readBack(printed[1]).includes(HIDDEN), printed[1]);
+});
+
+test('the dataset asked for prints only printable characters, and reads back as it was', async () => {
+  const result = await validateOne({}, undefined, { args: [`x${HIDDEN}`] });
+  assert.equal(result.code, 2, result.stdout);
+  assertPrintable(result);
+  const printed = /No dataset datasets\/(.*)\n/.exec(result.stderr);
+  assert.ok(printed, result.stderr);
+  assert.equal(readBack(printed[1]), `x${HIDDEN}`);
+});
+
+test('an error no check handles prints only printable characters, and its message reads back as it was', async () => {
+  // A link under datasets/ that leads to itself: stat() on it throws, and nothing handles that error.
+  const result = await validateOne({}, (dir) => symlinkSync(`l${HIDDEN}`, join(dir, 'datasets', `l${HIDDEN}`)));
+  assert.equal(result.code, 1, result.stdout);
+  assertPrintable(result);
+  const printed = /The checks stopped on an error they do not handle:\n\n {2}(Error: ELOOP.*)\n/.exec(result.stderr);
+  assert.ok(printed, result.stderr);
+  assert.ok(readBack(printed[1]).endsWith(`/datasets/l${HIDDEN}'`), printed[1]);
+});
+
+test('errata names and keys holding a backslash and u202e, and holding U+202E itself, print apart and read back as they were', async () => {
+  const literal = 'a\\u202e';
+  const real = 'a\u202e';
+  const result = await validateOne({}, (dir) => {
+    mkdirSync(join(dir, 'errata'), { recursive: true });
+    for (const name of [literal, real]) writeFileSync(join(dir, 'errata', `${name}.json`), '{}\n');
+    writeFileSync(join(dir, 'errata', `${FIRST_SHAPE}.json`), `${JSON.stringify({ [`k${literal}`]: 1, [`k${real}`]: 1 }, null, 2)}\n`);
+  });
+  assert.equal(result.code, 1, result.stdout);
+  assertPrintable(result);
+  const names = new Set([...result.stderr.matchAll(/^ {2}errata\/(a[^:]*)\.json: /gm)].map((m) => readBack(m[1])));
+  assert.deepEqual([...names].sort(), [literal, real].sort(), result.stderr);
+  const keys = /errata\/2026-03-18\.json: carries (.*), which an errata file does not define/.exec(result.stderr);
+  assert.ok(keys, result.stderr);
+  assert.deepEqual(keys[1].split(', ').map(readBack).sort(), [`k${literal}`, `k${real}`].sort());
+});
+
+test('a package name in a scan file prints only printable characters where the problem is listed', async () => {
+  // The line and paragraph separators and a character above U+FFFF: no rule on a package name refuses them.
+  const name = '@acme/alpha\u2028\u2029\u{1F600}';
+  const result = await validateOne(scanOf('npm', (s) => {
+    s.packages[0].name = name;
+    s.packages.push(structuredClone(s.packages[0]));
+    s.packagesWithMatch += 1;
+  }));
+  assert.equal(result.code, 1, result.stdout);
+  assertPrintable(result);
+  const printed = /scan-results-npm\.json: packages\[6\] \((.*)\) is listed a second time/.exec(result.stderr);
+  assert.ok(printed, result.stderr);
+  assert.equal(readBack(printed[1]), name);
 });
 
 // --- Running the planted defects -------------------------------------------------
