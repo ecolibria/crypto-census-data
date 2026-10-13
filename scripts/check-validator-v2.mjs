@@ -3695,7 +3695,7 @@ test('an error no check handles prints only printable characters, and its messag
 
 test('errata names and keys holding a backslash and u202e, and holding U+202E itself, print apart and read back as they were', async () => {
   const literal = 'a\\u202e';
-  const real = 'a‮';
+  const real = 'a\u202e';
   const result = await validateOne({}, (dir) => {
     mkdirSync(join(dir, 'errata'), { recursive: true });
     for (const name of [literal, real]) writeFileSync(join(dir, 'errata', `${name}.json`), '{}\n');
