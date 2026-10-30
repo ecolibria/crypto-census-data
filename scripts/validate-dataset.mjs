@@ -4605,7 +4605,7 @@ function validateVersion3Files(name, dir, { text, manifest, size }, bad) {
   }
   if (found.projects) checkProjectsFile(found.projects, recount, bad);
   checkComparisonIssues(manifest.knownIssues, files, recount, bad);
-  checkComparisonComparability(date, manifest.comparability, bad);
+  checkComparisonComparability(name, date, manifest.comparability, bad);
   if (recount !== null) recounts.push({ name, figures: recount.figures });
 }
 
@@ -5160,7 +5160,7 @@ function checkComparisonIssues(list, files, recount, bad) {
  * records no tool version, so it compares with no run. A census dataset is
  * never named: a comparison is not a census.
  */
-function checkComparisonComparability(date, list, bad) {
+function checkComparisonComparability(name, date, list, bad) {
   const at = 'MANIFEST.json: comparability';
   if (!Array.isArray(list)) {
     bad(`${at} is ${describe(list)}, not a list`);
@@ -5193,7 +5193,8 @@ function checkComparisonComparability(date, list, bad) {
       try {
         kind = readFor(join(DATASETS, item.dataset, 'MANIFEST.json'), (m) => (isObject(m) ? m.kind : null));
       } catch (err) {
-        if (err instanceof PastBound) fail(item.dataset, printable(err.message));
+        // Not read for the bound on what is held: listed for this comparison, whose check it stopped.
+        if (err instanceof PastBound) fail(name, printable(err.message));
         kind = null;
       }
       if (kind === 'comparison-aggregate-only') {

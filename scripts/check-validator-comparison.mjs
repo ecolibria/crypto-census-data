@@ -26,7 +26,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, truncateSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -558,6 +558,23 @@ test('T3 a later comparison that does not name the earlier one is refused', asyn
 test('T3 a later comparison that calls an earlier aggregate-only one comparable is refused', async () => {
   refused(await validate({ comparisons: { [NAME]: [{}], [LATER]: [namesEarlier({ comparable: true, reason: null }), '2026-10-15'] } }),
     `${LATER}: MANIFEST.json: comparability[0]: ${NAME} is comparison-aggregate-only, which records no tool version, so it is not comparable`);
+});
+
+test('T3 an earlier comparison\'s manifest not read for the bound is listed for the later comparison, whose check it stopped', async () => {
+  const result = await validate({
+    comparisons: { [NAME]: [{}], [LATER]: [namesEarlier({ comparable: true, reason: null }), '2026-10-15'] },
+    // The later comparison's README.md grown, sparse, until its directory holds all of the 150,000,000 bytes the checks
+    // hold at once, so that no byte is left for the earlier comparison's manifest.
+    prepare: (dir) => {
+      const later = join(dir, 'datasets', LATER);
+      const rest = ['MANIFEST.json', REPORT, 'comparison.json', 'projects.json'].reduce((n, file) => n + statSync(join(later, file)).size, 0);
+      truncateSync(join(later, 'README.md'), 150_000_000 - rest);
+    },
+  });
+  refused(result, `${LATER}: datasets/${NAME}/MANIFEST.json was not read: it is `);
+  refused(result, `${LATER}: MANIFEST.json: comparability[0]: ${NAME} has no manifest these rules can read`);
+  const earlier = result.stderr.split('\n').filter((line) => line.startsWith(`  ${NAME}: `));
+  assert.deepEqual(earlier, [], `${NAME} passes its own checks, and a problem is listed for it`);
 });
 
 // --- T4: the files --------------------------------------------------------------------
