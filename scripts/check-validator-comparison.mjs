@@ -967,6 +967,15 @@ for (const [what, affects, problem] of [
   });
 }
 
+test('T10 a comparison\'s errata issue with an affects path that names no file is refused where the comparison\'s files cannot be read', async () => {
+  const result = await validate({
+    errata: { [ERRATA]: comparisonErrata(NAME, { affects: ['figures.sourceFindings'] }) },
+    prepare: (dir) => unlinkSync(inComparison(dir, 'comparison.json')),
+  });
+  refused(result, errataLine(`cannot be checked against datasets/${NAME}: its comparison.json and ${REPORT} could not be read`));
+  refused(result, errataLine('issue 1 (example-comparison-issue) affects figures.sourceFindings, which names no file.'));
+});
+
 test('T10 a comparison\'s errata file in version 2 is refused', async () => {
   refused(await validate({ errata: { [ERRATA]: { ...comparisonErrata(), schemaVersion: 2 } } }), errataLine('schemaVersion is 2; the rules here are for version 3'));
 });

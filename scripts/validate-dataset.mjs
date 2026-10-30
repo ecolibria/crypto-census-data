@@ -680,7 +680,8 @@ function validateErrata(file) {
         if (figures.has(path)) fail(label, `${where} names ${path} twice in affects`);
         figures.add(path);
         if (comparison) {
-          const problem = compared === undefined ? null : unresolvedAffect(compared, path);
+          // A path names its file whether or not the comparison's files could be read; it is looked up only where they were.
+          const problem = unresolvedAffect(compared ?? {}, path);
           if (problem !== null) fail(label, `${where} affects ${path}, which ${problem}`);
         } else if (corpus !== undefined && resolvePath(corpus, path) === undefined) {
           fail(label, `${where} affects ${path}, which is not a field of the ${date} aggregate`);
