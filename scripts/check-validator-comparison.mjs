@@ -831,13 +831,18 @@ test('T7 a project left out is refused', async () => {
 
 for (const [file, change, path, key, what] of [
   ['projects.json', projectsOf((p) => { p.projects[0].secrets = 1; }), 'projects.*.secrets', 'secrets', 'hard-coded secret findings'],
-  ['projects.json', projectsOf((p) => { p.projects[0].certFiles = ['keys/example-key-file']; }), 'projects.*.certFiles', 'certFiles', 'key files'],
   ['comparison.json', comparisonOf((c) => { c.secrets = 1; }), 'secrets', 'secrets', 'hard-coded secret findings'],
 ]) {
   test(`T7 a ${key} field in ${file} is refused`, async () => {
     refusedHere(await validateOne(change), `${file}: ${path} is ${key}, the stored report's field for a project's ${what}.`);
   });
 }
+
+// The stored report holds no list of key files, so a certFiles field is refused as a key the contract does not define.
+test('T7 a certFiles field in projects.json is refused', async () => {
+  refusedHere(await validateOne(projectsOf((p) => { p.projects[0].certFiles = ['keys/example-key-file']; })),
+    'projects.json: projects[0] carries "certFiles", which the version 3 contract does not define.');
+});
 
 test('T7 a direction override and a control character in a project name print escaped', async () => {
   const result = await validateOne(reportOf((r) => { r.projects[0].project = 'example-\u202ealpha\u001b'; }));

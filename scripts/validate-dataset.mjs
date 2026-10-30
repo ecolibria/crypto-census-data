@@ -4409,8 +4409,8 @@ const wordsOf = (key) => key.split(/[^\p{L}\p{N}]+|(?<=[\p{Ll}\p{N}])(?=\p{Lu})|
 const RATIO_WORDS = ['multiplier', 'multipliers', 'ratio', 'ratios', 'times'];
 const isRatioKey = (key) => wordsOf(key).some((word) => RATIO_WORDS.includes(word));
 
-/** The stored report's per-project fields for hard-coded secret findings and key files. No other file of a comparison carries either. */
-const SECRET_FIELDS = ['secrets', 'certFiles'];
+/** The stored report's per-project field for hard-coded secret findings. No other file of a comparison carries it. */
+const SECRET_FIELDS = ['secrets'];
 
 /** Every key of a value at every level, with its dotted path: an element of a list as `*`. */
 function keysOf(value, path = [], found = []) {
@@ -4495,8 +4495,8 @@ function refuseRatioKeys(file, value, bad) {
 function refuseSecretFields(file, value, bad) {
   for (const { key, path } of keysOf(value)) {
     if (!SECRET_FIELDS.includes(key)) continue;
-    bad(`${file}: ${path} is ${key}, the stored report's field for a project's ` +
-      `${key === 'secrets' ? 'hard-coded secret findings' : 'key files'}. No file of a comparison but the stored report carries it.`);
+    bad(`${file}: ${path} is ${key}, the stored report's field for a project's hard-coded secret findings. No file of a ` +
+      'comparison but the stored report carries it.');
   }
 }
 
