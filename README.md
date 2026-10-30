@@ -194,10 +194,11 @@ The stored report keeps the form it was stored in: two-space JSON with no final 
 carries the SHA-256 of a directory's stored report, a changed report fails even with a manifest that matches it.
 The other JSON files are in canonical form: two-space JSON ending in one newline, `schemaVersion` first.
 
-`comparison.json` holds `projects`, five `figures`, `sourceFindingsByKind`, `secretFindingsExcluded` and
-`storedTotalFindings`, and in `rules` one text for each figure, plus `sourceAlgorithmsUnit` for the unit of
-`sourceAlgorithms`, each naming the stored fields it counts. Each figure is counted from the stored report's own
-fields:
+`comparison.json` holds `schemaVersion` 3; `dataset`, the name of its directory,
+`<YYYY-MM-DD>-deepscan-comparison`; `source`, `scan-comparison-report.json`, the file its figures are counted
+from; `projects`, five `figures`, `sourceFindingsByKind`, `secretFindingsExcluded` and `storedTotalFindings`; and
+in `rules` one text for each figure, plus `sourceAlgorithmsUnit` for the unit of `sourceAlgorithms`, each naming
+the stored fields it counts. Each figure is counted from the stored report's own fields:
 
 | Figure | Counted as |
 |---|---|
