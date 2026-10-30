@@ -157,6 +157,75 @@ datasets/<YYYY-MM-DD>/
 by more than an order of magnitude. Every published share is over `packagesWithCrypto`. Read the denominator
 before quoting a percentage.
 
+### Comparisons: schema version 3
+
+A comparison is a directory named for the date of the run it records and the suffix `-deepscan-comparison`. It
+holds one run of two scanners over the same projects, as the stored report records it: a dependency scanner's
+matches (`depMatch`) and a source scanner's findings (`deepScan`). Its `MANIFEST.json` declares `schemaVersion` 3,
+the comparison contract. A census dataset never declares 3, and a comparison never declares 2 or no version.
+
+```
+datasets/<YYYY-MM-DD>-deepscan-comparison/
+  MANIFEST.json                 describes and hashes everything below
+  scan-comparison-report.json   the stored report, byte for byte as it was stored
+  comparison.json               the figures, each counted from the stored report
+  projects.json                 the projects the stored report names, in its order
+  README.md                     what a reader can count again, and what these files cannot show
+```
+
+Version 3 accepts one kind, `comparison-aggregate-only`: the stored report is the only output of the run that was
+kept. Its `MANIFEST.json` carries exactly these fields, and no other:
+
+| Field | Meaning |
+|---|---|
+| `schemaVersion` | `3`, the first key. |
+| `dataset` | A title. |
+| `kind` | `comparison-aggregate-only`. Any other kind fails validation. |
+| `collectedAt` | The directory's date, which is also the UTC date of the stored report's `metadata.generatedAt`. |
+| `generatedAt` | When the derived files were written: not before `collectedAt`, and not after the day the validator runs. |
+| `license` | `CC-BY-4.0`. |
+| `provenance` | `null`. Neither scanner's run is recorded. |
+| `provenanceNote` | What was not recorded. Required, as text. |
+| `files[]` | One entry per role, `{ role, file, bytes, sha256, schemaVersion }`: `stored-report`, `comparison`, `projects` and `readme`. Every file in the directory except `MANIFEST.json` is listed. No link and no subdirectory. |
+| `comparability[]` | One entry, `{ dataset, doi, comparable, reason }`, for each earlier comparison directory, and empty when there is none. An earlier `comparison-aggregate-only` directory records no tool version, so it is not comparable. A census dataset is never listed, and a census dataset never lists a comparison. |
+| `knownIssues[]` | `{ defect, summary, affects, direction, magnitude, correctedIn }`, as in version 2. Each `affects` path names its file, `comparison.json:<path>` or `scan-comparison-report.json:<path>`, with `*` for every element of a list. |
+
+The stored report keeps the form it was stored in: two-space JSON with no final newline. Where the validator
+carries the SHA-256 of a directory's stored report, a changed report fails even with a manifest that matches it.
+The other JSON files are in canonical form: two-space JSON ending in one newline, `schemaVersion` first.
+
+`comparison.json` holds `projects`, five `figures`, `sourceFindingsByKind`, `secretFindingsExcluded` and
+`storedTotalFindings`, and in `rules` one text for each figure, plus `sourceAlgorithmsUnit` for the unit of
+`sourceAlgorithms`, each naming the stored fields it counts. Each figure is counted from the stored report's own
+fields:
+
+| Figure | Counted as |
+|---|---|
+| `dependencyMatches` | The sum over the projects of the entries in `depMatch.details`. |
+| `projectsWithDependencyMatch` | The projects with at least one entry in `depMatch.details`. |
+| `sourceFindings` | The sum over the projects of `libraries + weakPatterns + sourceAlgorithms + tlsFindings`. Secret findings are excluded. |
+| `projectsWithSourceFinding` | The projects where that sum is above zero. |
+| `projectsWithSourceFindingAndNoDependencyMatch` | The projects where that sum is above zero and `depMatch.details` is empty. |
+
+`sourceAlgorithms` counts distinct (algorithm, language) pairs in a project, not occurrences. No key of
+`comparison.json` holds the word `multiplier`, `ratio` or `times`: the file stores counts and no ratio.
+
+`projects.json` holds one entry per stored project, `{ name, repository, commit, languages }`. `repository` and
+`commit` are null, because the stored report records neither. `languages` is what the source scanner reported for
+the project.
+
+The validator counts every figure again from the stored report, and the size of each issue the contract defines by
+a count, and refuses a comparison in which one differs from its count. When it passes, it prints the five figures
+it counted:
+
+```bash
+node scripts/validate-dataset.mjs <YYYY-MM-DD>-deepscan-comparison
+```
+
+An errata file for a comparison is named for the whole directory name,
+`errata/<YYYY-MM-DD>-deepscan-comparison.json`, with kind `comparisonErrata` and `schemaVersion` 3. Each of its
+`affects` paths names its file, as in `knownIssues`.
+
 ## How a dataset gets here
 
 The scan is a workflow in the source repository that each manifest's `provenance` records. That repository is not
