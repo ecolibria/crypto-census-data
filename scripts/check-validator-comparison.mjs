@@ -788,6 +788,10 @@ test('T6 a source that is not the stored report is refused', async () => {
   refusedHere(await validateOne(comparisonOf((c) => { c.source = 'report.json'; })), 'comparison.json: source is "report.json".');
 });
 
+test('T6 comparison.json without dataset and source is refused', async () => {
+  refusedHere(await validateOne(comparisonOf((c) => { delete c.dataset; delete c.source; })), 'comparison.json is missing dataset, source.');
+});
+
 test('T6 a rule that does not name the stored fields it counts is refused', async () => {
   refusedHere(await validateOne(comparisonOf((c) => { c.rules.sourceFindings = 'The source findings.'; })),
     'comparison.json: rules.sourceFindings does not name libraries, weakPatterns, sourceAlgorithms, tlsFindings.');
