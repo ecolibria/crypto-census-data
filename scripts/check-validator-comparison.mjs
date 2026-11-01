@@ -1033,6 +1033,35 @@ test('T10 a census errata file naming a field of comparison.json is refused, and
   assert.match(result.stderr, /\n1 problem\(s\) across 2 dataset\(s\) and 1 errata file\(s\):/);
 });
 
+// --- T6: secrets and certFiles in the manifest, comparison.json and the errata file ------------------
+
+// No file of a comparison but the stored report carries secrets. The T7 tests above plant secrets in
+// projects.json and comparison.json, and certFiles in projects.json. Each test here plants one field where
+// they do not: secrets in MANIFEST.json, at the top and inside a known issue, where the walk over every key is
+// the only refusal; certFiles in MANIFEST.json and in comparison.json, refused as a key the contract does not
+// define; and secrets in the comparison's errata file, at the top and inside an issue.
+for (const [what, change, line] of [
+  ['a secrets field at the top level of MANIFEST.json', manifestOf((m) => { m.secrets = 1; }),
+    'MANIFEST.json: secrets is secrets, the stored report\'s field for a project\'s hard-coded secret findings.'],
+  ['a secrets field inside a known issue of MANIFEST.json', manifestOf((m) => { m.knownIssues[0].secrets = 1; }),
+    'MANIFEST.json: knownIssues.*.secrets is secrets, the stored report\'s field for a project\'s hard-coded secret findings.'],
+  ['a certFiles field at the top level of MANIFEST.json', manifestOf((m) => { m.certFiles = ['keys/example-key-file']; }),
+    'schemaVersion is 3, but MANIFEST.json is not a version 3 manifest: it carries "certFiles", which a version 3 manifest does not define.'],
+  ['a certFiles field at the top level of comparison.json', comparisonOf((c) => { c.certFiles = ['keys/example-key-file']; }),
+    'comparison.json carries "certFiles", which the version 3 contract does not define.'],
+]) {
+  test(`T6 ${what} is refused`, async () => refusedHere(await validateOne(change), line));
+}
+
+for (const [what, errata, text] of [
+  ['a secrets field at the top level of the comparison\'s errata file', { ...comparisonErrata(), secrets: 1 },
+    'carries secrets, which an errata file of a comparison does not define'],
+  ['a secrets field inside an issue of the comparison\'s errata file', comparisonErrata(NAME, { secrets: 1 }),
+    'issue 1 (example-comparison-issue) carries secrets, which an issue does not define'],
+]) {
+  test(`T6 ${what} is refused`, async () => refused(await validate({ errata: { [ERRATA]: errata } }), errataLine(text)));
+}
+
 // --- T11: the census does not read a comparison as an earlier census -------------------------------
 
 test('T11 a version 2 census dataset whose comparability names a comparison that passes is refused for it', async () => {
