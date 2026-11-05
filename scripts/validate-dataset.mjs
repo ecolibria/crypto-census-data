@@ -16,11 +16,15 @@
  *   - an errata file names a dataset that is here, and figures that are in it
  *
  * A dataset in schema version 2 is held to the rules of that version, in the
- * section "Schema version 2" below.
+ * section "Schema version 2" below. A comparison directory, named for its
+ * date and the suffix -deepscan-comparison, declares schema version 3 and is
+ * held to the rules of the section "Schema version 3: comparisons".
  *
  * Usage:
  *   node scripts/validate-dataset.mjs            # every dataset and every errata file
  *   node scripts/validate-dataset.mjs 2026-07-29 # one dataset, and its errata file if it has one
+ *   node scripts/validate-dataset.mjs 2026-07-29-deepscan-comparison
+ *                                                # one comparison, its errata file, and the figures counted from it
  */
 
 import { readFileSync, readdirSync, existsSync, statSync, lstatSync } from 'node:fs';
@@ -258,8 +262,29 @@ function validate(name) {
     fail(name, 'MANIFEST.json is not a JSON object, so it describes nothing.');
     return;
   }
+  // A comparison directory declares version 3 and nothing else, and version 3
+  // is read under no other name: the name and the version decide together
+  // which rules run, so no census rule is read for a comparison, nor the reverse.
+  if (isComparisonName(name)) {
+    if (manifest.schemaVersion === 3) return validateVersion3(name, dir, { text: strictText, manifest, size: manifestStat.size });
+    if (manifest.schemaVersion === undefined) {
+      fail(name, `MANIFEST.json declares no schemaVersion, and ${name} is a comparison directory, which declares version 3. The ` +
+        `first file shape is accepted only for ${FIRST_SHAPE_DATASETS.join(' and ')}.`);
+    } else if (manifest.schemaVersion === 2) {
+      fail(name, `schemaVersion is 2, and ${name} is a comparison directory. Version 2 is the census contract and 3 the ` +
+        'comparison contract, so a comparison declares 3 and no census rule is read for it.');
+    } else {
+      fail(name, `schemaVersion is ${JSON.stringify(manifest.schemaVersion)}, which is not a version these rules know. A comparison ` +
+        'directory declares the number 3; any other version is refused, never read as the newest one known.');
+    }
+    return;
+  }
   if (manifest.schemaVersion !== undefined) {
-    if (manifest.schemaVersion !== 2) {
+    if (manifest.schemaVersion === 3) {
+      fail(name, 'schemaVersion is 3, which is not a version these rules know for a directory named by its date alone. Version 3 ' +
+        'is the comparison contract, declared only in a directory named <date>-deepscan-comparison; a census dataset declares 2, ' +
+        'or none in the first file shape.');
+    } else if (manifest.schemaVersion !== 2) {
       fail(name, `schemaVersion is ${JSON.stringify(manifest.schemaVersion)}, which is not a version these rules know. A ` +
         'version 2 dataset declares the number 2 and a first-shape one declares none; any other version is refused, never ' +
         'read as the newest one known.');
@@ -446,12 +471,19 @@ function validate(name) {
 function validateErrata(file) {
   const label = `errata/${printable(file)}`;
 
-  const named = /^(\d{4}-\d{2}-\d{2})\.json$/.exec(file);
-  if (!named) {
-    fail(label, 'is not named <dataset date>.json. Everything in errata/ is the errata file of one dataset.');
+  // Named for the whole name of the directory it describes: <date>.json for a
+  // census dataset, <date>-deepscan-comparison.json for a comparison. So the
+  // errata file of a census dataset is never read as that of a comparison of
+  // the same date, nor the reverse.
+  const dataset = file.endsWith('.json') ? file.slice(0, -'.json'.length) : '';
+  const form = nameForm(dataset);
+  if (form === null) {
+    fail(label, 'is not named <dataset date>.json, or <comparison directory>.json for a comparison. Everything in errata/ is ' +
+      'the errata file of one dataset.');
     return;
   }
-  const date = named[1];
+  const comparison = form.form === 'comparison';
+  const date = form.date;
 
   // A regular file, and nothing else. A link would keep the text these checks
   // read somewhere the append-only check does not look, where it could be
@@ -501,18 +533,23 @@ function validateErrata(file) {
       'newline. Anything else can hide a repeated key from every check here.');
   }
 
-  const extra = unknownFields(errata, ERRATA_FIELDS);
+  // A comparison has no raw files to be written again, so its errata file
+  // records issues and no regenerations. It is read under the comparison
+  // contract, version 3, and names its fields file by file.
+  const extra = unknownFields(errata, comparison ? ERRATA_FIELDS.filter((field) => field !== 'regenerations') : ERRATA_FIELDS);
   if (extra.length > 0) {
-    fail(label, `carries ${extra.map(printable).join(', ')}, which an errata file does not define`);
+    fail(label, `carries ${extra.map(printable).join(', ')}, which an errata file${comparison ? ' of a comparison' : ''} does not define`);
   }
-  if (errata.schemaVersion !== 2) {
-    fail(label, `schemaVersion is ${JSON.stringify(errata.schemaVersion)}; the rules here are for version 2`);
+  const version = comparison ? 3 : 2;
+  if (errata.schemaVersion !== version) {
+    fail(label, `schemaVersion is ${JSON.stringify(errata.schemaVersion)}; the rules here are for version ${version}`);
   }
-  if (errata.kind !== 'censusErrata') {
-    fail(label, `kind is ${JSON.stringify(errata.kind)}, not "censusErrata"`);
+  const kind = comparison ? 'comparisonErrata' : 'censusErrata';
+  if (errata.kind !== kind) {
+    fail(label, `kind is ${JSON.stringify(errata.kind)}, not "${kind}"`);
   }
-  if (errata.dataset !== date) {
-    fail(label, `dataset is ${JSON.stringify(errata.dataset)}, and the file is named for ${date}`);
+  if (errata.dataset !== dataset) {
+    fail(label, `dataset is ${JSON.stringify(errata.dataset)}, and the file is named for ${dataset}`);
   }
   if (typeof errata.doi !== 'string' || !/^10\.\d{4,9}\/\S+$/.test(errata.doi)) {
     fail(label, `doi is ${JSON.stringify(errata.doi)}. An errata file gives the DOI of the dataset it ` +
@@ -529,12 +566,23 @@ function validateErrata(file) {
 
   // The figures an issue names are looked up in the dataset's own aggregate,
   // which its manifest names by the manifest's version: `corpus` in the first
-  // file shape, the file listed with the role `corpus` in version 2.
+  // file shape, the file listed with the role `corpus` in version 2. Those of
+  // a comparison are looked up in the file each names: its comparison.json or
+  // its stored report.
   let corpus;
   let manifest;
-  const manifestPath = join(DATASETS, date, 'MANIFEST.json');
+  let compared;
+  const manifestPath = join(DATASETS, dataset, 'MANIFEST.json');
   if (!existsSync(manifestPath)) {
-    fail(label, `describes datasets/${date}, which is not a dataset in this repository`);
+    fail(label, `describes datasets/${dataset}, which is not a dataset in this repository`);
+  } else if (comparison) {
+    try {
+      // Both are kept whole, and held, while the errata file is checked against them.
+      compared = Object.fromEntries([COMPARISON_FILE, STORED_REPORT].map((name) => [name, readFor(join(DATASETS, dataset, name))]));
+    } catch (err) {
+      if (err instanceof PastBound) fail(label, printable(err.message));
+      fail(label, `cannot be checked against datasets/${dataset}: its ${COMPARISON_FILE} and ${STORED_REPORT} could not be read`);
+    }
   } else {
     try {
       // Both are kept whole, and held, while the errata file is checked against them.
@@ -548,7 +596,7 @@ function validateErrata(file) {
     }
   }
 
-  if (Object.hasOwn(errata, 'regenerations')) validateRegenerations(label, date, errata.regenerations, isObject(manifest) ? manifest : undefined);
+  if (!comparison && Object.hasOwn(errata, 'regenerations')) validateRegenerations(label, date, errata.regenerations, isObject(manifest) ? manifest : undefined);
 
   if (!Array.isArray(errata.issues) || errata.issues.length === 0) {
     fail(label, 'lists no issues. An errata file with nothing in it reads as a dataset checked and cleared.');
@@ -631,7 +679,11 @@ function validateErrata(file) {
         }
         if (figures.has(path)) fail(label, `${where} names ${path} twice in affects`);
         figures.add(path);
-        if (corpus !== undefined && resolvePath(corpus, path) === undefined) {
+        if (comparison) {
+          // A path names its file whether or not the comparison's files could be read; it is looked up only where they were.
+          const problem = unresolvedAffect(compared ?? {}, path);
+          if (problem !== null) fail(label, `${where} affects ${path}, which ${problem}`);
+        } else if (corpus !== undefined && resolvePath(corpus, path) === undefined) {
           fail(label, `${where} affects ${path}, which is not a field of the ${date} aggregate`);
         }
       }
@@ -4231,6 +4283,997 @@ function listRegeneratedScans(name, manifest, found) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Schema version 3: comparisons
+// ---------------------------------------------------------------------------
+//
+// A comparison directory, datasets/<YYYY-MM-DD>-deepscan-comparison/, holds
+// what one run of two scanners over the same projects recorded, as its stored
+// report holds it: a dependency scanner's matches (depMatch) and a source
+// scanner's findings (deepScan). Version 3 is its contract. A census dataset
+// never declares 3, and a comparison never declares 2 or no version, so no
+// census rule is read for a comparison, nor the reverse.
+//
+// Under comparison-aggregate-only, the one kind version 3 accepts, the
+// directory is five files, flat: MANIFEST.json; the stored report, byte for
+// byte as it was stored; comparison.json, the figures counted from it;
+// projects.json, the projects it names; and README.md. Every figure of
+// comparison.json is counted again here from the stored report, by the rule
+// the file states for it, so a figure that does not follow from the report is
+// refused rather than published.
+
+/** The suffixes a comparison directory's name carries after its date: a closed list. */
+const COMPARISON_SUFFIXES = ['deepscan-comparison'];
+
+/**
+ * The form of a name under datasets/: a census dataset, named for its
+ * collection date alone, or a comparison, named for its date and a suffix of
+ * the closed list. Null for any other name. The date part is returned as it is
+ * written; one that is not a date of the calendar is refused where the name is read.
+ */
+function nameForm(name) {
+  if (typeof name !== 'string') return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(name)) return { form: 'census', date: name };
+  const match = /^(\d{4}-\d{2}-\d{2})-([a-z]+(?:-[a-z]+)*)$/.exec(name);
+  return match && COMPARISON_SUFFIXES.includes(match[2]) ? { form: 'comparison', date: match[1] } : null;
+}
+const isComparisonName = (name) => nameForm(name)?.form === 'comparison';
+
+/** The kinds version 3 accepts. A census kind, and a comparison kind these rules do not have, is one no rule here applies to. */
+const COMPARISON_KINDS = ['comparison-aggregate-only'];
+
+/**
+ * The SHA-256 of the stored report of each comparison whose report is pinned,
+ * the file as it was stored. A report changed together with the hash in its
+ * manifest is still refused, so one mistake has to be made twice to pass.
+ */
+const STORED_REPORTS = {
+  '2026-03-18-deepscan-comparison': '44764fdc547333b17adefba322b67757cda37f845cce73971ab49dccfd32a959',
+};
+
+const STORED_REPORT = 'scan-comparison-report.json';
+const COMPARISON_FILE = 'comparison.json';
+const PROJECTS_FILE = 'projects.json';
+
+/** The files of a comparison-aggregate-only directory: role, name, and the version its entry declares, null where the bytes are not versioned here. */
+const COMPARISON_FILES = [
+  { role: 'stored-report', file: STORED_REPORT, schemaVersion: null },
+  { role: 'comparison', file: COMPARISON_FILE, schemaVersion: 3 },
+  { role: 'projects', file: PROJECTS_FILE, schemaVersion: 3 },
+  { role: 'readme', file: 'README.md', schemaVersion: null },
+];
+
+/** The five figures of a comparison, in the order they are printed. */
+const FIGURES = ['dependencyMatches', 'projectsWithDependencyMatch', 'sourceFindings', 'projectsWithSourceFinding',
+  'projectsWithSourceFindingAndNoDependencyMatch'];
+
+/** The four kinds of source finding sourceFindings sums. Secret findings are the fifth part of totalFindings, and are excluded. */
+const SOURCE_KINDS = ['libraries', 'weakPatterns', 'sourceAlgorithms', 'tlsFindings'];
+
+/** Each figure's rule, written over the stored report's field names, as a problem states it. */
+const FIGURE_RULES = {
+  dependencyMatches: 'the sum over the projects of the entries in depMatch.details',
+  projectsWithDependencyMatch: 'the projects with at least one entry in depMatch.details',
+  sourceFindings: 'the sum over the projects of libraries + weakPatterns + sourceAlgorithms + tlsFindings, secrets excluded',
+  projectsWithSourceFinding: 'the projects where libraries + weakPatterns + sourceAlgorithms + tlsFindings is above zero',
+  projectsWithSourceFindingAndNoDependencyMatch: 'the projects where that sum is above zero and depMatch.details is empty',
+};
+
+/**
+ * The stored field names each text of comparison.json's rules is written
+ * over. A rule that does not name them cannot be followed back to the report.
+ */
+const RULE_FIELDS = {
+  dependencyMatches: ['depMatch.details'],
+  projectsWithDependencyMatch: ['depMatch.details'],
+  sourceFindings: SOURCE_KINDS,
+  projectsWithSourceFinding: SOURCE_KINDS,
+  projectsWithSourceFindingAndNoDependencyMatch: [...SOURCE_KINDS, 'depMatch.details'],
+  sourceAlgorithmsUnit: ['sourceAlgorithms', 'algorithm', 'language'],
+};
+
+/** The fields of each object of a comparison, all of them required, and those of each object of the stored report as it was stored. */
+const KEYS3 = {
+  manifest: ['schemaVersion', 'dataset', 'kind', 'collectedAt', 'generatedAt', 'license', 'provenance', 'provenanceNote', 'files',
+    'comparability', 'knownIssues'],
+  file: ['role', 'file', 'bytes', 'sha256', 'schemaVersion'],
+  comparability: ['dataset', 'doi', 'comparable', 'reason'],
+  comparison: ['schemaVersion', 'dataset', 'source', 'projects', 'figures', 'sourceFindingsByKind', 'secretFindingsExcluded',
+    'storedTotalFindings', 'rules'],
+  figures: FIGURES,
+  sourceFindingsByKind: SOURCE_KINDS,
+  rules: Object.keys(RULE_FIELDS),
+  projects: ['schemaVersion', 'projects'],
+  project: ['name', 'repository', 'commit', 'languages'],
+  report: ['metadata', 'projects', 'summary'],
+  reportMetadata: ['generatedAt', 'projectCount', 'scanTool', 'comparisonMethod'],
+  reportSummary: ['projectsWithDepMatch', 'projectsWithDeepFindings', 'projectsDeepFoundButDepMissed', 'totalDepFindings',
+    'totalDeepFindings', 'overallMultiplier', 'averageMultiplierPerProject', 'totalSourceAlgorithms', 'totalWeakPatterns',
+    'totalTlsFindings', 'totalFilesScanned', 'languagesCovered'],
+  reportProject: ['project', 'depMatch', 'deepScan', 'multiplier'],
+  depMatch: ['count', 'details'],
+  deepScan: ['totalFindings', 'libraries', 'libraryNames', 'weakPatterns', 'weakDetails', 'sourceAlgorithms', 'algorithmDetails',
+    'secrets', 'tlsFindings', 'filesScanned', 'languages'],
+  weakDetail: ['issue', 'severity', 'file'],
+  algorithmDetail: ['algorithm', 'category', 'language', 'quantumRisk'],
+};
+
+/**
+ * The words of a key, split at camelCase, hyphen, underscore and every other
+ * mark: `overallMultiplier` holds the word multiplier, while `duration` and
+ * `timestamp` hold the letters of a ratio word and no ratio word.
+ */
+const wordsOf = (key) => key.split(/[^\p{L}\p{N}]+|(?<=[\p{Ll}\p{N}])(?=\p{Lu})|(?<=\p{Lu})(?=\p{Lu}\p{Ll})/u)
+  .filter(Boolean).map((word) => word.toLowerCase());
+/** The words of a key that stores a ratio. A comparison stores counts; a ratio of two counts is drawn where it is shown. */
+const RATIO_WORDS = ['multiplier', 'multipliers', 'ratio', 'ratios', 'times'];
+const isRatioKey = (key) => wordsOf(key).some((word) => RATIO_WORDS.includes(word));
+
+/** The stored report's per-project field for hard-coded secret findings. No other file of a comparison carries it. */
+const SECRET_FIELDS = ['secrets'];
+
+/** Every key of a value at every level, with its dotted path: an element of a list as `*`. */
+function keysOf(value, path = [], found = []) {
+  if (Array.isArray(value)) {
+    for (const item of value) keysOf(item, [...path, '*'], found);
+  } else if (isObject(value)) {
+    for (const [key, item] of Object.entries(value)) {
+      found.push({ key, path: [...path, key].join('.') });
+      keysOf(item, [...path, key], found);
+    }
+  }
+  return found;
+}
+
+/** Whether a dotted path names a field of a value: own properties only, and `*` for every element of a list that has one at least. */
+function resolves(value, keys) {
+  if (keys.length === 0) return value !== undefined;
+  const [key, ...rest] = keys;
+  if (key === '*') return Array.isArray(value) && value.length > 0 && value.every((item) => resolves(item, rest));
+  return isObject(value) && Object.hasOwn(value, key) && resolves(value[key], rest);
+}
+
+/**
+ * Why an affects path of a comparison names nothing, or null where it names a
+ * field. A path names its file, comparison.json:<path> or
+ * scan-comparison-report.json:<path>, so that a reader knows where the figure
+ * is. `files` holds each file as parsed; one that was not read is not looked in.
+ */
+function unresolvedAffect(files, path) {
+  const named = /^([^:]*):(.*)$/.exec(path);
+  if (named === null) {
+    return `names no file. Each path is ${COMPARISON_FILE}:<path> or ${STORED_REPORT}:<path>, so that a reader knows which file holds the figure.`;
+  }
+  const [, file, dotted] = named;
+  if (file !== COMPARISON_FILE && file !== STORED_REPORT) {
+    return `names ${describe(file)}. A path names a field of ${COMPARISON_FILE} or of ${STORED_REPORT}.`;
+  }
+  if (files[file] === undefined) return null;
+  return resolves(files[file], dotted.split('.')) ? null : `is not a field of ${file}`;
+}
+
+/**
+ * An object with exactly the given keys, in a file of a comparison or, with
+ * `stored`, in the stored report. Reports each key it does not define and
+ * each it lacks, and says whether every expected key is there to be read
+ * further. In a file of a comparison a ratio key and a secret field are
+ * refused by rules of their own, which name them, so they are not reported again.
+ */
+function closed3(value, keys, where, bad, stored = false) {
+  if (!isObject(value)) {
+    bad(`${where} is ${describe(value)}, not an object`);
+    return false;
+  }
+  for (const key of Object.keys(value)) {
+    if (keys.includes(key) || (!stored && (isRatioKey(key) || SECRET_FIELDS.includes(key)))) continue;
+    bad(stored
+      ? `${where} carries ${describe(key)}, which the stored report does not hold there. The report is read with exactly the keys it ` +
+        'was stored with.'
+      : `${where} carries ${describe(key)}, which the version 3 contract does not define. Every object is closed, so a stale or ` +
+        'misspelt field fails instead of being ignored.');
+  }
+  const missing = keys.filter((key) => !Object.hasOwn(value, key));
+  if (missing.length > 0) {
+    bad(stored
+      ? `${where} is missing ${missing.join(', ')}, which the stored report holds there`
+      : `${where} is missing ${missing.join(', ')}. Every field of a version 3 file is written out, null included, so that an ` +
+        'absent field is never read as a default.');
+  }
+  return missing.length === 0;
+}
+
+/** A key that stores a ratio, anywhere in a file of a comparison. */
+function refuseRatioKeys(file, value, bad) {
+  for (const { key, path } of keysOf(value)) {
+    if (!isRatioKey(key)) continue;
+    bad(`${file}: ${path} is a key that holds the word ${wordsOf(key).find((word) => RATIO_WORDS.includes(word))}. A comparison ` +
+      'stores counts and no ratio: one is drawn where it is shown, from two counts a reader can see.');
+  }
+}
+
+/** A secret field of the stored report's projects, anywhere in a file of a comparison other than the stored report. */
+function refuseSecretFields(file, value, bad) {
+  for (const { key, path } of keysOf(value)) {
+    if (!SECRET_FIELDS.includes(key)) continue;
+    bad(`${file}: ${path} is ${key}, the stored report's field for a project's hard-coded secret findings. No file of a ` +
+      'comparison but the stored report carries it.');
+  }
+}
+
+/**
+ * The figures counted from each comparison validated, printed on success, one
+ * line for each, so that counting them again from the stored report is one
+ * command.
+ */
+const recounts = [];
+
+/**
+ * Every rule of a version 3 dataset. `read` is the manifest as validate()
+ * read it: its text, its value and its size on disk. As in version 2, no
+ * more than a bound of problems is listed for one file, and the rest are counted.
+ */
+function validateVersion3(name, dir, read) {
+  const counted = new Map();
+  const bad = (message) => {
+    const file = (/^([A-Za-z0-9.-]+\.(?:json|md))[: ]/.exec(Array.isArray(message) ? message[0] : message) ?? [])[1] ?? '';
+    const count = (counted.get(file) ?? 0) + 1;
+    counted.set(file, count);
+    if (file === '' || count <= MAX_PROBLEMS_PER_FILE) fail(name, message);
+  };
+  try {
+    validateVersion3Files(name, dir, read, bad);
+  } finally {
+    for (const [file, count] of counted) {
+      if (file !== '' && count > MAX_PROBLEMS_PER_FILE) fail(name, `${file}: ${count - MAX_PROBLEMS_PER_FILE} more problem(s) in this file are not listed`);
+    }
+  }
+}
+
+function validateVersion3Files(name, dir, { text, manifest, size }, bad) {
+  const { date } = nameForm(name);
+  const at = 'MANIFEST.json';
+  if (text === null) {
+    bad(`${at} is not UTF-8. A decoder that substitutes a character would hide the difference from every check here.`);
+    return;
+  }
+  refuseRatioKeys(at, manifest, bad);
+  refuseSecretFields(at, manifest, bad);
+  const missing = KEYS3.manifest.filter((key) => !Object.hasOwn(manifest, key));
+  const extra = Object.keys(manifest).filter((key) => !KEYS3.manifest.includes(key) && !isRatioKey(key) && !SECRET_FIELDS.includes(key));
+  if (missing.length > 0 || extra.length > 0) {
+    const parts = [];
+    if (missing.length > 0) parts.push(`it lacks ${missing.join(', ')}`);
+    if (extra.length > 0) parts.push(`it carries ${extra.map(describe).join(', ')}, which a version 3 manifest does not define`);
+    bad(`schemaVersion is 3, but ${at} is not a version 3 manifest: ${parts.join('; ')}. A file is read as version 3 by the fields ` +
+      'it has, not by its marker alone.');
+    return;
+  }
+  if (!startsWithVersion(text)) {
+    bad(`${at} does not begin with schemaVersion. It is the first key of every version 3 file, so that a reader learns the version ` +
+      'before it reads anything else.');
+  }
+  if (text !== `${JSON.stringify(manifest, null, 2)}\n`) {
+    bad(`${at} is not in its canonical form: two-space JSON as JSON.stringify writes it, ending in one newline. Anything else can ` +
+      'hide a repeated key from every check here.');
+  }
+  if (!COMPARISON_KINDS.includes(manifest.kind)) {
+    bad(`${at}: kind is ${describe(manifest.kind)}, which is not a kind version 3 accepts (${COMPARISON_KINDS.join(', ')}). A census ` +
+      'kind, or a comparison kind these rules do not have, is refused rather than passed unchecked.');
+    return;
+  }
+  if (!isText(manifest.dataset)) bad(`${at}: dataset is ${describe(manifest.dataset)}, not a title`);
+  if (manifest.collectedAt !== date) {
+    bad(`${at}: collectedAt is ${describe(manifest.collectedAt)}, and the directory's date is ${date}. The date names the ` +
+      'directory, its files and its citation, so they agree.');
+  }
+  if (!isTime(manifest.generatedAt)) {
+    bad(`${at}: generatedAt is ${describe(manifest.generatedAt)}, not a time as toISOString() writes it, or a date`);
+  } else if (manifest.generatedAt.slice(0, 10) < date) {
+    bad(`${at}: generatedAt is ${manifest.generatedAt}, before the run it describes, on ${date}`);
+  } else if (manifest.generatedAt.slice(0, 10) > TODAY) {
+    bad(`${at}: generatedAt is ${manifest.generatedAt}, after today (${TODAY})`);
+  }
+  if (manifest.license !== 'CC-BY-4.0') bad(`${at}: license is ${describe(manifest.license)}; published datasets here are CC-BY-4.0`);
+  if (manifest.provenance !== null) {
+    bad(`${at}: provenance is ${describe(manifest.provenance)}. Under comparison-aggregate-only it is null: neither scanner's run ` +
+      'is recorded, and provenanceNote says what is not.');
+  }
+  if (!isText(manifest.provenanceNote)) {
+    bad(`${at}: provenanceNote is ${describe(manifest.provenanceNote)}. Where provenance is null, the note says what was not ` +
+      'recorded, in text a reader can see.');
+  }
+
+  const found = readComparisonFiles(name, dir, manifest, size, bad);
+  if (found === null) return;
+  // Each file as parsed, by name, for the issues that name its fields; and what the stored report counts to.
+  const files = {};
+  let recount = null;
+  if (found['stored-report']) {
+    const report = readStoredReport(name, found['stored-report'], bad);
+    if (report !== null) {
+      files[STORED_REPORT] = report;
+      recount = checkReport(report, bad);
+    }
+  }
+  if (recount !== null && recount.generatedAt !== null && manifest.collectedAt !== recount.generatedAt.slice(0, 10)) {
+    bad(`${at}: collectedAt is ${describe(manifest.collectedAt)}, and ${STORED_REPORT} was generated at ${recount.generatedAt}, on ` +
+      `${recount.generatedAt.slice(0, 10)} in UTC. The date is that of the run the report records.`);
+  }
+  if (found.comparison) {
+    const comparison = checkComparisonFile(name, found.comparison, recount, bad);
+    if (comparison !== null) files[COMPARISON_FILE] = comparison;
+  }
+  if (found.projects) checkProjectsFile(found.projects, recount, bad);
+  checkComparisonIssues(manifest.knownIssues, files, recount, bad);
+  checkComparisonComparability(name, date, manifest.comparability, bad);
+  if (recount !== null) recounts.push({ name, figures: recount.figures });
+}
+
+/**
+ * The files the manifest lists, one for each role and named for it, and what
+ * the directory holds: every entry but MANIFEST.json a regular file the
+ * manifest lists, no link and no subdirectory. Returns each file read, by
+ * role, as its bytes and their hash; past the bound on what is held, null.
+ */
+function readComparisonFiles(name, dir, manifest, manifestBytes, bad) {
+  const at = 'MANIFEST.json';
+  if (!Array.isArray(manifest.files)) {
+    bad(`${at}: files is ${describe(manifest.files)}, not a list of the dataset's files`);
+    return null;
+  }
+  const byRole = new Map();
+  manifest.files.forEach((entry, index) => {
+    const where = `${at}: files[${index}]`;
+    if (!closed3(entry, KEYS3.file, where, bad)) return;
+    const expected = COMPARISON_FILES.find((f) => f.role === entry.role);
+    if (!expected) {
+      bad(`${where}.role is ${describe(entry.role)}, not one of: ${COMPARISON_FILES.map((f) => f.role).join(', ')}`);
+      return;
+    }
+    if (!isFileName(entry.file)) {
+      bad(`${where} names ${describe(entry.file)}, which is not the name of a file in the dataset's own directory. A path would ` +
+        'have these checks read a file outside it.');
+      return;
+    }
+    if (entry.file !== expected.file) {
+      bad(`${where} names ${describe(entry.file)} as the ${entry.role} file, which is named ${expected.file}`);
+      return;
+    }
+    if (byRole.has(entry.role)) {
+      bad(`${where} lists the ${entry.role} file a second time. Each role is listed once.`);
+      return;
+    }
+    byRole.set(entry.role, entry);
+    if (entry.schemaVersion !== expected.schemaVersion) {
+      bad(`${where}.schemaVersion is ${describe(entry.schemaVersion)}, and the ${entry.role} file's is ` +
+        `${expected.schemaVersion === null ? 'null: its bytes are not versioned here' : expected.schemaVersion}`);
+    }
+    if (!isCount(entry.bytes)) bad(`${where}.bytes is ${describe(entry.bytes)}, not a size in bytes`);
+    if (!isSha256(entry.sha256)) bad(`${where}.sha256 is ${describe(entry.sha256)}, not a SHA-256 digest in lower-case hex`);
+  });
+  for (const { role } of COMPARISON_FILES) {
+    if (!byRole.has(role)) bad(`${at} lists no ${role} file, and a comparison-aggregate-only directory has one`);
+  }
+
+  // What the directory holds. A link is refused here and not only by the immutability check: it would keep the bytes
+  // these checks read somewhere neither looks.
+  const listed = new Set([...byRole.values()].map((entry) => entry.file));
+  for (const entry of readdirSync(dir).sort()) {
+    if (entry === 'MANIFEST.json') continue;
+    const stat = lstatSync(join(dir, entry));
+    if (stat.isSymbolicLink()) {
+      bad(`${listed.has(entry) ? entry : describe(entry)} is a link. A link keeps its bytes somewhere these checks and the ` +
+        'immutability check do not look.');
+    } else if (stat.isDirectory()) {
+      bad(`${describe(entry)} is a directory. A comparison is its files, flat, and a subdirectory holds files no entry of the ` +
+        'manifest names.');
+    } else if (!stat.isFile()) {
+      bad(`${describe(entry)} is not a regular file`);
+    } else if (!listed.has(entry)) {
+      bad(`present but not listed in MANIFEST.json: ${describe(entry)}. An unlisted file is one no reader can attribute and no ` +
+        'hash covers.');
+    }
+  }
+
+  // The sizes on disk of the files to be read, before any is, with the manifest's. Past the bound none is read.
+  let total = manifestBytes;
+  for (const entry of byRole.values()) {
+    const stat = lstatSync(join(dir, entry.file), { throwIfNoEntry: false });
+    if (stat && stat.isFile()) total += stat.size;
+  }
+  if (total > MAX_DATASET_JSON_BYTES) {
+    fail(name, `MANIFEST.json and its listed files total ${total.toLocaleString('en-US')} bytes, over the ` +
+      `${MAX_DATASET_JSON_BYTES.toLocaleString('en-US')} a dataset may hold; past that, small objects exhaust memory before any ` +
+      'problem is listed. Nothing listed was parsed.');
+    return null;
+  }
+  // Held together, from before the first is read until the dataset's checks end; the manifest is held already.
+  held += total - manifestBytes;
+
+  const found = {};
+  for (const [role, entry] of byRole) {
+    const path = join(dir, entry.file);
+    const stat = lstatSync(path, { throwIfNoEntry: false });
+    if (!stat) {
+      bad(`${entry.file} is listed in MANIFEST.json but is not in the dataset`);
+      continue;
+    }
+    if (!stat.isFile()) continue;
+    if (stat.size > MAX_FILE_BYTES) {
+      bad(`${entry.file} is ${stat.size.toLocaleString('en-US')} bytes, over the ${MAX_FILE_BYTES.toLocaleString('en-US')} a ` +
+        `dataset file may hold. ${FILE_LIMIT.why}`);
+      continue;
+    }
+    const buffer = readFileSync(path);
+    const actual = createHash('sha256').update(buffer).digest('hex');
+    if (isSha256(entry.sha256) && actual !== entry.sha256) {
+      bad([`${entry.file} does not match its recorded hash`, `    recorded ${entry.sha256}`, `    actual   ${actual}`]);
+    }
+    if (isCount(entry.bytes) && entry.bytes !== buffer.length) bad(`${entry.file} is ${buffer.length} bytes, manifest says ${entry.bytes}`);
+    found[role] = { file: entry.file, buffer, sha256: actual };
+  }
+  return found;
+}
+
+/**
+ * The stored report, read as it was stored: its hash, where these rules pin
+ * it, and its form, two-space JSON as JSON.stringify writes it, with no final
+ * newline. The bytes are never normalised: a newline an editor or a hook
+ * adds changes the hash, and is refused. Returns the report as parsed, or null.
+ */
+function readStoredReport(name, { file, buffer, sha256: actual }, bad) {
+  const pinned = STORED_REPORTS[name];
+  if (pinned !== undefined && actual !== pinned) {
+    bad(`${file} has SHA-256 ${actual}, and the report stored for ${name} has ${pinned}. The hash is carried here as well as in ` +
+      'the manifest, so a changed report with a matching manifest is still refused.');
+  }
+  let text;
+  try {
+    text = decodeStrict(buffer);
+  } catch {
+    bad(`${file} is not UTF-8. A decoder that substitutes a character would hide the difference from every check here.`);
+    return null;
+  }
+  if (textNestsDeeperThan(text, MAX_NESTING)) {
+    bad(`${file} ${NESTED_PAST_LIMIT}`);
+    return null;
+  }
+  let report;
+  try {
+    report = JSON.parse(text);
+  } catch (err) {
+    bad(`${file} does not parse: ${printable(err.message)}`);
+    return null;
+  }
+  if (text !== JSON.stringify(report, null, 2)) {
+    bad(`${file} is not in the form it was stored in: two-space JSON as JSON.stringify writes it, with no final newline. A byte ` +
+      'an editor or a hook adds changes its hash, and it is refused, never normalised.');
+  }
+  if (!isObject(report)) {
+    bad(`${file} is not a JSON object`);
+    return null;
+  }
+  return report;
+}
+
+/**
+ * The stored report held to its own arithmetic: every object with exactly the
+ * keys it was stored with, each project's counts equal to the lists they
+ * count, no (algorithm, language) pair listed twice in a project, and every
+ * count of its summary equal to the same count made again from its projects.
+ * Every text in it is printable as it is: a control or direction character in
+ * a name or a path can make it display as another. Returns what the other
+ * files are compared with, or null where the projects cannot be read so far.
+ * Ratio fields are not checked for a value: the knownIssues name them.
+ */
+function checkReport(r, bad) {
+  const file = STORED_REPORT;
+  const shape = (value, keys, where) => closed3(value, keys, where, bad, true);
+  const text = (v, where) => {
+    if (typeof v === 'string' && !hasHiddenCharacters(v)) return true;
+    bad(typeof v === 'string'
+      ? `${where} is ${describe(v)}, which holds a control or format character. A direction override can make a name or a path ` +
+        'display as another.'
+      : `${where} is ${describe(v)}, not text`);
+    return false;
+  };
+  const count = (v, where) => {
+    if (isCount(v)) return true;
+    bad(`${where} is ${describe(v)}, not a whole count`);
+    return false;
+  };
+  const texts = (v, where) => {
+    if (!Array.isArray(v)) {
+      bad(`${where} is ${describe(v)}, not a list`);
+      return false;
+    }
+    return v.map((item, index) => text(item, `${where}[${index}]`)).every(Boolean);
+  };
+  const details = (v, keys, where) => {
+    if (!Array.isArray(v)) {
+      bad(`${where} is ${describe(v)}, not a list`);
+      return false;
+    }
+    return v.map((item, index) => shape(item, keys, `${where}[${index}]`) &&
+      keys.map((key) => text(item[key], `${where}[${index}].${key}`)).every(Boolean)).every(Boolean);
+  };
+
+  if (!shape(r, KEYS3.report, file)) return null;
+  let generatedAt = null;
+  if (shape(r.metadata, KEYS3.reportMetadata, `${file}: metadata`)) {
+    if (isTime(r.metadata.generatedAt)) generatedAt = r.metadata.generatedAt;
+    else bad(`${file}: metadata.generatedAt is ${describe(r.metadata.generatedAt)}, not a time as toISOString() writes it, or a date`);
+    for (const key of ['scanTool', 'comparisonMethod']) text(r.metadata[key], `${file}: metadata.${key}`);
+    if (count(r.metadata.projectCount, `${file}: metadata.projectCount`) && Array.isArray(r.projects) &&
+        r.metadata.projectCount !== r.projects.length) {
+      bad(`${file}: metadata.projectCount is ${r.metadata.projectCount}, and the report lists ${r.projects.length} projects`);
+    }
+  }
+  if (!Array.isArray(r.projects)) {
+    bad(`${file}: projects is ${describe(r.projects)}, not a list`);
+    return null;
+  }
+
+  const projects = [];
+  let readable = true;
+  r.projects.forEach((p, index) => {
+    const where = `${file}: projects[${index}]`;
+    if (!shape(p, KEYS3.reportProject, where)) {
+      readable = false;
+      return;
+    }
+    const d = p.depMatch;
+    const s = p.deepScan;
+    const fields = [
+      text(p.project, `${where}.project`) && (hasWords(p.project) || (bad(`${where}.project is ${describe(p.project)}, not a name`), false)),
+      shape(d, KEYS3.depMatch, `${where}.depMatch`) && [
+        count(d.count, `${where}.depMatch.count`), texts(d.details, `${where}.depMatch.details`),
+      ].every(Boolean),
+      shape(s, KEYS3.deepScan, `${where}.deepScan`) && [
+        ...['totalFindings', ...SOURCE_KINDS, 'secrets', 'filesScanned'].map((key) => count(s[key], `${where}.deepScan.${key}`)),
+        texts(s.libraryNames, `${where}.deepScan.libraryNames`),
+        texts(s.languages, `${where}.deepScan.languages`),
+        details(s.weakDetails, KEYS3.weakDetail, `${where}.deepScan.weakDetails`),
+        details(s.algorithmDetails, KEYS3.algorithmDetail, `${where}.deepScan.algorithmDetails`),
+      ].every(Boolean),
+    ];
+    if (!fields.every(Boolean)) {
+      readable = false;
+      return;
+    }
+    if (d.count !== d.details.length) {
+      bad(`${where}.depMatch.count is ${d.count}, and depMatch.details lists ${d.details.length}. The count is the number of ` +
+        'matches the list holds.');
+    }
+    const parts = s.libraries + s.weakPatterns + s.sourceAlgorithms + s.secrets + s.tlsFindings;
+    if (s.totalFindings !== parts) {
+      bad(`${where}.deepScan.totalFindings is ${s.totalFindings}, and its five parts, libraries, weakPatterns, sourceAlgorithms, ` +
+        `secrets and tlsFindings, sum to ${parts}`);
+    }
+    for (const [field, list] of [['libraries', 'libraryNames'], ['weakPatterns', 'weakDetails'], ['sourceAlgorithms', 'algorithmDetails']]) {
+      if (s[field] !== s[list].length) bad(`${where}.deepScan.${field} is ${s[field]}, and ${list} lists ${s[list].length}`);
+    }
+    const pairs = new Set();
+    for (const a of s.algorithmDetails) {
+      const pair = JSON.stringify([a.algorithm, a.language]);
+      if (pairs.has(pair)) {
+        bad(`${where}.deepScan.algorithmDetails lists the pair (${describe(a.algorithm)}, ${describe(a.language)}) twice. ` +
+          'sourceAlgorithms counts distinct (algorithm, language) pairs, so a pair listed twice would be counted twice.');
+      }
+      pairs.add(pair);
+    }
+    projects.push({ name: p.project, details: d.details, languages: s.languages, weakDetails: s.weakDetails, ...Object.fromEntries(
+      ['totalFindings', ...SOURCE_KINDS, 'secrets', 'filesScanned'].map((key) => [key, s[key]])) });
+  });
+  if (!readable) return null;
+
+  const total = (key) => sum(projects.map((p) => p[key]));
+  const sourceOf = (p) => sum(SOURCE_KINDS.map((key) => p[key]));
+  if (shape(r.summary, KEYS3.reportSummary, `${file}: summary`)) {
+    const summary = {
+      projectsWithDepMatch: projects.filter((p) => p.details.length > 0).length,
+      projectsWithDeepFindings: projects.filter((p) => p.totalFindings > 0).length,
+      projectsDeepFoundButDepMissed: projects.filter((p) => p.totalFindings > 0 && p.details.length === 0).length,
+      totalDepFindings: sum(projects.map((p) => p.details.length)),
+      totalDeepFindings: total('totalFindings'),
+      totalSourceAlgorithms: total('sourceAlgorithms'),
+      totalWeakPatterns: total('weakPatterns'),
+      totalTlsFindings: total('tlsFindings'),
+      totalFilesScanned: total('filesScanned'),
+      languagesCovered: [...new Set(projects.flatMap((p) => p.languages))].sort(),
+    };
+    for (const [key, value] of Object.entries(summary)) {
+      if (!sameValue(r.summary[key], value)) {
+        bad(`${file}: summary.${key} is ${describe(r.summary[key])}; counted again from the projects, it is ${describe(value)}`);
+      }
+    }
+  }
+
+  return {
+    generatedAt,
+    names: projects.map((p) => p.name),
+    languages: projects.map((p) => p.languages),
+    projectCount: projects.length,
+    figures: {
+      dependencyMatches: sum(projects.map((p) => p.details.length)),
+      projectsWithDependencyMatch: projects.filter((p) => p.details.length > 0).length,
+      sourceFindings: sum(projects.map(sourceOf)),
+      projectsWithSourceFinding: projects.filter((p) => sourceOf(p) > 0).length,
+      projectsWithSourceFindingAndNoDependencyMatch: projects.filter((p) => sourceOf(p) > 0 && p.details.length === 0).length,
+    },
+    byKind: Object.fromEntries(SOURCE_KINDS.map((key) => [key, total(key)])),
+    secrets: total('secrets'),
+    storedTotal: total('totalFindings'),
+    // A library, an algorithm and a TLS finding carry no file path in the report; a weak pattern carries one unless its file is empty.
+    withoutPath: sum(projects.map((p) => p.libraries + p.sourceAlgorithms + p.tlsFindings + p.weakDetails.filter((w) => w.file === '').length)),
+    // A match whose name contains the project's own name: the project's own package, matched in its own dependencies.
+    ownPackage: sum(projects.map((p) => p.details.filter((match) => match.includes(p.name)).length)),
+    ratioPaths: [...new Set(keysOf(r).filter(({ key }) => isRatioKey(key)).map(({ path }) => path))],
+  };
+}
+
+/**
+ * A file a comparison derives, read as version 3: UTF-8, nested within the
+ * bound, a JSON object declaring version 3 as its first key, in canonical form.
+ */
+function parseDerived({ file, buffer }, bad) {
+  let text;
+  try {
+    text = decodeStrict(buffer);
+  } catch {
+    bad(`${file} is not UTF-8. A decoder that substitutes a character would hide the difference from every check here.`);
+    return null;
+  }
+  if (textNestsDeeperThan(text, MAX_NESTING)) {
+    bad(`${file} ${NESTED_PAST_LIMIT}`);
+    return null;
+  }
+  let value;
+  try {
+    value = JSON.parse(text);
+  } catch (err) {
+    bad(`${file} does not parse: ${printable(err.message)}`);
+    return null;
+  }
+  if (!isObject(value)) {
+    bad(`${file} is not a JSON object`);
+    return null;
+  }
+  if (value.schemaVersion !== 3) {
+    bad(`${file} has schemaVersion ${describe(value.schemaVersion)}. The files a comparison derives are version 3, and a version ` +
+      'these rules do not know is never read as one they do.');
+    return null;
+  }
+  if (!startsWithVersion(text)) {
+    bad(`${file} does not begin with schemaVersion. It is the first key of every version 3 file, so that a reader learns the ` +
+      'version before it reads anything else.');
+  }
+  if (text !== `${JSON.stringify(value, null, 2)}\n`) {
+    bad(`${file} is not in its canonical form: two-space JSON as JSON.stringify writes it, ending in one newline. Anything else ` +
+      'can hide a repeated key from every check here.');
+  }
+  return value;
+}
+
+/**
+ * comparison.json: closed, and every figure equal to the same figure counted
+ * here from the stored report, by its rule. No key holds a ratio word.
+ * Returns the file as parsed, or null.
+ */
+function checkComparisonFile(name, record, recount, bad) {
+  const file = COMPARISON_FILE;
+  const c = parseDerived(record, bad);
+  if (c === null) return null;
+  refuseRatioKeys(file, c, bad);
+  refuseSecretFields(file, c, bad);
+  closed3(c, KEYS3.comparison, file, bad);
+  if (c.dataset !== name) bad(`${file}: dataset is ${describe(c.dataset)}, and the directory is ${name}`);
+  if (c.source !== STORED_REPORT) bad(`${file}: source is ${describe(c.source)}. The figures are counted from ${STORED_REPORT}, and the file names it.`);
+  const figure = (where, stored, expected, rule, hint = '') => {
+    if (!isCount(stored)) bad(`${file}: ${where} is ${describe(stored)}, not a whole count`);
+    else if (recount !== null && stored !== expected) bad(`${file}: ${where} is ${stored}; counted from ${STORED_REPORT} as ${rule}, it is ${expected}${hint}`);
+  };
+  figure('projects', c.projects, recount?.projectCount, 'the number of its projects');
+  if (closed3(c.figures, KEYS3.figures, `${file}: figures`, bad)) {
+    for (const key of FIGURES) {
+      const withSecrets = recount !== null && recount.secrets > 0 && c.figures[key] === recount.figures[key] + recount.secrets;
+      figure(`figures.${key}`, c.figures[key], recount?.figures[key], FIGURE_RULES[key],
+        key === 'sourceFindings' && withSecrets ? `. ${c.figures[key]} is the sum with secrets included, and secret findings are excluded from it.` : '');
+    }
+  }
+  if (closed3(c.sourceFindingsByKind, KEYS3.sourceFindingsByKind, `${file}: sourceFindingsByKind`, bad)) {
+    for (const key of SOURCE_KINDS) figure(`sourceFindingsByKind.${key}`, c.sourceFindingsByKind[key], recount?.byKind[key], `the sum of ${key} over the projects`);
+  }
+  figure('secretFindingsExcluded', c.secretFindingsExcluded, recount?.secrets, 'the sum of secrets over the projects');
+  figure('storedTotalFindings', c.storedTotalFindings, recount?.storedTotal, 'the sum of totalFindings over the projects');
+  if (closed3(c.rules, KEYS3.rules, `${file}: rules`, bad)) {
+    for (const [key, fields] of Object.entries(RULE_FIELDS)) {
+      const rule = c.rules[key];
+      if (!isText(rule)) {
+        bad(`${file}: rules.${key} is ${describe(rule)}, not text a reader can see`);
+        continue;
+      }
+      const absent = fields.filter((field) => !rule.includes(field));
+      if (absent.length > 0) {
+        bad(`${file}: rules.${key} does not name ${absent.join(', ')}. Each rule is written over the stored report's field names, so ` +
+          'that a reader can count the figure again from the report.');
+      }
+    }
+  }
+  return c;
+}
+
+/** projects.json: one entry for each stored project, in stored order, with its stored name and languages, and no address. */
+function checkProjectsFile(record, recount, bad) {
+  const file = PROJECTS_FILE;
+  const value = parseDerived(record, bad);
+  if (value === null) return;
+  refuseRatioKeys(file, value, bad);
+  refuseSecretFields(file, value, bad);
+  if (!closed3(value, KEYS3.projects, file, bad)) return;
+  if (!Array.isArray(value.projects)) {
+    bad(`${file}: projects is ${describe(value.projects)}, not a list`);
+    return;
+  }
+  if (recount !== null && value.projects.length !== recount.projectCount) {
+    bad(`${file}: projects lists ${value.projects.length}, and ${STORED_REPORT} ${recount.projectCount}. There is one entry for ` +
+      'each stored project, in stored order.');
+  }
+  value.projects.forEach((p, index) => {
+    const where = `${file}: projects[${index}]`;
+    if (!closed3(p, KEYS3.project, where, bad)) return;
+    if (recount !== null && index < recount.projectCount) {
+      if (p.name !== recount.names[index]) {
+        bad(`${where}.name is ${describe(p.name)}, and ${STORED_REPORT} names project ${index + 1} ${describe(recount.names[index])}. ` +
+          'The names are the stored names, in stored order.');
+      }
+      if (!sameValue(p.languages, recount.languages[index])) {
+        bad(`${where}.languages is ${describe(p.languages)}, and ${STORED_REPORT} lists ${describe(recount.languages[index])} for ` +
+          'that project, the languages its source scanner reported');
+      }
+    }
+    for (const field of ['repository', 'commit']) {
+      if (p[field] !== null) {
+        bad(`${where}.${field} is ${describe(p[field])}. Under comparison-aggregate-only it is null: the stored report records ` +
+          'none, and a value from anywhere else has no source in the dataset.');
+      }
+    }
+  });
+}
+
+/** The issues a comparison-aggregate-only directory always carries, and why. */
+const REQUIRED_ISSUES = {
+  'source-findings-not-reviewed-by-a-human': 'no review of the source findings is in the dataset',
+  'dependency-matches-not-reviewed-by-a-human': 'no review of the dependency matches is in the dataset',
+  'raw-output-of-both-tools-not-stored': 'the stored report is the only output of the run in the dataset',
+  'project-commits-and-tool-versions-not-recorded': 'the stored report records no project commit and no tool version',
+};
+
+/**
+ * The knownIssues of a comparison: the version 2 entry, with every affects
+ * path naming its file and resolving there; the issues the kind always
+ * carries; the ratio entry wherever the stored report carries a ratio key;
+ * and each size the contract defines by a count, counted again.
+ */
+function checkComparisonIssues(list, files, recount, bad) {
+  const at = 'MANIFEST.json: knownIssues';
+  if (!Array.isArray(list)) {
+    bad(`${at} is ${describe(list)}, not a list`);
+    return;
+  }
+  const byDefect = new Map();
+  list.forEach((issue, index) => {
+    const where = `${at}[${index}]`;
+    if (!closed3(issue, KEYS.knownIssue, where, bad)) return;
+    if (!isText(issue.defect) || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(issue.defect)) {
+      bad(`${where}.defect is ${describe(issue.defect)}, not an id of lower-case words joined by hyphens`);
+    } else if (byDefect.has(issue.defect)) {
+      bad(`${where} repeats the defect ${issue.defect}. A reader citing it could mean either.`);
+    } else {
+      byDefect.set(issue.defect, { issue, where });
+    }
+    for (const field of ['summary', 'correctedIn']) {
+      if (!isText(issue[field])) bad(`${where}.${field} is ${describe(issue[field])}, not text a reader can see`);
+    }
+    if (!DIRECTIONS.includes(issue.direction)) {
+      bad(`${where}.direction is ${describe(issue.direction)}, which tells a reader nothing about which way to read the figure`);
+    }
+    if (!Array.isArray(issue.affects) || issue.affects.length === 0 || !issue.affects.every(isText) || !isDistinct(issue.affects)) {
+      bad(`${where}.affects is ${describe(issue.affects)}, not a list of the figures the issue bears on`);
+    } else {
+      for (const path of issue.affects) {
+        const problem = unresolvedAffect(files, path);
+        if (problem !== null) bad(`${where} affects ${describe(path)}, which ${problem}`);
+      }
+    }
+    const m = issue.magnitude;
+    if (m !== null && !(isObject(m) && hasExactly(m, KEYS.magnitude) && isCount(m.value) && isCount(m.of) && m.of > 0 &&
+        m.value <= m.of && isText(m.unit))) {
+      bad(`${where}.magnitude is ${describe(m)}, not null or { value, of, unit } with whole counts, value no more than of`);
+    }
+  });
+  for (const [defect, why] of Object.entries(REQUIRED_ISSUES)) {
+    if (!byDefect.has(defect)) bad(`${at} has no ${defect} entry. A comparison-aggregate-only directory carries it: ${why}.`);
+  }
+  if (recount === null) return;
+
+  const ratio = byDefect.get('stored-report-carries-ratio-fields');
+  if (recount.ratioPaths.length > 0 && !ratio) {
+    bad(`${at} has no stored-report-carries-ratio-fields entry, and ${STORED_REPORT} carries ${recount.ratioPaths.join(', ')}. A ` +
+      'ratio in the report is named, so that no reader takes it for a figure of the dataset.');
+  } else if (ratio) {
+    if (Array.isArray(ratio.issue.affects)) {
+      const absent = recount.ratioPaths.filter((path) => !ratio.issue.affects.includes(`${STORED_REPORT}:${path}`));
+      if (absent.length > 0) {
+        bad(`${ratio.where}.affects does not name ${absent.map((path) => `${STORED_REPORT}:${path}`).join(', ')}, a ratio the stored ` +
+          'report carries');
+      }
+    }
+    if (ratio.issue.magnitude !== null) bad(`${ratio.where}.magnitude is ${describe(ratio.issue.magnitude)}. A ratio field is not counted, so it is null.`);
+  }
+
+  // The sizes the contract defines by a count, each counted again from the stored report. Two are the review statement:
+  // no review is in the dataset, so none of the figure's count was reviewed, and the value equals of.
+  const projects = recount.projectCount;
+  const { sourceFindings, dependencyMatches } = recount.figures;
+  const counted = {
+    'source-findings-not-reviewed-by-a-human': { figures: ['sourceFindings'], value: sourceFindings, of: sourceFindings, review: true },
+    'dependency-matches-not-reviewed-by-a-human': { figures: ['dependencyMatches'], value: dependencyMatches, of: dependencyMatches, review: true },
+    'raw-output-of-both-tools-not-stored': { figures: FIGURES, value: projects, of: projects },
+    'project-commits-and-tool-versions-not-recorded': { figures: FIGURES, value: projects, of: projects },
+    'source-findings-carry-no-location': { figures: ['sourceFindings'], value: recount.withoutPath, of: sourceFindings },
+    'dependency-matches-include-the-projects-own-package': { figures: ['dependencyMatches'], value: recount.ownPackage, of: dependencyMatches },
+  };
+  for (const [defect, expected] of Object.entries(counted)) {
+    const entry = byDefect.get(defect);
+    if (!entry) continue;
+    const { issue, where } = entry;
+    if (Array.isArray(issue.affects)) {
+      const absent = expected.figures.filter((key) => !issue.affects.includes(`${COMPARISON_FILE}:figures.${key}`));
+      if (absent.length > 0) {
+        bad(`${where}.affects does not name ${absent.map((key) => `${COMPARISON_FILE}:figures.${key}`).join(', ')}, which the issue ` +
+          'bears on');
+      }
+    }
+    const m = issue.magnitude;
+    if (m === null) {
+      bad(`${where}.magnitude is null. Its size is counted from the stored report: ${expected.value} of ${expected.of}.`);
+      continue;
+    }
+    if (!isObject(m) || !isCount(m.value) || !isCount(m.of)) continue;
+    if (m.of !== expected.of) {
+      bad(`${where}.magnitude.of is ${m.of}, and ${expected.review ? `the figure it names, figures.${expected.figures[0]},` : 'the whole it is counted in'} ` +
+        `is ${expected.of}, counted from the stored report`);
+    }
+    if (expected.review && m.value !== m.of) {
+      bad(`${where}.magnitude.value is ${m.value} of ${m.of}. No review is in the dataset, so none of them was reviewed, and the ` +
+        'value equals of.');
+    } else if (!expected.review && m.value !== expected.value) {
+      bad(`${where}.magnitude.value is ${m.value}; counted from the stored report it is ${expected.value} of ${expected.of}`);
+    }
+  }
+}
+
+/**
+ * The comparison with every earlier comparison directory: each named once,
+ * with whether the two compare. An earlier comparison-aggregate-only directory
+ * records no tool version, so it compares with no run. A census dataset is
+ * never named: a comparison is not a census.
+ */
+function checkComparisonComparability(name, date, list, bad) {
+  const at = 'MANIFEST.json: comparability';
+  if (!Array.isArray(list)) {
+    bad(`${at} is ${describe(list)}, not a list`);
+    return;
+  }
+  const earlier = readdirSync(DATASETS)
+    .filter((d) => isComparisonName(d) && nameForm(d).date < date && lstatSync(join(DATASETS, d)).isDirectory()).sort();
+  const named = new Set();
+  list.forEach((item, index) => {
+    const where = `${at}[${index}]`;
+    if (!closed3(item, KEYS3.comparability, where, bad)) return;
+    if (!earlier.includes(item.dataset)) {
+      bad(`${where} names ${describe(item.dataset)}, which is not a comparison directory of this repository dated before ${date}`);
+      return;
+    }
+    if (named.has(item.dataset)) {
+      bad(`${where} names ${item.dataset} a second time`);
+      return;
+    }
+    named.add(item.dataset);
+    if (item.doi !== null && !isDoi(item.doi)) bad(`${where}.doi is ${describe(item.doi)}, not a DOI or null`);
+    if (typeof item.comparable !== 'boolean') {
+      bad(`${where}.comparable is ${describe(item.comparable)}, not true or false`);
+      return;
+    }
+    if (item.comparable && item.reason !== null) bad(`${where} is comparable and still gives a reason; a comparable directory has reason null`);
+    if (!item.comparable && !isText(item.reason)) bad(`${where} is not comparable, so its reason says why, in text a reader can see`);
+    if (item.comparable) {
+      let kind;
+      try {
+        kind = readFor(join(DATASETS, item.dataset, 'MANIFEST.json'), (m) => (isObject(m) ? m.kind : null));
+      } catch (err) {
+        // Not read for the bound on what is held: listed for this comparison, whose check it stopped.
+        if (err instanceof PastBound) fail(name, printable(err.message));
+        kind = null;
+      }
+      if (kind === 'comparison-aggregate-only') {
+        bad(`${where}: ${item.dataset} is comparison-aggregate-only, which records no tool version, so it is not comparable with ` +
+          'any run, and no difference, ratio or trend may be drawn between the two.');
+      } else if (kind === null) {
+        bad(`${where}: ${item.dataset} has no manifest these rules can read, so whether it is comparable cannot be checked`);
+      }
+    }
+  });
+  for (const dataset of earlier) {
+    if (!named.has(dataset)) {
+      bad(`${at} does not name ${dataset}. Every earlier comparison directory is named, so that a reader holding two of them knows ` +
+        'whether they compare.');
+    }
+  }
+}
+
+/** Whether text names a path whole: followed by nothing that could go on to name a longer directory. */
+function namesPath(text, path) {
+  for (let at = text.indexOf(path); at !== -1; at = text.indexOf(path, at + 1)) {
+    if (!/[A-Za-z0-9_-]/.test(text.charAt(at + path.length))) return true;
+  }
+  return false;
+}
+
+/**
+ * .zenodo.json, the metadata a release of this repository is deposited with,
+ * names what its tag holds: its version is dataset-<d> for a directory d under
+ * datasets/, and its description names datasets/<d> for every directory there,
+ * each whole, so that datasets/2026-03-18 is not read as named inside the name
+ * of a longer directory. Where the file is absent there is nothing to compare.
+ */
+function checkZenodo(directories) {
+  const label = '.zenodo.json';
+  const path = join(ROOT, label);
+  const stat = lstatSync(path, { throwIfNoEntry: false });
+  if (!stat) return;
+  if (!stat.isFile()) {
+    fail(label, 'is not a regular file. A link would keep the text somewhere these checks do not look.');
+    return;
+  }
+  if (stat.size > MAX_FILE_BYTES) {
+    fail(label, `is ${stat.size.toLocaleString('en-US')} bytes, over the ${MAX_FILE_BYTES.toLocaleString('en-US')} a file read here may hold`);
+    return;
+  }
+  let zenodo;
+  try {
+    const text = readStrict(path);
+    if (textNestsDeeperThan(text, MAX_NESTING)) {
+      fail(label, NESTED_PAST_LIMIT);
+      return;
+    }
+    zenodo = JSON.parse(text);
+  } catch (err) {
+    fail(label, `does not parse: ${printable(err.message)}`);
+    return;
+  }
+  if (!isObject(zenodo)) {
+    fail(label, 'is not a JSON object');
+    return;
+  }
+  const version = typeof zenodo.version === 'string' && zenodo.version.startsWith('dataset-') ? zenodo.version.slice('dataset-'.length) : null;
+  if (version === null || !directories.includes(version)) {
+    fail(label, `version is ${describe(zenodo.version)}, which is not dataset-<d> for a directory d under datasets/. A release is ` +
+      'cut for a dataset that is in it.');
+  }
+  if (typeof zenodo.description !== 'string') {
+    fail(label, `description is ${describe(zenodo.description)}, not text`);
+    return;
+  }
+  for (const d of directories) {
+    if (!namesPath(zenodo.description, `datasets/${d}`)) {
+      fail(label, `description does not name datasets/${d}. It names every directory a release holds, so that a reader of the ` +
+        'deposit knows what is in it.');
+    }
+  }
+}
+
 
 
 // ---------------------------------------------------------------------------
@@ -4307,8 +5350,15 @@ function main() {
   }
 
   for (const name of names) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(name)) {
+    // A census dataset is named for its collection date, and a comparison for its date and a suffix of a closed list;
+    // either date is a date of the calendar. Every other name is refused as it always was.
+    const form = nameForm(name);
+    if (form === null) {
       fail(describe(name), 'directory name is not a YYYY-MM-DD collection date');
+      continue;
+    }
+    if (!isCalendarDate(form.date)) {
+      fail(describe(name), `directory name has the form of a ${form.form} directory, and ${form.date} is not a date of the calendar`);
       continue;
     }
     // A check that throws reports where it stopped, and the problems found before it are still listed. What a
@@ -4329,6 +5379,9 @@ function main() {
     }
   }
 
+  // What a release holds is every directory here, so its metadata is checked when every dataset is.
+  if (!requested) checkZenodo(all.filter((d) => nameForm(d) !== null).sort());
+
   const checked = `${names.length} dataset(s)` +
     (errataFiles.length > 0 ? ` and ${errataFiles.length} errata file(s)` : '');
 
@@ -4348,6 +5401,11 @@ function main() {
   process.stdout.write(`${names.length} dataset(s) validated: ${names.map(printable).join(', ')}\n`);
   if (errataFiles.length > 0) {
     process.stdout.write(`${errataFiles.length} errata file(s) validated: ${errataFiles.map(printable).join(', ')}\n`);
+  }
+  // The five figures of each comparison, as counted here from its stored report: one command counts them again.
+  for (const { name, figures } of recounts) {
+    process.stdout.write(`Recounted from datasets/${printable(name)}/${STORED_REPORT}: ` +
+      `${FIGURES.map((key) => `${key} ${figures[key]}`).join(', ')}\n`);
   }
   return 0;
 }
