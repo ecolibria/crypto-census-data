@@ -46,9 +46,13 @@ jobs:
       # hold. An opener that exits non-zero ends the step on its own code
       # before node --test runs; otherwise the step's result is node --test's.
 
-      # The validator's own rules, run against copies in a temporary directory.
+      # The validator's own rules, run against copies in a temporary directory:
+      # the first file shape, and the version 3 rules of a comparison directory
+      # with one defect planted per test. The comparison tests run in this step
+      # and not in a fourth, since check-validator-v2.mjs holds the number of
+      # test steps at three.
       - name: Check the validator
-        run: node scripts/stop-commands.mjs && node --test scripts/check-validator.mjs
+        run: node scripts/stop-commands.mjs && node --test scripts/check-validator.mjs scripts/check-validator-comparison.mjs
 
       # The rules an errata file lives under, in the validator and in the
       # immutability check, run against copies and scratch repositories.
