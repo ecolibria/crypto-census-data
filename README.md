@@ -1,6 +1,6 @@
 # CryptoServe Census — open data
 
-Raw output from the CryptoServe Cryptographic Census: how many packages in each public registry depend on a catalogued cryptographic library, and how those dependencies split across weak, modern and post-quantum tiers. The command below checks every dataset and errata file against the SHA-256 recorded in its manifest (output captured from this repository at ca02a147c279 on 2026-11-18, trimmed).
+Raw output from the CryptoServe Cryptographic Census: how many packages in each public registry depend on a catalogued cryptographic library, and how those dependencies split across weak, modern and post-quantum tiers. The command below checks every dataset file against the SHA-256 recorded in its manifest, and each errata file against the dataset it describes (output captured from this repository at ca02a147c279 on 2026-11-18, trimmed).
 
 ```bash
 git clone https://github.com/ecolibria/crypto-census-data
@@ -21,7 +21,7 @@ Every dataset is dated, hashed, and immutable once published.
 
 The validator's stdout and stderr each open with four lines for the CI runner, inert elsewhere and omitted above: three `::remove-matcher` lines, then `::stop-commands::` and a fresh token. The clone's own progress lines are omitted as well.
 
-Every file is verified against the SHA-256 recorded in its `MANIFEST.json`, so a
+Every dataset file is verified against the SHA-256 recorded in its `MANIFEST.json`, so a
 dataset that was altered in transit or after publication fails rather than
 reading as valid.
 
