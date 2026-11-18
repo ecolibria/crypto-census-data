@@ -1,20 +1,25 @@
 # CryptoServe Census — open data
 
-Raw output from the CryptoServe Cryptographic Census: how many packages in each
-public registry depend on a catalogued cryptographic library, and how those
-dependencies split across weak, modern and post-quantum tiers.
+Raw output from the CryptoServe Cryptographic Census: how many packages in each public registry depend on a catalogued cryptographic library, and how those dependencies split across weak, modern and post-quantum tiers. The command below checks every dataset and errata file against the SHA-256 recorded in its manifest (output captured from this repository at ca02a147c279 on 2026-11-18, trimmed).
 
-Published under CC-BY-4.0. Every dataset is dated, hashed, and immutable once
-published.
+```bash
+git clone https://github.com/ecolibria/crypto-census-data
+cd crypto-census-data
+node scripts/validate-dataset.mjs
+```
 
-```console
-$ git clone https://github.com/ecolibria/crypto-census-data
-$ node scripts/validate-dataset.mjs
+```
 2 dataset(s) validated: 2026-03-18, 2026-08-03
 1 errata file(s) validated: 2026-08-03.json
 ```
 
-The validator's stdout and stderr each open with four lines for the CI runner, inert elsewhere and omitted above: three `::remove-matcher` lines, then `::stop-commands::` and a fresh token.
+[![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](LICENSE)
+
+[Website](https://census.cryptoserve.dev)
+
+Every dataset is dated, hashed, and immutable once published.
+
+The validator's stdout and stderr each open with four lines for the CI runner, inert elsewhere and omitted above: three `::remove-matcher` lines, then `::stop-commands::` and a fresh token. The clone's own progress lines are omitted as well.
 
 Every file is verified against the SHA-256 recorded in its `MANIFEST.json`, so a
 dataset that was altered in transit or after publication fails rather than
